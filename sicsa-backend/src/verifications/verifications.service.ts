@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import axios from 'axios';
 
+import { Patient } from '../patients/entities/patient.entity';
 import { Verification } from './entities/verification.entity';
 
 interface JwtUser {
@@ -15,6 +17,9 @@ export class VerificationsService {
   constructor(
     @InjectRepository(Verification)
     private verificationRepo: Repository<Verification>,
+
+    @InjectRepository(Patient)
+    private patientRepo: Repository<Patient>,
   ) {}
 
   async requestVerification(
@@ -67,7 +72,35 @@ export class VerificationsService {
     verification.motivoRechazo = null;
     verification.adminId = admin.sub;
 
-    return this.verificationRepo.save(verification);
+    const savedVerification = await this.verificationRepo.save(verification);
+
+    const patient = await this.patientRepo.findOne({
+      where: { userId: verification.patientId },
+    });
+
+    if (patient) {
+      try {
+        await axios.post(
+          'http://localhost:5678/webhook/verificacion-aprobada',
+          {
+            nombre: patient.primerNombre,
+            email: patient.email,
+          },
+        );
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.error('Error enviando webhook a n8n:', error.message);
+        } else {
+          console.error('Error enviando webhook a n8n:', error);
+        }
+      }
+    } else {
+      console.warn(
+        `No se encontró paciente con userId ${verification.patientId}`,
+      );
+    }
+
+    return savedVerification;
   }
 
   async reject(id: number, motivoRechazo: string, admin: JwtUser) {

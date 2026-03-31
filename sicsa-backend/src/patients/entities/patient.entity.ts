@@ -2,7 +2,6 @@ import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
 @Entity()
 export class Patient {
-
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -35,5 +34,4 @@ export class Patient {
 
   @Column()
   eps: string;
-
 }
