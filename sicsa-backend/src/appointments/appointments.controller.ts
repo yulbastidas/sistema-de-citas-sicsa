@@ -68,4 +68,10 @@ export class AppointmentsController {
   getQueue(@Query('fecha') fecha: string) {
     return this.appointmentsService.getQueue(fecha);
   }
+
+  @Roles('admin')
+  @Get('tomorrow-reminders')
+  getTomorrowReminders() {
+    return this.appointmentsService.getTomorrowReminders();
+  }
 }

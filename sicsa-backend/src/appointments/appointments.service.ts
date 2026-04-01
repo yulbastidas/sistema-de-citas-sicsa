@@ -90,7 +90,7 @@ export class AppointmentsService {
     if (user.role !== 'admin') {
       const verification = await this.verificationRepo.findOne({
         where: {
-          patientId,
+          patientId: user.sub,
           estado: 'aprobado',
         },
       });
@@ -258,5 +258,50 @@ export class AppointmentsService {
         hora: 'ASC',
       },
     });
+  }
+
+  async getTomorrowReminders() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+
+    const fechaManana = `${year}-${month}-${day}`;
+
+    const appointments = await this.appointmentRepo.find({
+      where: {
+        fecha: fechaManana,
+        estado: 'confirmada',
+      },
+      order: {
+        hora: 'ASC',
+      },
+    });
+
+    const reminders = await Promise.all(
+      appointments.map(async (appointment) => {
+        const patient = await this.patientRepo.findOne({
+          where: { id: appointment.patientId },
+        });
+
+        if (!patient) {
+          return null;
+        }
+
+        return {
+          appointmentId: appointment.id,
+          nombre: `${patient.primerNombre} ${patient.primerApellido}`,
+          email: patient.email,
+          telefono: patient.telefono,
+          fecha: appointment.fecha,
+          hora: appointment.hora,
+          estado: appointment.estado,
+        };
+      }),
+    );
+
+    return reminders.filter((item) => item !== null);
   }
 }
