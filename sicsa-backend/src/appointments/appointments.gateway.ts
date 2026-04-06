@@ -9,14 +9,15 @@ import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: 'http://localhost:3001',
+    credentials: true,
   },
 })
 export class AppointmentsGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   handleConnection(client: Socket) {
     console.log(`Cliente conectado: ${client.id}`);
@@ -26,11 +27,31 @@ export class AppointmentsGateway
     console.log(`Cliente desconectado: ${client.id}`);
   }
 
-  emitAppointmentCreated(data: any) {
+  // ─── Citas ────────────────────────────────────────────
+  emitAppointmentCreated(data: unknown) {
     this.server.emit('appointmentCreated', data);
   }
 
-  emitAppointmentUpdated(data: any) {
+  emitAppointmentUpdated(data: unknown) {
     this.server.emit('appointmentUpdated', data);
+  }
+
+  emitAppointmentCancelled(data: unknown) {
+    this.server.emit('appointmentCancelled', data);
+  }
+
+  emitQueueUpdated(data: unknown) {
+    this.server.emit('queueUpdated', data);
+  }
+
+  // ─── Verificaciones ───────────────────────────────────
+  // ✅ NUEVO: el paciente solicitó verificación → avisa al admin en tiempo real
+  emitVerificationRequested(data: unknown) {
+    this.server.emit('verificationRequested', data);
+  }
+
+  // ✅ NUEVO: admin aprobó o rechazó → avisa al paciente en tiempo real
+  emitVerificationUpdated(data: unknown) {
+    this.server.emit('verificationUpdated', data);
   }
 }

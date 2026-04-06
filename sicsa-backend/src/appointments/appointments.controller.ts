@@ -12,6 +12,7 @@ import { AuthGuard } from '@nestjs/passport';
 
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/appointment.dto';
+import { CreateAdminAppointmentDto } from './dto/create-admin-appointment.dto';
 import { ApproveAppointmentDto } from './dto/approve-appointment.dto';
 import { CancelAppointmentDto } from './dto/cancel-appointment.dto';
 import { Roles } from '../auth/roles.decorator';
@@ -35,6 +36,12 @@ export class AppointmentsController {
   @Post()
   create(@Body() body: CreateAppointmentDto, @Req() req: RequestWithUser) {
     return this.appointmentsService.create(body, req.user);
+  }
+
+  @Roles('admin')
+  @Post('admin-create')
+  createByAdmin(@Body() body: CreateAdminAppointmentDto) {
+    return this.appointmentsService.createByAdmin(body);
   }
 
   @Roles('admin')

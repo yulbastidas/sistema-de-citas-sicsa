@@ -1,16 +1,18 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { HeartPulse, LogIn } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { loginUser } from "@/service/auth";
+import { logout, saveSession } from "@/service/session";
 
-type LoginPageProps = {
-  searchParams?: Promise<{
-    role?: string;
-  }>;
-};
+export default function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const params = await searchParams;
-  const role = params?.role || "patient";
+  const role = searchParams.get("role") || "patient";
 
   const roleLabel =
     role === "doctor"
@@ -18,6 +20,67 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       : role === "admin"
       ? "Administrador"
       : "Paciente";
+
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+  });
+
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!form.email || !form.password) {
+      alert("Completa correo y contraseña");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      logout();
+
+      const result = await loginUser(form.email, form.password);
+
+      if (!result?.access_token) {
+        alert("El backend no devolvió un token válido");
+        return;
+      }
+
+      const savedUser = saveSession(result.access_token);
+
+      if (!savedUser) {
+        alert("Login exitoso, pero no se pudo guardar la sesión");
+        return;
+      }
+
+      if (savedUser.role === "patient") {
+        router.replace("/dashboard/patient");
+      } else if (savedUser.role === "doctor") {
+        router.replace("/dashboard/doctor");
+      } else if (savedUser.role === "admin") {
+        router.replace("/dashboard/admin");
+      } else {
+        router.replace("/");
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("Error al iniciar sesión");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-100 p-4">
@@ -35,15 +98,18 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               Inicia sesión como {roleLabel}
             </p>
 
-            <form className="space-y-6">
+            <form className="space-y-6" onSubmit={handleLogin}>
               <div>
                 <label className="mb-2 block text-lg font-semibold text-slate-800">
                   Correo Electrónico
                 </label>
                 <input
+                  name="email"
                   type="email"
                   placeholder="tu@email.com"
-                  className="w-full rounded-2xl border border-slate-300 px-5 py-4 text-lg outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="input"
+                  value={form.email}
+                  onChange={handleChange}
                 />
               </div>
 
@@ -52,18 +118,22 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   Contraseña
                 </label>
                 <input
+                  name="password"
                   type="password"
                   placeholder="********"
-                  className="w-full rounded-2xl border border-slate-300 px-5 py-4 text-lg outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="input"
+                  value={form.password}
+                  onChange={handleChange}
                 />
               </div>
 
               <button
                 type="submit"
-                className="flex w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 px-6 py-4 text-lg font-semibold text-white transition hover:bg-blue-700"
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 px-6 py-4 text-lg font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 <LogIn size={22} />
-                Iniciar Sesión
+                {loading ? "Ingresando..." : "Iniciar Sesión"}
               </button>
             </form>
 
@@ -97,6 +167,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             src="/hospital.jpg"
             alt="Hospital"
             fill
+            sizes="50vw"
             className="object-cover"
           />
           <div className="absolute inset-0 bg-blue-900/35" />

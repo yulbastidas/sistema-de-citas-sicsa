@@ -1,12 +1,16 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import axios from 'axios';
 
 import { Appointment } from './entities/appointment.entity';
-import { Verification } from '../verifications/entities/verification.entity';
 import { Patient } from '../patients/entities/patient.entity';
 import { CreateAppointmentDto } from './dto/appointment.dto';
+import { CreateAdminAppointmentDto } from './dto/create-admin-appointment.dto';
 import { AppointmentsGateway } from './appointments.gateway';
 
 interface JwtUser {
@@ -15,11 +19,23 @@ interface JwtUser {
   role: string;
 }
 
-interface IAResponse {
+type PriorityResult = {
   prioridad: string;
-  score: number;
-  explicacion: string;
-}
+  scorePrioridad: number;
+  explicacionPrioridad: string;
+};
+
+type PatientSummary = {
+  documento: string;
+  nombre: string;
+  telefono: string;
+  email: string;
+  eps: string;
+};
+
+export type AppointmentWithPatient = Appointment & {
+  patient: PatientSummary | null;
+};
 
 @Injectable()
 export class AppointmentsService {
@@ -27,110 +43,24 @@ export class AppointmentsService {
     @InjectRepository(Appointment)
     private appointmentRepo: Repository<Appointment>,
 
-    @InjectRepository(Verification)
-    private verificationRepo: Repository<Verification>,
-
     @InjectRepository(Patient)
     private patientRepo: Repository<Patient>,
 
     private appointmentsGateway: AppointmentsGateway,
   ) {}
 
-  private async getPatientByUser(user: JwtUser): Promise<Patient> {
-    const patient = await this.patientRepo.findOne({
-      where: { userId: user.sub },
-    });
+  async create(
+    data: CreateAppointmentDto,
+    user: JwtUser,
+  ): Promise<AppointmentWithPatient> {
+    await this.validateAvailableSlot(data.fecha, data.hora);
 
-    if (!patient) {
-      throw new BadRequestException('Paciente no encontrado');
-    }
+    const prioridadData = await this.getPrioridad(data);
 
-    return patient;
-  }
-
-  private async notifyN8n(appointment: Appointment): Promise<void> {
-    try {
-      const patient = await this.patientRepo.findOne({
-        where: { id: appointment.patientId },
-      });
-
-      if (!patient) {
-        throw new BadRequestException(
-          'Paciente no encontrado para enviar a n8n',
-        );
-      }
-
-      if (!patient.email || patient.email.trim() === '') {
-        throw new BadRequestException('El paciente no tiene email válido');
-      }
-
-      const nombre = `${patient.primerNombre} ${patient.primerApellido}`;
-      const email = patient.email.trim();
-
-      await axios.post('http://localhost:5678/webhook/cita-creada', {
-        nombre,
-        email,
-        fecha: appointment.fecha,
-        hora: appointment.hora,
-        estado: appointment.estado,
-      });
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error('Error enviando cita a n8n:', error.message);
-      } else {
-        console.error('Error enviando cita a n8n:', 'Error desconocido');
-      }
-    }
-  }
-
-  async create(data: CreateAppointmentDto, user: JwtUser) {
-    const patient = await this.getPatientByUser(user);
-    const patientId = patient.id;
-
-    if (user.role !== 'admin') {
-      const verification = await this.verificationRepo.findOne({
-        where: {
-          patientId: user.sub,
-          estado: 'aprobado',
-        },
-      });
-
-      if (!verification) {
-        throw new BadRequestException('No está verificado');
-      }
-    }
-
-    const existingAppointment = await this.appointmentRepo.findOne({
-      where: {
-        fecha: data.fecha,
-        hora: data.hora,
-        estado: Not('cancelada'),
-      },
-    });
-
-    if (existingAppointment) {
-      throw new BadRequestException('Esta hora ya está ocupada');
-    }
-
-    const iaResponse = await axios.post<IAResponse>(
-      'http://localhost:8000/prioridad',
-      {
-        motivoConsulta: data.motivoConsulta,
-        edad: data.edad,
-        embarazada: data.embarazada ?? false,
-        discapacidad: data.discapacidad ?? false,
-        dolorIntenso: data.dolorIntenso ?? false,
-        sangrado: data.sangrado ?? false,
-        dificultadRespiratoria: data.dificultadRespiratoria ?? false,
-        fiebre: data.fiebre ?? false,
-      },
-    );
-
-    const appointment = this.appointmentRepo.create({
-      patientId,
+    const appointmentData: Partial<Appointment> = {
+      patientId: user.sub,
       fecha: data.fecha,
       hora: data.hora,
-      estado: 'pendiente',
       motivoConsulta: data.motivoConsulta,
       edad: data.edad,
       embarazada: data.embarazada ?? false,
@@ -139,169 +69,294 @@ export class AppointmentsService {
       sangrado: data.sangrado ?? false,
       dificultadRespiratoria: data.dificultadRespiratoria ?? false,
       fiebre: data.fiebre ?? false,
-      prioridad: iaResponse.data.prioridad,
-      scorePrioridad: iaResponse.data.score,
-      explicacionPrioridad: iaResponse.data.explicacion,
+      estado: 'pendiente',
+      prioridad: prioridadData.prioridad,
+      scorePrioridad: prioridadData.scorePrioridad,
+      explicacionPrioridad: prioridadData.explicacionPrioridad,
+    };
+
+    const appointment = this.appointmentRepo.create(appointmentData);
+    const saved = await this.appointmentRepo.save(appointment);
+    const result = await this.attachPatientData(saved);
+
+    this.appointmentsGateway.emitAppointmentCreated(result);
+    this.appointmentsGateway.emitQueueUpdated({
+      fecha: saved.fecha,
+      message: 'Cola actualizada',
     });
 
-    const savedAppointment = await this.appointmentRepo.save(appointment);
-
-    this.appointmentsGateway.emitAppointmentCreated({
-      message: 'Nueva cita creada',
-      appointment: savedAppointment,
-    });
-
-    return savedAppointment;
+    return result;
   }
 
-  findAll() {
-    return this.appointmentRepo.find();
-  }
-
-  async getByUser(userId: number) {
+  async createByAdmin(
+    data: CreateAdminAppointmentDto,
+  ): Promise<AppointmentWithPatient> {
     const patient = await this.patientRepo.findOne({
-      where: { userId },
+      where: { numeroDocumento: data.documento },
     });
 
     if (!patient) {
-      throw new BadRequestException('Paciente no encontrado');
+      throw new NotFoundException('Paciente no encontrado');
     }
 
-    return this.appointmentRepo.find({
-      where: { patientId: patient.id },
+    await this.validateAvailableSlot(data.fecha, data.hora);
+
+    const prioridadData = await this.getPrioridad(data);
+
+    const appointmentData: Partial<Appointment> = {
+      patientId: patient.userId,
+      fecha: data.fecha,
+      hora: data.hora,
+      motivoConsulta: data.motivoConsulta,
+      edad: data.edad,
+      embarazada: data.embarazada ?? false,
+      discapacidad: data.discapacidad ?? false,
+      dolorIntenso: data.dolorIntenso ?? false,
+      sangrado: data.sangrado ?? false,
+      dificultadRespiratoria: data.dificultadRespiratoria ?? false,
+      fiebre: data.fiebre ?? false,
+      estado: 'pendiente',
+      prioridad: prioridadData.prioridad,
+      scorePrioridad: prioridadData.scorePrioridad,
+      explicacionPrioridad: prioridadData.explicacionPrioridad,
+    };
+
+    const appointment = this.appointmentRepo.create(appointmentData);
+    const saved = await this.appointmentRepo.save(appointment);
+    const result = await this.attachPatientData(saved);
+
+    this.appointmentsGateway.emitAppointmentCreated(result);
+    this.appointmentsGateway.emitQueueUpdated({
+      fecha: saved.fecha,
+      message: 'Cola actualizada',
     });
+
+    return result;
   }
 
-  async approve(id: number) {
+  async findAll(): Promise<AppointmentWithPatient[]> {
+    const appointments = await this.appointmentRepo.find({
+      order: {
+        fecha: 'ASC',
+        hora: 'ASC',
+      },
+    });
+
+    return Promise.all(
+      appointments.map((appointment) => this.attachPatientData(appointment)),
+    );
+  }
+
+  async getByUser(userId: number): Promise<AppointmentWithPatient[]> {
+    const appointments = await this.appointmentRepo.find({
+      where: { patientId: userId },
+      order: {
+        fecha: 'DESC',
+        hora: 'DESC',
+      },
+    });
+
+    return Promise.all(
+      appointments.map((appointment) => this.attachPatientData(appointment)),
+    );
+  }
+
+  async approve(id: number): Promise<AppointmentWithPatient> {
     const appointment = await this.appointmentRepo.findOne({
       where: { id },
     });
 
     if (!appointment) {
-      throw new BadRequestException('Cita no encontrada');
+      throw new NotFoundException('Cita no encontrada');
     }
 
     appointment.estado = 'confirmada';
 
-    const updatedAppointment = await this.appointmentRepo.save(appointment);
+    const saved = await this.appointmentRepo.save(appointment);
+    const result = await this.attachPatientData(saved);
 
-    await this.notifyN8n(updatedAppointment);
-
-    this.appointmentsGateway.emitAppointmentUpdated({
-      message: 'Cita aprobada',
-      appointment: updatedAppointment,
+    this.appointmentsGateway.emitAppointmentUpdated(result);
+    this.appointmentsGateway.emitQueueUpdated({
+      fecha: saved.fecha,
+      message: 'Cola actualizada',
     });
 
-    return updatedAppointment;
+    return result;
   }
 
-  async cancel(id: number, user: JwtUser) {
+  async cancel(id: number, user: JwtUser): Promise<AppointmentWithPatient> {
     const appointment = await this.appointmentRepo.findOne({
       where: { id },
     });
 
     if (!appointment) {
-      throw new BadRequestException('Cita no encontrada');
+      throw new NotFoundException('Cita no encontrada');
     }
 
-    if (user.role !== 'admin') {
-      const patient = await this.getPatientByUser(user);
-
-      if (appointment.patientId !== patient.id) {
-        throw new BadRequestException('No autorizado');
-      }
+    if (user.role !== 'admin' && appointment.patientId !== user.sub) {
+      throw new BadRequestException('No puedes cancelar esta cita');
     }
 
     appointment.estado = 'cancelada';
 
-    const updatedAppointment = await this.appointmentRepo.save(appointment);
+    const saved = await this.appointmentRepo.save(appointment);
+    const result = await this.attachPatientData(saved);
 
-    this.appointmentsGateway.emitAppointmentUpdated({
-      message: 'Cita cancelada',
-      appointment: updatedAppointment,
+    this.appointmentsGateway.emitAppointmentCancelled(result);
+    this.appointmentsGateway.emitQueueUpdated({
+      fecha: saved.fecha,
+      message: 'Cola actualizada',
     });
 
-    return updatedAppointment;
+    return result;
   }
 
-  async getAvailable(fecha: string) {
-    const horariosBase = [
+  async getAvailable(fecha: string): Promise<string[]> {
+    const allHours = [
+      '07:00',
+      '07:20',
+      '07:40',
       '08:00',
+      '08:20',
+      '08:40',
       '09:00',
+      '09:20',
+      '09:40',
       '10:00',
+      '10:20',
+      '10:40',
       '11:00',
+      '11:20',
+      '11:40',
       '14:00',
+      '14:20',
+      '14:40',
       '15:00',
+      '15:20',
+      '15:40',
       '16:00',
+      '16:20',
+      '16:40',
+      '17:00',
+      '17:20',
+      '17:40',
     ];
 
-    const ocupadas = await this.appointmentRepo.find({
+    const appointments = await this.appointmentRepo.find({
       where: {
         fecha,
         estado: Not('cancelada'),
       },
     });
 
-    const horasOcupadas = ocupadas.map((cita) => cita.hora);
+    const occupiedHours = appointments.map((appointment) => appointment.hora);
 
-    return horariosBase.filter((hora) => !horasOcupadas.includes(hora));
+    return allHours.filter((hour) => !occupiedHours.includes(hour));
   }
 
-  async getQueue(fecha: string) {
-    return this.appointmentRepo.find({
+  async getQueue(fecha: string): Promise<AppointmentWithPatient[]> {
+    const appointments = await this.appointmentRepo.find({
       where: {
         fecha,
-        estado: 'confirmada',
+        estado: Not('cancelada'),
       },
       order: {
-        prioridad: 'DESC',
+        scorePrioridad: 'DESC',
         hora: 'ASC',
       },
     });
+
+    return Promise.all(
+      appointments.map((appointment) => this.attachPatientData(appointment)),
+    );
   }
 
-  async getTomorrowReminders() {
+  async getTomorrowReminders(): Promise<AppointmentWithPatient[]> {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const year = tomorrow.getFullYear();
-    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
-    const day = String(tomorrow.getDate()).padStart(2, '0');
-
-    const fechaManana = `${year}-${month}-${day}`;
+    const fecha = tomorrow.toISOString().split('T')[0];
 
     const appointments = await this.appointmentRepo.find({
       where: {
-        fecha: fechaManana,
-        estado: 'confirmada',
-      },
-      order: {
-        hora: 'ASC',
+        fecha,
+        estado: Not('cancelada'),
       },
     });
 
-    const reminders = await Promise.all(
-      appointments.map(async (appointment) => {
-        const patient = await this.patientRepo.findOne({
-          where: { id: appointment.patientId },
-        });
-
-        if (!patient) {
-          return null;
-        }
-
-        return {
-          appointmentId: appointment.id,
-          nombre: `${patient.primerNombre} ${patient.primerApellido}`,
-          email: patient.email,
-          telefono: patient.telefono,
-          fecha: appointment.fecha,
-          hora: appointment.hora,
-          estado: appointment.estado,
-        };
-      }),
+    return Promise.all(
+      appointments.map((appointment) => this.attachPatientData(appointment)),
     );
+  }
 
-    return reminders.filter((item) => item !== null);
+  private async validateAvailableSlot(
+    fecha: string,
+    hora: string,
+  ): Promise<void> {
+    const existingAppointment = await this.appointmentRepo.findOne({
+      where: {
+        fecha,
+        hora,
+        estado: Not('cancelada'),
+      },
+    });
+
+    if (existingAppointment) {
+      throw new BadRequestException('Ese horario ya está ocupado');
+    }
+  }
+
+  private async getPrioridad(
+    data: CreateAppointmentDto | CreateAdminAppointmentDto,
+  ): Promise<PriorityResult> {
+    try {
+      const response = await axios.post<{
+        prioridad?: string;
+        score?: number;
+        explicacion?: string;
+      }>('http://localhost:8000/prioridad', {
+        motivoConsulta: data.motivoConsulta,
+        edad: data.edad ?? 0,
+        embarazada: data.embarazada ?? false,
+        discapacidad: data.discapacidad ?? false,
+        dolorIntenso: data.dolorIntenso ?? false,
+        sangrado: data.sangrado ?? false,
+        dificultadRespiratoria: data.dificultadRespiratoria ?? false,
+        fiebre: data.fiebre ?? false,
+      });
+
+      return {
+        prioridad: response.data.prioridad ?? 'baja',
+        scorePrioridad: response.data.score ?? 0,
+        explicacionPrioridad: response.data.explicacion ?? '',
+      };
+    } catch {
+      return {
+        prioridad: 'baja',
+        scorePrioridad: 0,
+        explicacionPrioridad: '',
+      };
+    }
+  }
+
+  private async attachPatientData(
+    appointment: Appointment,
+  ): Promise<AppointmentWithPatient> {
+    const patient = await this.patientRepo.findOne({
+      where: { userId: appointment.patientId },
+    });
+
+    return {
+      ...appointment,
+      patient: patient
+        ? {
+            documento: patient.numeroDocumento,
+            nombre: `${patient.primerNombre} ${patient.primerApellido}`,
+            telefono: patient.telefono,
+            email: patient.email,
+            eps: patient.eps,
+          }
+        : null,
+    };
   }
 }

@@ -9,6 +9,13 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
+  private normalizeRole(role: string | number): string {
+    if (role === 1 || role === '1') return 'admin';
+    if (role === 2 || role === '2') return 'patient';
+    if (role === 3 || role === '3') return 'doctor';
+    return String(role);
+  }
+
   async login(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
 
@@ -20,11 +27,12 @@ export class AuthService {
       throw new UnauthorizedException('Contraseña incorrecta');
     }
 
-    // 🔥 payload del token
+    const normalizedRole = this.normalizeRole(user.role);
+
     const payload = {
       sub: user.id,
       email: user.email,
-      role: user.role,
+      role: normalizedRole,
     };
 
     return {

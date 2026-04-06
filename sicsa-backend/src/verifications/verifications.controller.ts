@@ -21,7 +21,6 @@ type RequestWithUser = Request & {
 export class VerificationsController {
   constructor(private readonly verificationsService: VerificationsService) {}
 
-  // Paciente o admin: solicitar verificación
   @Post('request')
   requestVerification(
     @Body()
@@ -34,21 +33,28 @@ export class VerificationsController {
     return this.verificationsService.requestVerification(body, req.user);
   }
 
-  // Solo admin: listar solicitudes
+  @Get('me')
+  getMyVerification(@Req() req: RequestWithUser) {
+    return this.verificationsService.getByPatient(req.user.sub);
+  }
+
+  @Post('expire-my')
+  expireMyVerification(@Req() req: RequestWithUser) {
+    return this.verificationsService.expireMyVerification(req.user.sub);
+  }
+
   @Roles('admin')
   @Get()
   findAll() {
     return this.verificationsService.findAll();
   }
 
-  // Solo admin: aprobar
   @Roles('admin')
   @Post('approve')
   approve(@Body() body: { id: number }, @Req() req: RequestWithUser) {
     return this.verificationsService.approve(body.id, req.user);
   }
 
-  // Solo admin: rechazar
   @Roles('admin')
   @Post('reject')
   reject(
