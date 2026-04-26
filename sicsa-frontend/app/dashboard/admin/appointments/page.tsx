@@ -1,18 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { CheckCircle2, PlusCircle, ShieldCheck, XCircle } from "lucide-react";
+import {
+  Activity,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  FilePlus2,
+  Search,
+  SlidersHorizontal,
+  XCircle,
+} from "lucide-react";
 import { io, Socket } from "socket.io-client";
-import { getToken, getUser } from "@/service/session";
 import {
   adminCreateAppointment,
   approveAppointment,
   cancelAppointment,
   getAllAppointments,
+  getAppointmentClasses,
   getAvailableAppointments,
+  getEpsCatalog,
   getQueueAppointments,
 } from "@/service/appointment";
+import { getToken, getUser } from "@/service/session";
+import { getSpecialties } from "@/service/specialty";
 import AdminSidebar from "@/app/components/AdminSidebar";
 
 type SessionUser = {
@@ -38,6 +49,10 @@ type AppointmentItem = {
   prioridad?: string | number;
   scorePrioridad?: number;
   patient?: PatientInfo;
+  observaciones?: string;
+  municipio?: string;
+  departamento?: string;
+  eps?: string;
 };
 
 type QueueItem = {
@@ -51,12 +66,34 @@ type QueueItem = {
   patient?: PatientInfo;
 };
 
+type SpecialtyItem = {
+  id: number;
+  nombre?: string;
+};
+
+type EpsItem = {
+  id: number;
+  nombre?: string;
+};
+
+type AppointmentClassItem = {
+  id: number;
+  nombre?: string;
+};
+
 type AdminAppointmentForm = {
   documento: string;
+  specialtyId: string;
   fecha: string;
   hora: string;
   motivoConsulta: string;
   edad: string;
+  eps: string;
+  epsId: string;
+  departamento: string;
+  municipio: string;
+  appointmentClassId: string;
+  observaciones: string;
   embarazada: boolean;
   discapacidad: boolean;
   dolorIntenso: boolean;
@@ -69,30 +106,44 @@ const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 export default function AdminAppointmentsPage() {
-  const router = useRouter();
   const socketRef = useRef<Socket | null>(null);
 
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingQueue, setLoadingQueue] = useState(false);
   const [loadingHours, setLoadingHours] = useState(false);
+  const [loadingCatalogs, setLoadingCatalogs] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [availableHours, setAvailableHours] = useState<string[]>([]);
+  const [specialties, setSpecialties] = useState<SpecialtyItem[]>([]);
+  const [epsList, setEpsList] = useState<EpsItem[]>([]);
+  const [appointmentClasses, setAppointmentClasses] = useState<
+    AppointmentClassItem[]
+  >([]);
 
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [statusFilter, setStatusFilter] = useState("todos");
+  const [dateFilter, setDateFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [form, setForm] = useState<AdminAppointmentForm>({
     documento: "",
+    specialtyId: "",
     fecha: "",
     hora: "",
     motivoConsulta: "",
     edad: "",
+    eps: "",
+    epsId: "",
+    departamento: "Nariño",
+    municipio: "",
+    appointmentClassId: "",
+    observaciones: "",
     embarazada: false,
     discapacidad: false,
     dolorIntenso: false,
@@ -106,7 +157,7 @@ export default function AdminAppointmentsPage() {
     const user = getUser() as SessionUser | null;
 
     if (!token || !user) {
-      router.replace("/login?role=admin");
+      window.location.replace("/login?role=admin");
       return;
     }
 
@@ -114,12 +165,12 @@ export default function AdminAppointmentsPage() {
       user.role === "admin" || user.role === 1 || user.role === "1";
 
     if (!isAdmin) {
-      router.replace("/login?role=admin");
+      window.location.replace("/login?role=admin");
       return;
     }
 
     setCheckingAuth(false);
-  }, [router]);
+  }, []);
 
   const loadAppointments = async () => {
     const token = getToken();
@@ -128,7 +179,7 @@ export default function AdminAppointmentsPage() {
     try {
       setLoading(true);
       const result = await getAllAppointments(token);
-      const items = Array.isArray(result) ? result : result.data || [];
+      const items = Array.isArray(result) ? result : result?.data || [];
       setAppointments(items);
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -148,7 +199,7 @@ export default function AdminAppointmentsPage() {
     try {
       setLoadingQueue(true);
       const result = await getQueueAppointments(token, fecha);
-      const items = Array.isArray(result) ? result : result.data || [];
+      const items = Array.isArray(result) ? result : result?.data || [];
       setQueueItems(items);
     } catch (error: unknown) {
       setQueueItems([]);
@@ -172,7 +223,7 @@ export default function AdminAppointmentsPage() {
     try {
       setLoadingHours(true);
       const result = await getAvailableAppointments(token, fecha);
-      const hours = Array.isArray(result) ? result : result.data || [];
+      const hours = Array.isArray(result) ? result : result?.data || [];
       setAvailableHours(hours);
     } catch (error: unknown) {
       setAvailableHours([]);
@@ -186,10 +237,53 @@ export default function AdminAppointmentsPage() {
     }
   };
 
+  const loadCatalogs = async () => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      setLoadingCatalogs(true);
+
+      const [specialtiesResult, epsResult, classesResult] = await Promise.all([
+        getSpecialties(token),
+        getEpsCatalog(),
+        getAppointmentClasses(),
+      ]);
+
+      setSpecialties(
+        Array.isArray(specialtiesResult)
+          ? specialtiesResult
+          : specialtiesResult?.data || [],
+      );
+
+      setEpsList(
+        Array.isArray(epsResult) ? epsResult : epsResult?.data || [],
+      );
+
+      setAppointmentClasses(
+        Array.isArray(classesResult)
+          ? classesResult
+          : classesResult?.data || [],
+      );
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("Error al cargar catálogos");
+      }
+      setSpecialties([]);
+      setEpsList([]);
+      setAppointmentClasses([]);
+    } finally {
+      setLoadingCatalogs(false);
+    }
+  };
+
   useEffect(() => {
     if (checkingAuth) return;
     void loadAppointments();
     void loadQueue(selectedDate);
+    void loadCatalogs();
   }, [checkingAuth, selectedDate]);
 
   useEffect(() => {
@@ -202,7 +296,6 @@ export default function AdminAppointmentsPage() {
     void loadAvailableHours(form.fecha);
   }, [form.fecha]);
 
-  // respaldo suave para que no dependa solo del socket
   useEffect(() => {
     if (checkingAuth) return;
 
@@ -232,14 +325,6 @@ export default function AdminAppointmentsPage() {
       console.log("Socket admin-citas conectado:", socket.id);
     });
 
-    socket.on("verificationRequested", () => {
-      console.log("Nueva verificación pendiente recibida");
-    });
-
-    socket.on("verificationUpdated", () => {
-      console.log("Verificación actualizada");
-    });
-
     socket.on("appointmentCreated", () => {
       void loadAppointments();
       void loadQueue(selectedDate);
@@ -258,21 +343,10 @@ export default function AdminAppointmentsPage() {
       if (form.fecha) void loadAvailableHours(form.fecha);
     });
 
-    socket.on("queueUpdated", (payload?: { fecha?: string }) => {
+    socket.on("queueUpdated", () => {
       void loadAppointments();
-
-      if (payload?.fecha) {
-        if (payload.fecha === selectedDate) {
-          void loadQueue(selectedDate);
-        }
-
-        if (form.fecha && payload.fecha === form.fecha) {
-          void loadAvailableHours(form.fecha);
-        }
-      } else {
-        void loadQueue(selectedDate);
-        if (form.fecha) void loadAvailableHours(form.fecha);
-      }
+      void loadQueue(selectedDate);
+      if (form.fecha) void loadAvailableHours(form.fecha);
     });
 
     socket.on("disconnect", () => {
@@ -281,8 +355,6 @@ export default function AdminAppointmentsPage() {
 
     return () => {
       socket.off("connect");
-      socket.off("verificationRequested");
-      socket.off("verificationUpdated");
       socket.off("appointmentCreated");
       socket.off("appointmentUpdated");
       socket.off("appointmentCancelled");
@@ -296,9 +368,21 @@ export default function AdminAppointmentsPage() {
   const handleTextChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
+
+    if (name === "epsId") {
+      const selectedEps = epsList.find((item) => String(item.id) === value);
+
+      setForm((prev) => ({
+        ...prev,
+        epsId: value,
+        eps: selectedEps?.nombre || "",
+      }));
+      return;
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -352,15 +436,29 @@ export default function AdminAppointmentsPage() {
     const token = getToken();
     if (!token) return;
 
-    if (!form.documento || !form.fecha || !form.hora || !form.motivoConsulta) {
-      alert("Completa documento, fecha, hora y motivo de consulta");
+    if (
+      !form.documento ||
+      !form.specialtyId ||
+      !form.fecha ||
+      !form.hora ||
+      !form.motivoConsulta ||
+      !form.epsId ||
+      !form.departamento ||
+      !form.municipio ||
+      !form.appointmentClassId
+    ) {
+      alert(
+        "Completa documento, especialidad, fecha, hora, EPS, municipio, departamento y clase de cita",
+      );
       return;
     }
 
     try {
       setSaving(true);
+
       await adminCreateAppointment(token, {
         documento: form.documento,
+        specialtyId: Number(form.specialtyId),
         fecha: form.fecha,
         hora: form.hora,
         motivoConsulta: form.motivoConsulta,
@@ -371,15 +469,31 @@ export default function AdminAppointmentsPage() {
         sangrado: form.sangrado,
         dificultadRespiratoria: form.dificultadRespiratoria,
         fiebre: form.fiebre,
+        eps: form.eps,
+        epsId: form.epsId ? Number(form.epsId) : undefined,
+        departamento: form.departamento,
+        municipio: form.municipio,
+        appointmentClassId: form.appointmentClassId
+          ? Number(form.appointmentClassId)
+          : undefined,
+        observaciones: form.observaciones,
       });
 
       alert("Cita creada correctamente");
+
       setForm({
         documento: "",
+        specialtyId: "",
         fecha: "",
         hora: "",
         motivoConsulta: "",
         edad: "",
+        eps: "",
+        epsId: "",
+        departamento: "Nariño",
+        municipio: "",
+        appointmentClassId: "",
+        observaciones: "",
         embarazada: false,
         discapacidad: false,
         dolorIntenso: false,
@@ -403,31 +517,98 @@ export default function AdminAppointmentsPage() {
   };
 
   const filteredAppointments = useMemo(() => {
-    if (statusFilter === "todos") return appointments;
-    return appointments.filter(
-      (item) =>
-        (item.estado || "").toLowerCase() === statusFilter.toLowerCase()
-    );
-  }, [appointments, statusFilter]);
+    const normalizedSearch = searchTerm.trim().toLowerCase();
 
-  const getPriorityTextClass = (priority: string | number | undefined) => {
+    return appointments.filter((item) => {
+      const matchStatus =
+        statusFilter === "todos"
+          ? true
+          : (item.estado || "").toLowerCase() === statusFilter.toLowerCase();
+
+      const matchDate = dateFilter ? (item.fecha || "") === dateFilter : true;
+
+      const searchableText = [
+        item.patient?.nombre || "",
+        item.patient?.documento || "",
+        item.patient?.email || "",
+        item.patient?.telefono || "",
+        item.patient?.eps || "",
+        item.eps || "",
+        item.municipio || "",
+        item.departamento || "",
+        item.motivoConsulta || "",
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      const matchSearch = normalizedSearch
+        ? searchableText.includes(normalizedSearch)
+        : true;
+
+      return matchStatus && matchDate && matchSearch;
+    });
+  }, [appointments, statusFilter, dateFilter, searchTerm]);
+
+  const getPriorityBadgeClass = (priority: string | number | undefined) => {
     const value = String(priority || "").toLowerCase();
-    if (value.includes("alta") || value === "3") return "text-red-700";
-    if (value.includes("media") || value === "2") return "text-amber-700";
-    if (value.includes("baja") || value === "1") return "text-emerald-700";
-    return "text-slate-700";
+
+    if (value.includes("alta") || value === "3") {
+      return "border border-red-200 bg-red-50 text-red-700";
+    }
+
+    if (value.includes("media") || value === "2") {
+      return "border border-amber-200 bg-amber-50 text-amber-700";
+    }
+
+    if (value.includes("baja") || value === "1") {
+      return "border border-emerald-200 bg-emerald-50 text-emerald-700";
+    }
+
+    return "border border-slate-200 bg-slate-50 text-slate-700";
   };
 
-  const getStatusTextClass = (status: string | undefined) => {
+  const getStatusBadgeClass = (status: string | undefined) => {
     const value = (status || "").toLowerCase();
-    if (value === "aprobada" || value === "confirmada")
-      return "text-emerald-700";
-    if (value === "pendiente") return "text-amber-700";
-    if (value === "cancelada") return "text-red-700";
-    return "text-slate-700";
+
+    if (value === "confirmada" || value === "aprobada") {
+      return "border border-emerald-200 bg-emerald-50 text-emerald-700";
+    }
+
+    if (value === "pendiente") {
+      return "border border-amber-200 bg-amber-50 text-amber-700";
+    }
+
+    if (value === "cancelada") {
+      return "border border-red-200 bg-red-50 text-red-700";
+    }
+
+    if (value === "atendida") {
+      return "border border-blue-200 bg-blue-50 text-blue-700";
+    }
+
+    return "border border-slate-200 bg-slate-50 text-slate-700";
   };
 
   const today = new Date().toISOString().split("T")[0];
+
+  const pendingCount = useMemo(() => {
+    return appointments.filter(
+      (item) => (item.estado || "").toLowerCase() === "pendiente",
+    ).length;
+  }, [appointments]);
+
+  const confirmedCount = useMemo(() => {
+    return appointments.filter((item) =>
+      ["confirmada", "aprobada"].includes((item.estado || "").toLowerCase()),
+    ).length;
+  }, [appointments]);
+
+  const highPriorityCount = useMemo(() => {
+    return queueItems.filter((item) => {
+      const value = String(item.prioridad || "").toLowerCase();
+      return value.includes("alta") || value === "3";
+    }).length;
+  }, [queueItems]);
 
   if (checkingAuth) {
     return (
@@ -442,32 +623,65 @@ export default function AdminAppointmentsPage() {
       <AdminSidebar />
 
       <section className="flex-1 px-6 py-8">
-        <header className="border border-slate-200 bg-white px-6 py-6 shadow-sm">
-          <section className="flex items-center gap-3">
-            <ShieldCheck className="text-slate-700" size={24} />
-            <article>
-              <h1 className="text-3xl font-bold text-slate-900">
-                Gestión de citas
-              </h1>
-              <p className="mt-1 text-sm text-slate-600">
-                Agenda clínica, registro manual y control de citas
-              </p>
+        <header className="rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-blue-900 px-8 py-8 text-white shadow-xl">
+          <section className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+            <article className="flex items-start gap-4">
+              <figure className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 backdrop-blur">
+                <ClipboardList className="text-white" size={30} />
+              </figure>
+
+              <section>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-100">
+                  Panel administrativo
+                </p>
+                <h1 className="mt-2 text-4xl font-bold tracking-tight">
+                  Gestión integral de citas
+                </h1>
+                <p className="mt-2 max-w-3xl text-slate-200">
+                  Controla la agenda clínica, registra citas manuales, revisa la
+                  cola priorizada y administra el estado operativo del servicio.
+                </p>
+              </section>
             </article>
+
+            <section className="grid gap-3 sm:grid-cols-3">
+              <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
+                <p className="text-sm text-slate-200">Pendientes</p>
+                <p className="mt-1 text-2xl font-bold">{pendingCount}</p>
+              </article>
+
+              <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
+                <p className="text-sm text-slate-200">Confirmadas</p>
+                <p className="mt-1 text-2xl font-bold">{confirmedCount}</p>
+              </article>
+
+              <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
+                <p className="text-sm text-slate-200">Prioridad alta</p>
+                <p className="mt-1 text-2xl font-bold">{highPriorityCount}</p>
+              </article>
+            </section>
           </section>
         </header>
 
-        <section className="mt-6 grid gap-6 xl:grid-cols-[420px_1fr]">
-          <section className="border border-slate-200 bg-white p-6 shadow-sm">
-            <header className="mb-5 flex items-center gap-2">
-              <PlusCircle className="text-slate-700" size={20} />
-              <h2 className="text-lg font-semibold text-slate-900">
-                Registro manual de cita
-              </h2>
+        <section className="mt-6 grid gap-6 xl:grid-cols-[460px_1fr]">
+          <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+            <header className="mb-6 flex items-center gap-3">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
+                <FilePlus2 className="text-slate-700" size={22} />
+              </span>
+              <section>
+                <h2 className="text-2xl font-semibold text-slate-900">
+                  Registro manual de cita
+                </h2>
+                <p className="mt-1 text-slate-600">
+                  Completa la información clínica y administrativa.
+                </p>
+              </section>
             </header>
 
             <section className="space-y-4">
               <article>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Documento del paciente
                 </label>
                 <input
@@ -475,50 +689,166 @@ export default function AdminAppointmentsPage() {
                   value={form.documento}
                   onChange={handleTextChange}
                   placeholder="Número de documento"
-                  className="w-full border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                  className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
                 />
               </article>
 
-              <article>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Fecha
-                </label>
-                <input
-                  type="date"
-                  name="fecha"
-                  min={today}
-                  value={form.fecha}
-                  onChange={handleTextChange}
-                  className="w-full border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
-                />
-              </article>
-
-              <article>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Hora disponible
-                </label>
-                <select
-                  name="hora"
-                  value={form.hora}
-                  onChange={handleTextChange}
-                  disabled={!form.fecha || loadingHours}
-                  className="w-full border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 disabled:bg-slate-100"
-                >
-                  <option value="">
-                    {loadingHours
-                      ? "Cargando horarios..."
-                      : "Selecciona una hora"}
-                  </option>
-                  {availableHours.map((hour) => (
-                    <option key={hour} value={hour}>
-                      {hour}
+              <section className="grid gap-4 md:grid-cols-2">
+                <article>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Especialidad
+                  </label>
+                  <select
+                    name="specialtyId"
+                    value={form.specialtyId}
+                    onChange={handleTextChange}
+                    disabled={loadingCatalogs}
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white disabled:bg-slate-100"
+                  >
+                    <option value="">
+                      {loadingCatalogs
+                        ? "Cargando especialidades..."
+                        : "Selecciona especialidad"}
                     </option>
-                  ))}
-                </select>
-              </article>
+                    {specialties.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.nombre || `Especialidad ${item.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </article>
+
+                <article>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Clase de cita
+                  </label>
+                  <select
+                    name="appointmentClassId"
+                    value={form.appointmentClassId}
+                    onChange={handleTextChange}
+                    disabled={loadingCatalogs}
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white disabled:bg-slate-100"
+                  >
+                    <option value="">
+                      {loadingCatalogs
+                        ? "Cargando clases..."
+                        : "Selecciona clase de cita"}
+                    </option>
+                    {appointmentClasses.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.nombre || `Clase ${item.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </article>
+              </section>
+
+              <section className="grid gap-4 md:grid-cols-2">
+                <article>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    name="fecha"
+                    min={today}
+                    value={form.fecha}
+                    onChange={handleTextChange}
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
+                  />
+                </article>
+
+                <article>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Hora disponible
+                  </label>
+                  <select
+                    name="hora"
+                    value={form.hora}
+                    onChange={handleTextChange}
+                    disabled={!form.fecha || loadingHours}
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white disabled:bg-slate-100"
+                  >
+                    <option value="">
+                      {loadingHours
+                        ? "Cargando horarios..."
+                        : "Selecciona una hora"}
+                    </option>
+                    {availableHours.map((hour) => (
+                      <option key={hour} value={hour}>
+                        {hour}
+                      </option>
+                    ))}
+                  </select>
+                </article>
+              </section>
+
+              <section className="grid gap-4 md:grid-cols-2">
+                <article>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    EPS
+                  </label>
+                  <select
+                    name="epsId"
+                    value={form.epsId}
+                    onChange={handleTextChange}
+                    disabled={loadingCatalogs}
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white disabled:bg-slate-100"
+                  >
+                    <option value="">
+                      {loadingCatalogs ? "Cargando EPS..." : "Selecciona EPS"}
+                    </option>
+                    {epsList.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.nombre || `EPS ${item.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </article>
+
+                <article>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    EPS seleccionada
+                  </label>
+                  <input
+                    value={form.eps}
+                    readOnly
+                    placeholder="EPS seleccionada"
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-700 outline-none"
+                  />
+                </article>
+              </section>
+
+              <section className="grid gap-4 md:grid-cols-2">
+                <article>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Departamento
+                  </label>
+                  <input
+                    name="departamento"
+                    value={form.departamento}
+                    onChange={handleTextChange}
+                    placeholder="Departamento"
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
+                  />
+                </article>
+
+                <article>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Municipio
+                  </label>
+                  <input
+                    name="municipio"
+                    value={form.municipio}
+                    onChange={handleTextChange}
+                    placeholder="Municipio"
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
+                  />
+                </article>
+              </section>
 
               <article>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Edad
                 </label>
                 <input
@@ -527,12 +857,12 @@ export default function AdminAppointmentsPage() {
                   value={form.edad}
                   onChange={handleTextChange}
                   placeholder="Edad"
-                  className="w-full border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                  className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
                 />
               </article>
 
               <article>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Motivo de consulta
                 </label>
                 <textarea
@@ -541,12 +871,26 @@ export default function AdminAppointmentsPage() {
                   value={form.motivoConsulta}
                   onChange={handleTextChange}
                   placeholder="Escribe el motivo de consulta"
-                  className="w-full border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                  className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
+                />
+              </article>
+
+              <article>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Observaciones
+                </label>
+                <textarea
+                  name="observaciones"
+                  rows={3}
+                  value={form.observaciones}
+                  onChange={handleTextChange}
+                  placeholder="Observaciones administrativas o clínicas"
+                  className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
                 />
               </article>
 
               <section className="grid grid-cols-2 gap-3 text-sm text-slate-700">
-                <label className="flex items-center gap-2">
+                <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <input
                     type="checkbox"
                     name="embarazada"
@@ -555,7 +899,8 @@ export default function AdminAppointmentsPage() {
                   />
                   Embarazada
                 </label>
-                <label className="flex items-center gap-2">
+
+                <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <input
                     type="checkbox"
                     name="discapacidad"
@@ -564,7 +909,8 @@ export default function AdminAppointmentsPage() {
                   />
                   Discapacidad
                 </label>
-                <label className="flex items-center gap-2">
+
+                <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <input
                     type="checkbox"
                     name="dolorIntenso"
@@ -573,7 +919,8 @@ export default function AdminAppointmentsPage() {
                   />
                   Dolor intenso
                 </label>
-                <label className="flex items-center gap-2">
+
+                <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <input
                     type="checkbox"
                     name="sangrado"
@@ -582,7 +929,8 @@ export default function AdminAppointmentsPage() {
                   />
                   Sangrado
                 </label>
-                <label className="flex items-center gap-2">
+
+                <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <input
                     type="checkbox"
                     name="dificultadRespiratoria"
@@ -591,7 +939,8 @@ export default function AdminAppointmentsPage() {
                   />
                   Dif. respiratoria
                 </label>
-                <label className="flex items-center gap-2">
+
+                <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <input
                     type="checkbox"
                     name="fiebre"
@@ -605,223 +954,317 @@ export default function AdminAppointmentsPage() {
               <button
                 onClick={handleCreateAppointment}
                 disabled={saving}
-                className="w-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-70"
+                className="w-full rounded-2xl bg-gradient-to-r from-slate-900 to-blue-900 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-70"
               >
                 {saving ? "Guardando..." : "Crear cita"}
               </button>
             </section>
           </section>
 
-          <section className="border border-slate-200 bg-white p-6 shadow-sm">
-            <header className="mb-4 flex items-center justify-between gap-4">
-              <article>
-                <h2 className="text-lg font-semibold text-slate-900">
+          <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+            <header className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <section>
+                <h2 className="text-2xl font-semibold text-slate-900">
                   Cola priorizada del día
                 </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Visualización clínica por prioridad y horario
+                <p className="mt-1 text-slate-600">
+                  Orden de atención clínica según prioridad y horario.
                 </p>
+              </section>
+
+              <article className="relative">
+                <CalendarDays
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={18}
+                />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="rounded-2xl border border-slate-300 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500"
+                />
               </article>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
-              />
             </header>
 
             {loadingQueue ? (
-              <p className="text-sm text-slate-600">Cargando cola...</p>
+              <article className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+                <p className="text-slate-600">Cargando cola...</p>
+              </article>
             ) : queueItems.length === 0 ? (
-              <p className="text-sm text-slate-600">
-                No hay citas para la fecha seleccionada.
-              </p>
+              <article className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+                <p className="text-slate-600">
+                  No hay citas para la fecha seleccionada.
+                </p>
+              </article>
             ) : (
-              <section className="overflow-x-auto">
-                <table className="min-w-full border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-700">
-                      <th className="px-3 py-2">Orden</th>
-                      <th className="px-3 py-2">Hora</th>
-                      <th className="px-3 py-2">Documento</th>
-                      <th className="px-3 py-2">Paciente</th>
-                      <th className="px-3 py-2">Teléfono</th>
-                      <th className="px-3 py-2">Correo</th>
-                      <th className="px-3 py-2">EPS</th>
-                      <th className="px-3 py-2">Estado</th>
-                      <th className="px-3 py-2">Prioridad</th>
-                      <th className="px-3 py-2">Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {queueItems.map((item, index) => (
-                      <tr
-                        key={item.id}
-                        className="border-b border-slate-200 text-slate-800"
-                      >
-                        <td className="px-3 py-2">{index + 1}</td>
-                        <td className="px-3 py-2">{item.hora || "-"}</td>
-                        <td className="px-3 py-2">
-                          {item.patient?.documento || "-"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {item.patient?.nombre || "Paciente"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {item.patient?.telefono || "-"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {item.patient?.email || "-"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {item.patient?.eps || "-"}
-                        </td>
-                        <td
-                          className={`px-3 py-2 font-medium ${getStatusTextClass(
-                            item.estado
-                          )}`}
-                        >
-                          {item.estado || "-"}
-                        </td>
-                        <td
-                          className={`px-3 py-2 font-medium ${getPriorityTextClass(
-                            item.prioridad
-                          )}`}
-                        >
-                          {item.prioridad || "-"}
-                        </td>
-                        <td className="px-3 py-2">
+              <section className="space-y-4">
+                {queueItems.map((item, index) => (
+                  <article
+                    key={item.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                  >
+                    <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <section className="flex-1">
+                        <section className="flex flex-wrap items-center gap-3">
+                          <p className="text-lg font-semibold text-slate-900">
+                            #{index + 1} {item.patient?.nombre || "Paciente"}
+                          </p>
+
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${getPriorityBadgeClass(
+                              item.prioridad,
+                            )}`}
+                          >
+                            Prioridad: {item.prioridad || "-"}
+                          </span>
+
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
+                              item.estado,
+                            )}`}
+                          >
+                            {item.estado || "-"}
+                          </span>
+                        </section>
+
+                        <section className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                          <p>Hora: {item.hora || "-"}</p>
+                          <p>Documento: {item.patient?.documento || "-"}</p>
+                          <p>EPS: {item.patient?.eps || "-"}</p>
+                          <p>Teléfono: {item.patient?.telefono || "-"}</p>
+                        </section>
+
+                        <article className="mt-3 rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-sm font-medium text-slate-500">
+                            Motivo de consulta
+                          </p>
+                          <p className="mt-1 text-sm text-slate-700">
+                            {item.motivoConsulta || "Sin detalle"}
+                          </p>
+                        </article>
+                      </section>
+
+                      <aside className="min-w-[120px] rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-sm">
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                          Score
+                        </p>
+                        <p className="mt-2 text-2xl font-bold text-slate-900">
                           {item.scorePrioridad ?? "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </p>
+                      </aside>
+                    </header>
+                  </article>
+                ))}
               </section>
             )}
           </section>
         </section>
 
-        <section className="mt-6 border border-slate-200 bg-white p-6 shadow-sm">
-          <header className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <article>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Agenda general de citas
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Control administrativo y operativo
-              </p>
-            </article>
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <header className="mb-6">
+            <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+              <article>
+                <h2 className="text-2xl font-semibold text-slate-900">
+                  Agenda general de citas
+                </h2>
+                <p className="mt-1 text-slate-600">
+                  Control administrativo, operativo y seguimiento del estado.
+                </p>
+              </article>
+            </section>
 
-            <article>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Filtrar por estado
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
-              >
-                <option value="todos">Todos</option>
-                <option value="pendiente">Pendientes</option>
-                <option value="aprobada">Aprobadas</option>
-                <option value="confirmada">Confirmadas</option>
-                <option value="cancelada">Canceladas</option>
-              </select>
-            </article>
+            <section className="mt-5 grid gap-4 xl:grid-cols-[1.3fr_220px_220px]">
+              <article className="relative">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={18}
+                />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar por paciente, documento, correo, EPS o municipio"
+                  className="w-full rounded-2xl border border-slate-300 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500"
+                />
+              </article>
+
+              <article className="relative">
+                <CalendarDays
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={18}
+                />
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500"
+                />
+              </article>
+
+              <article className="relative">
+                <SlidersHorizontal
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={18}
+                />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="pendiente">Pendientes</option>
+                  <option value="aprobada">Aprobadas</option>
+                  <option value="confirmada">Confirmadas</option>
+                  <option value="cancelada">Canceladas</option>
+                  <option value="atendida">Atendidas</option>
+                </select>
+              </article>
+            </section>
           </header>
 
           {loading ? (
-            <p className="text-sm text-slate-600">Cargando citas...</p>
+            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+              <p className="text-slate-600">Cargando citas...</p>
+            </article>
           ) : filteredAppointments.length === 0 ? (
-            <p className="text-sm text-slate-600">No hay citas para mostrar.</p>
+            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+              <p className="text-slate-600">No hay citas para mostrar.</p>
+            </article>
           ) : (
-            <section className="overflow-x-auto">
-              <table className="min-w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-700">
-                    <th className="px-3 py-2">Fecha</th>
-                    <th className="px-3 py-2">Hora</th>
-                    <th className="px-3 py-2">Documento</th>
-                    <th className="px-3 py-2">Paciente</th>
-                    <th className="px-3 py-2">Teléfono</th>
-                    <th className="px-3 py-2">Correo</th>
-                    <th className="px-3 py-2">EPS</th>
-                    <th className="px-3 py-2">Estado</th>
-                    <th className="px-3 py-2">Prioridad</th>
-                    <th className="px-3 py-2">Motivo</th>
-                    <th className="px-3 py-2">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAppointments.map((item) => {
-                    const status = (item.estado || "").toLowerCase();
-                    return (
-                      <tr
-                        key={item.id}
-                        className="border-b border-slate-200 text-slate-800"
-                      >
-                        <td className="px-3 py-2">{item.fecha || "-"}</td>
-                        <td className="px-3 py-2">{item.hora || "-"}</td>
-                        <td className="px-3 py-2">
-                          {item.patient?.documento || "-"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {item.patient?.nombre || "Paciente"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {item.patient?.telefono || "-"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {item.patient?.email || "-"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {item.patient?.eps || "-"}
-                        </td>
-                        <td
-                          className={`px-3 py-2 font-medium ${getStatusTextClass(
-                            item.estado
-                          )}`}
-                        >
-                          {item.estado || "-"}
-                        </td>
-                        <td
-                          className={`px-3 py-2 font-medium ${getPriorityTextClass(
-                            item.prioridad
-                          )}`}
-                        >
-                          {item.prioridad || "-"}
-                        </td>
-                        <td className="max-w-[280px] px-3 py-2">
-                          {item.motivoConsulta || "-"}
-                        </td>
-                        <td className="px-3 py-2">
-                          <section className="flex flex-wrap gap-2">
-                            {status === "pendiente" && (
-                              <button
-                                onClick={() => handleApprove(item.id)}
-                                className="flex items-center gap-1 border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                              >
-                                <CheckCircle2 size={14} />
-                                Aprobar
-                              </button>
-                            )}
-                            {status !== "cancelada" && (
-                              <button
-                                onClick={() => handleCancel(item.id)}
-                                className="flex items-center gap-1 border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"
-                              >
-                                <XCircle size={14} />
-                                Cancelar
-                              </button>
-                            )}
-                          </section>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <section className="space-y-4">
+              {filteredAppointments.map((item) => {
+                const status = (item.estado || "").toLowerCase();
+
+                return (
+                  <article
+                    key={item.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm"
+                  >
+                    <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <section className="flex-1">
+                        <section className="flex flex-wrap items-center gap-3">
+                          <p className="text-2xl font-bold text-slate-900">
+                            {item.patient?.nombre || "Paciente"}
+                          </p>
+
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
+                              item.estado,
+                            )}`}
+                          >
+                            {item.estado || "-"}
+                          </span>
+
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${getPriorityBadgeClass(
+                              item.prioridad,
+                            )}`}
+                          >
+                            Prioridad: {item.prioridad || "-"}
+                          </span>
+                        </section>
+
+                        <section className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-4">
+                          <p>
+                            <span className="font-medium text-slate-800">
+                              Fecha:
+                            </span>{" "}
+                            {item.fecha || "-"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-800">
+                              Hora:
+                            </span>{" "}
+                            {item.hora || "-"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-800">
+                              Documento:
+                            </span>{" "}
+                            {item.patient?.documento || "-"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-800">
+                              Teléfono:
+                            </span>{" "}
+                            {item.patient?.telefono || "-"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-800">
+                              Correo:
+                            </span>{" "}
+                            {item.patient?.email || "-"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-800">
+                              EPS:
+                            </span>{" "}
+                            {item.patient?.eps || item.eps || "-"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-800">
+                              Departamento:
+                            </span>{" "}
+                            {item.departamento || "-"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-800">
+                              Municipio:
+                            </span>{" "}
+                            {item.municipio || "-"}
+                          </p>
+                        </section>
+
+                        <article className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-sm font-medium text-slate-500">
+                            Motivo de consulta
+                          </p>
+                          <p className="mt-2 text-sm text-slate-700">
+                            {item.motivoConsulta || "Sin detalle"}
+                          </p>
+                        </article>
+
+                        <article className="mt-3 rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-sm font-medium text-slate-500">
+                            Observaciones
+                          </p>
+                          <p className="mt-2 text-sm text-slate-700">
+                            {item.observaciones || "Sin observaciones"}
+                          </p>
+                        </article>
+                      </section>
+
+                      <aside className="w-full max-w-[260px] rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <p className="text-sm font-semibold text-slate-900">
+                          Acciones rápidas
+                        </p>
+
+                        <section className="mt-4 flex flex-wrap gap-2">
+                          {status === "pendiente" && (
+                            <button
+                              onClick={() => handleApprove(item.id)}
+                              className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                            >
+                              <CheckCircle2 size={16} />
+                              Aprobar
+                            </button>
+                          )}
+
+                          {status !== "cancelada" && (
+                            <button
+                              onClick={() => handleCancel(item.id)}
+                              className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                            >
+                              <XCircle size={16} />
+                              Cancelar
+                            </button>
+                          )}
+                        </section>
+                      </aside>
+                    </header>
+                  </article>
+                );
+              })}
             </section>
           )}
         </section>

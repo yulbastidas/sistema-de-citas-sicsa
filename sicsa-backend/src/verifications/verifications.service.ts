@@ -146,10 +146,13 @@ export class VerificationsService {
 
     if (patient) {
       try {
-        await axios.post('http://localhost:5678/webhook/verificacion-aprobada', {
-          nombre: patient.primerNombre,
-          email: patient.email,
-        });
+        await axios.post(
+          'http://localhost:5678/webhook/verificacion-aprobada',
+          {
+            nombre: patient.primerNombre,
+            email: patient.email,
+          },
+        );
       } catch (error: unknown) {
         if (error instanceof Error) {
           console.error('Error enviando webhook a n8n:', error.message);

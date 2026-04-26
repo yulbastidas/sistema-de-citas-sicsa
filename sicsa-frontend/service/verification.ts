@@ -7,6 +7,12 @@ function authHeaders(token: string) {
   };
 }
 
+// 🔥 helper para evitar error de JSON vacío
+async function safeJson(response: Response) {
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
 export async function requestVerification(
   token: string,
   data: {
@@ -20,13 +26,13 @@ export async function requestVerification(
     body: JSON.stringify(data),
   });
 
-  const result = await response.json();
+  const result = await safeJson(response);
 
   if (!response.ok) {
     throw new Error(
-      Array.isArray(result.message)
+      Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result.message || "Error al solicitar verificación"
+        : result?.message || "Error al solicitar verificación"
     );
   }
 
@@ -39,13 +45,13 @@ export async function getAllVerifications(token: string) {
     headers: authHeaders(token),
   });
 
-  const result = await response.json();
+  const result = await safeJson(response);
 
   if (!response.ok) {
     throw new Error(
-      Array.isArray(result.message)
+      Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result.message || "Error al consultar verificaciones"
+        : result?.message || "Error al consultar verificaciones"
     );
   }
 
@@ -59,13 +65,13 @@ export async function approveVerification(token: string, id: number) {
     body: JSON.stringify({ id }),
   });
 
-  const result = await response.json();
+  const result = await safeJson(response);
 
   if (!response.ok) {
     throw new Error(
-      Array.isArray(result.message)
+      Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result.message || "Error al aprobar verificación"
+        : result?.message || "Error al aprobar verificación"
     );
   }
 
@@ -83,13 +89,13 @@ export async function rejectVerification(
     body: JSON.stringify({ id, motivoRechazo }),
   });
 
-  const result = await response.json();
+  const result = await safeJson(response);
 
   if (!response.ok) {
     throw new Error(
-      Array.isArray(result.message)
+      Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result.message || "Error al rechazar verificación"
+        : result?.message || "Error al rechazar verificación"
     );
   }
 
@@ -102,13 +108,13 @@ export async function getMyVerification(token: string) {
     headers: authHeaders(token),
   });
 
-  const result = await response.json();
+  const result = await safeJson(response);
 
   if (!response.ok) {
     throw new Error(
-      Array.isArray(result.message)
+      Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result.message || "Error al consultar mi verificación"
+        : result?.message || "Error al consultar mi verificación"
     );
   }
 
@@ -121,13 +127,13 @@ export async function expireMyVerification(token: string) {
     headers: authHeaders(token),
   });
 
-  const result = await response.json();
+  const result = await safeJson(response);
 
   if (!response.ok) {
     throw new Error(
-      Array.isArray(result.message)
+      Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result.message || "Error al expirar verificación"
+        : result?.message || "Error al expirar verificación"
     );
   }
 

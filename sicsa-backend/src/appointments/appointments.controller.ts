@@ -2,12 +2,15 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  ParseIntPipe,
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 
 import { AppointmentsService } from './appointments.service';
@@ -28,57 +31,112 @@ type RequestWithUser = Request & {
   user: JwtUser;
 };
 
-@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('appointments')
 export class AppointmentsController {
   constructor(private appointmentsService: AppointmentsService) {}
 
+  // Endpoint público SOLO para n8n
+  // n8n lo usará para consultar las citas de mañana y enviar recordatorios
+  @Get('n8n/reminders')
+  getRemindersForN8n() {
+    return this.appointmentsService.getTomorrowReminders();
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post()
   create(@Body() body: CreateAppointmentDto, @Req() req: RequestWithUser) {
     return this.appointmentsService.create(body, req.user);
   }
 
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Post('admin-create')
   createByAdmin(@Body() body: CreateAdminAppointmentDto) {
     return this.appointmentsService.createByAdmin(body);
   }
 
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Get('all')
   findAll() {
     return this.appointmentsService.findAll();
   }
 
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get('my')
   getMy(@Req() req: RequestWithUser) {
     return this.appointmentsService.getByUser(req.user.sub);
   }
 
-  @Roles('admin')
-  @Post('approve')
-  approve(@Body() body: ApproveAppointmentDto) {
-    return this.appointmentsService.approve(body.id);
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('doctor', 'admin')
+  @Get('doctor/:id')
+  findByDoctor(@Param('id', ParseIntPipe) id: number) {
+    return this.appointmentsService.findByDoctor(id);
   }
 
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('doctor', 'admin')
+  @Get('doctor/:id/history')
+  findHistoryByDoctor(@Param('id', ParseIntPipe) id: number) {
+    return this.appointmentsService.findHistoryByDoctor(id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Post('approve')
+  approve(@Body() body: ApproveAppointmentDto, @Req() req: RequestWithUser) {
+    return this.appointmentsService.approve(body.id, req.user);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post('cancel')
   cancel(@Body() body: CancelAppointmentDto, @Req() req: RequestWithUser) {
     return this.appointmentsService.cancel(body.id, req.user);
   }
 
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get('available')
   getAvailable(@Query('fecha') fecha: string) {
     return this.appointmentsService.getAvailable(fecha);
   }
 
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('doctor', 'admin')
   @Get('queue')
-  getQueue(@Query('fecha') fecha: string) {
-    return this.appointmentsService.getQueue(fecha);
+  getQueue(
+    @Query('fecha') fecha: string,
+    @Query('doctorId') doctorId?: string,
+  ) {
+    return this.appointmentsService.getQueue(
+      fecha,
+      doctorId ? Number(doctorId) : undefined,
+    );
   }
 
+  // Endpoint interno protegido para admin
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Get('tomorrow-reminders')
   getTomorrowReminders() {
     return this.appointmentsService.getTomorrowReminders();
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('doctor', 'admin')
+  @Get(':id/pdf')
+  async downloadPdf(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer =
+      await this.appointmentsService.generateMedicalReportPdf(id);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=reporte-cita-${id}.pdf`,
+    });
+
+    res.send(pdfBuffer);
   }
 }

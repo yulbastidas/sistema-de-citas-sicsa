@@ -5,16 +5,24 @@ import { PatientsModule } from './patients/patients.module';
 import { VerificationsModule } from './verifications/verifications.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { AuthModule } from './auth/auth.module';
+import { DoctorsModule } from './doctors/doctors.module';
+import { SpecialtiesModule } from './specialties/specialties.module';
+import { MedicalReportsModule } from './medical-reports/medical-reports.module';
+import { EpsModule } from './eps/eps.module';
+import { AppointmentClassModule } from './appointment-class/appointment-class.module';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'mysql',
-      host: 'localhost',
-      port: 3306,
-      username: 'root',
-      password: '1230809075',
-      database: 'sicsa',
+      host: process.env.DB_HOST || 'localhost',
+      port: Number(process.env.DB_PORT || 3306),
+      username: process.env.DB_USERNAME || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_DATABASE || 'sicsa',
       autoLoadEntities: true,
       synchronize: true,
     }),
@@ -23,6 +31,11 @@ import { AuthModule } from './auth/auth.module';
     VerificationsModule,
     AppointmentsModule,
     AuthModule,
+    DoctorsModule,
+    SpecialtiesModule,
+    MedicalReportsModule,
+    EpsModule,
+    AppointmentClassModule,
   ],
 })
 export class AppModule {}
