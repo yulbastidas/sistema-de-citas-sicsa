@@ -12,13 +12,34 @@ export async function registerPatient(data: {
   segundoApellido?: string;
   telefono?: string;
   eps?: string;
+  epsId?: number;
+  genero?: string;
+  fechaNacimiento?: string;
+  departamento?: string;
+  municipio?: string;
 }) {
-  const response = await fetch(`${API_URL}/users`, {
+  const response = await fetch(`${API_URL}/auth/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      email: data.email,
+      password: data.password,
+      tipoDocumento: data.tipoDocumento,
+      numeroDocumento: data.numeroDocumento,
+      primerNombre: data.primerNombre,
+      segundoNombre: data.segundoNombre,
+      primerApellido: data.primerApellido,
+      segundoApellido: data.segundoApellido,
+      telefono: data.telefono,
+      eps: data.eps,
+      epsId: data.epsId,
+      genero: data.genero,
+      fechaNacimiento: data.fechaNacimiento,
+      departamento: data.departamento,
+      municipio: data.municipio,
+    }),
   });
 
   const result = await response.json();
@@ -27,7 +48,7 @@ export async function registerPatient(data: {
     throw new Error(
       Array.isArray(result.message)
         ? result.message.join(", ")
-        : result.message || "Error al registrar paciente"
+        : result.message || "Error al registrar paciente",
     );
   }
 
@@ -49,7 +70,7 @@ export async function loginUser(email: string, password: string) {
     throw new Error(
       Array.isArray(result.message)
         ? result.message.join(", ")
-        : result.message || "Error al iniciar sesión"
+        : result.message || "Error al iniciar sesión",
     );
   }
 

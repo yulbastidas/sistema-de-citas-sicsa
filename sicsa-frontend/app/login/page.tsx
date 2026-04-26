@@ -18,8 +18,8 @@ export default function LoginPage() {
     role === "doctor"
       ? "Médico"
       : role === "admin"
-      ? "Administrador"
-      : "Paciente";
+        ? "Administrador"
+        : "Paciente";
 
   const [form, setForm] = useState({
     email: "",
@@ -27,12 +27,28 @@ export default function LoginPage() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
     }));
+  };
+
+  const handleHiddenAccess = () => {
+    const nextCount = tapCount + 1;
+    setTapCount(nextCount);
+
+    if (nextCount >= 5) {
+      setTapCount(0);
+      router.push("/select-role");
+      return;
+    }
+
+    window.setTimeout(() => {
+      setTapCount(0);
+    }, 1800);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -83,10 +99,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4">
-      <div className="mx-auto grid min-h-[95vh] max-w-7xl overflow-hidden rounded-3xl bg-white shadow-2xl md:grid-cols-2">
-        <div className="flex items-center justify-center px-8 py-12 md:px-16">
-          <div className="w-full max-w-md">
+    <main className="min-h-screen bg-slate-100 p-4">
+      <section className="mx-auto grid min-h-[95vh] max-w-7xl overflow-hidden rounded-3xl bg-white shadow-2xl md:grid-cols-2">
+        <section className="flex items-center justify-center px-8 py-12 md:px-16">
+          <section className="w-full max-w-md">
             <p className="mb-3 inline-block rounded-full bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-700">
               Rol seleccionado: {roleLabel}
             </p>
@@ -99,7 +115,7 @@ export default function LoginPage() {
             </p>
 
             <form className="space-y-6" onSubmit={handleLogin}>
-              <div>
+              <section>
                 <label className="mb-2 block text-lg font-semibold text-slate-800">
                   Correo Electrónico
                 </label>
@@ -111,9 +127,9 @@ export default function LoginPage() {
                   value={form.email}
                   onChange={handleChange}
                 />
-              </div>
+              </section>
 
-              <div>
+              <section>
                 <label className="mb-2 block text-lg font-semibold text-slate-800">
                   Contraseña
                 </label>
@@ -125,7 +141,7 @@ export default function LoginPage() {
                   value={form.password}
                   onChange={handleChange}
                 />
-              </div>
+              </section>
 
               <button
                 type="submit"
@@ -137,7 +153,7 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <div className="mt-8 space-y-2 text-center text-base text-slate-600">
+            <section className="mt-8 space-y-2 text-center text-base text-slate-600">
               {role === "patient" && (
                 <p>
                   ¿No tienes una cuenta?{" "}
@@ -150,19 +166,21 @@ export default function LoginPage() {
                 </p>
               )}
 
-              <p>
-                <Link
-                  href="/select-role"
-                  className="font-semibold text-slate-700 hover:underline"
-                >
-                  Cambiar rol
-                </Link>
-              </p>
-            </div>
-          </div>
-        </div>
+              {role !== "patient" && (
+                <p>
+                  <Link
+                    href="/select-role"
+                    className="font-semibold text-slate-700 hover:underline"
+                  >
+                    Cambiar rol
+                  </Link>
+                </p>
+              )}
+            </section>
+          </section>
+        </section>
 
-        <div className="relative hidden md:block">
+        <section className="relative hidden md:block">
           <Image
             src="/hospital.jpg"
             alt="Hospital"
@@ -170,12 +188,17 @@ export default function LoginPage() {
             sizes="50vw"
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-blue-900/35" />
+          <section className="absolute inset-0 bg-blue-900/35" />
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-10 text-center text-white">
-            <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-lg">
+          <section className="absolute inset-0 flex flex-col items-center justify-center px-10 text-center text-white">
+            <button
+              type="button"
+              onClick={handleHiddenAccess}
+              className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-lg"
+              aria-label="Acceso interno"
+            >
               <HeartPulse className="text-blue-600" size={48} />
-            </div>
+            </button>
 
             <h2 className="text-5xl font-extrabold leading-tight drop-shadow-lg">
               Sistema de Gestión
@@ -186,9 +209,9 @@ export default function LoginPage() {
             <p className="mt-6 max-w-lg text-2xl text-white/95">
               Cuidando tu salud con tecnología de vanguardia
             </p>
-          </div>
-        </div>
-      </div>
-    </div>
+          </section>
+        </section>
+      </section>
+    </main>
   );
 }

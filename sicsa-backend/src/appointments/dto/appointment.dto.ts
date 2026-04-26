@@ -2,13 +2,16 @@ import { IsBoolean, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class CreateAppointmentDto {
   @IsString()
-  fecha: string;
+  fecha!: string;
 
   @IsString()
-  hora: string;
+  hora!: string;
 
   @IsString()
-  motivoConsulta: string;
+  motivoConsulta!: string;
+
+  @IsInt()
+  specialtyId!: number;
 
   @IsOptional()
   @IsInt()
@@ -37,4 +40,30 @@ export class CreateAppointmentDto {
   @IsOptional()
   @IsBoolean()
   fiebre?: boolean;
+
+  // 🔥 NUEVO (LO QUE TE FALTABA)
+
+  @IsOptional()
+  @IsString()
+  eps?: string;
+
+  @IsOptional()
+  @IsInt()
+  epsId?: number;
+
+  @IsOptional()
+  @IsString()
+  departamento?: string;
+
+  @IsOptional()
+  @IsString()
+  municipio?: string;
+
+  @IsOptional()
+  @IsInt()
+  appointmentClassId?: number;
+
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
 }

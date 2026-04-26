@@ -36,19 +36,19 @@ export default function RegisterPage() {
     localStorage.setItem(
       "register_credentials",
       JSON.stringify({
-        email: form.email,
+        email: form.email.trim(),
         password: form.password,
-      })
+      }),
     );
 
     router.push("/register/patient-profile");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50 p-4">
-      <div className="mx-auto grid min-h-[95vh] max-w-7xl overflow-hidden rounded-3xl bg-white shadow-2xl md:grid-cols-2">
-        <div className="flex items-center justify-center px-8 py-12 md:px-16">
-          <div className="w-full max-w-md">
+    <main className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50 p-4">
+      <section className="mx-auto grid min-h-[95vh] max-w-7xl overflow-hidden rounded-3xl bg-white shadow-2xl md:grid-cols-2">
+        <section className="flex items-center justify-center px-8 py-12 md:px-16">
+          <article className="w-full max-w-md">
             <h1 className="mb-2 text-5xl font-extrabold text-slate-900">
               Crear Cuenta
             </h1>
@@ -108,22 +108,22 @@ export default function RegisterPage() {
                 Inicia sesión aquí
               </Link>
             </p>
-          </div>
-        </div>
+          </article>
+        </section>
 
-        <div className="relative hidden md:block">
+        <section className="relative hidden md:block">
           <Image
             src="/hospital.jpg"
             alt="Hospital"
             fill
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-blue-900/40" />
+          <section className="absolute inset-0 bg-blue-900/40" />
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-10 text-center text-white">
-            <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-lg">
+          <section className="absolute inset-0 flex flex-col items-center justify-center px-10 text-center text-white">
+            <figure className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-lg">
               <HeartPulse className="text-blue-600" size={48} />
-            </div>
+            </figure>
 
             <h2 className="text-5xl font-extrabold">
               Sistema de Gestión Hospitalaria
@@ -132,9 +132,9 @@ export default function RegisterPage() {
             <p className="mt-6 text-xl">
               Cuidando tu salud con tecnología de vanguardia
             </p>
-          </div>
-        </div>
-      </div>
-    </div>
+          </section>
+        </section>
+      </section>
+    </main>
   );
 }

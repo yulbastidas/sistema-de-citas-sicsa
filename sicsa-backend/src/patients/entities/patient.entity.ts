@@ -3,35 +3,50 @@ import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 @Entity()
 export class Patient {
   @PrimaryGeneratedColumn()
-  id: number;
+  id!: number;
 
   @Column()
-  userId: number;
+  userId!: number;
 
   @Column()
-  tipoDocumento: string;
+  tipoDocumento!: string;
 
   @Column()
-  numeroDocumento: string;
+  numeroDocumento!: string;
 
   @Column()
-  primerNombre: string;
+  primerNombre!: string;
 
   @Column({ nullable: true })
-  segundoNombre: string;
+  segundoNombre!: string;
 
   @Column()
-  primerApellido: string;
+  primerApellido!: string;
 
   @Column({ nullable: true })
-  segundoApellido: string;
+  segundoApellido!: string;
 
   @Column()
-  telefono: string;
+  telefono!: string;
 
   @Column()
-  email: string;
+  email!: string;
 
   @Column()
-  eps: string;
+  eps!: string;
+
+  @Column({ nullable: true })
+  epsId!: number;
+
+  @Column({ nullable: true })
+  genero!: string;
+
+  @Column({ nullable: true })
+  fechaNacimiento!: string;
+
+  @Column({ nullable: true })
+  departamento!: string;
+
+  @Column({ nullable: true })
+  municipio!: string;
 }

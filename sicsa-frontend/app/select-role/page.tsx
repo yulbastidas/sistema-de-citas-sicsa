@@ -1,14 +1,7 @@
 import Link from "next/link";
-import { ShieldCheck, Stethoscope, Users } from "lucide-react";
+import { ShieldCheck, Stethoscope } from "lucide-react";
 
 const roles = [
-  {
-    title: "Paciente",
-    description: "Accede a tus citas, historial médico y más",
-    icon: <Users size={42} className="text-blue-600" />,
-    bg: "bg-blue-100",
-    href: "/login?role=patient",
-  },
   {
     title: "Médico",
     description: "Gestiona pacientes, citas y expedientes",
@@ -25,31 +18,31 @@ const roles = [
   },
 ];
 
-export default function SelectRolePage() {
+export default function StaffAccessPage() {
   return (
-    <div className="min-h-screen bg-blue-50 px-6 py-16">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-16 text-center">
+    <main className="min-h-screen bg-blue-50 px-6 py-16">
+      <section className="mx-auto max-w-5xl">
+        <header className="mb-16 text-center">
           <h1 className="text-5xl font-extrabold text-slate-900">
-            Selecciona tu Rol
+            Acceso Interno
           </h1>
           <p className="mt-4 text-xl text-slate-600">
-            Elige el tipo de cuenta que mejor se adapta a ti
+            Solo personal autorizado
           </p>
-        </div>
+        </header>
 
-        <div className="grid gap-8 md:grid-cols-3">
+        <section className="grid gap-8 md:grid-cols-2">
           {roles.map((role) => (
             <Link
               key={role.title}
               href={role.href}
               className="rounded-3xl bg-white p-10 shadow-lg transition hover:-translate-y-1 hover:shadow-2xl"
             >
-              <div
+              <section
                 className={`mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full ${role.bg}`}
               >
                 {role.icon}
-              </div>
+              </section>
 
               <h2 className="mb-4 text-center text-4xl font-bold text-slate-900">
                 {role.title}
@@ -60,8 +53,8 @@ export default function SelectRolePage() {
               </p>
             </Link>
           ))}
-        </div>
-      </div>
-    </div>
+        </section>
+      </section>
+    </main>
   );
 }

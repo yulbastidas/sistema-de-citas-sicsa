@@ -3,14 +3,17 @@ import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()
-  id: number;
+  id!: number;
 
   @Column({ unique: true })
-  email: string;
+  email!: string;
 
   @Column()
-  password: string;
+  password!: string;
 
   @Column()
-  role: 'admin' | 'patient' | 'doctor';
+  role!: 'admin' | 'patient' | 'doctor';
+
+  @Column({ default: false })
+  emailVerified!: boolean;
 }
