@@ -66,4 +66,7 @@ export class CreateAppointmentDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+  @IsOptional()
+  @IsString()
+  ordenMedicaUrl?: string;
 }

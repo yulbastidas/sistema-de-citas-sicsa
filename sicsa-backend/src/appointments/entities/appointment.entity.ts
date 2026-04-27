@@ -80,4 +80,6 @@ export class Appointment {
 
   @Column({ type: 'datetime', nullable: true })
   approvedAt!: Date;
+  @Column({ nullable: true })
+  ordenMedicaUrl?: string;
 }

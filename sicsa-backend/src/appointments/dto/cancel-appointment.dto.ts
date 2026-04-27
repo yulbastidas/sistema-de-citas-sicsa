@@ -1,3 +1,8 @@
+import { Type } from 'class-transformer';
+import { IsInt } from 'class-validator';
+
 export class CancelAppointmentDto {
-  id: number;
+  @Type(() => Number)
+  @IsInt()
+  id!: number;
 }

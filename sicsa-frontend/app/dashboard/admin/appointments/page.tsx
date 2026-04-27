@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity,
   CalendarDays,
   CheckCircle2,
   ClipboardList,

@@ -35,8 +35,6 @@ type RequestWithUser = Request & {
 export class AppointmentsController {
   constructor(private appointmentsService: AppointmentsService) {}
 
-  // Endpoint público SOLO para n8n
-  // n8n lo usará para consultar las citas de mañana y enviar recordatorios
   @Get('n8n/reminders')
   getRemindersForN8n() {
     return this.appointmentsService.getTomorrowReminders();
@@ -97,8 +95,14 @@ export class AppointmentsController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Get('available')
-  getAvailable(@Query('fecha') fecha: string) {
-    return this.appointmentsService.getAvailable(fecha);
+  getAvailable(
+    @Query('fecha') fecha: string,
+    @Query('appointmentClassId') appointmentClassId?: string,
+  ) {
+    return this.appointmentsService.getAvailable(
+      fecha,
+      appointmentClassId ? Number(appointmentClassId) : undefined,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -114,7 +118,6 @@ export class AppointmentsController {
     );
   }
 
-  // Endpoint interno protegido para admin
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Get('tomorrow-reminders')
