@@ -1,7 +1,21 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
+
 import { PatientsService } from './patients.service';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 
 interface JwtUser {
   sub: number;
@@ -11,6 +25,23 @@ interface JwtUser {
 
 type RequestWithUser = Request & {
   user: JwtUser;
+};
+
+type UpdatePatientByAdminDto = {
+  tipoDocumento?: string;
+  numeroDocumento?: string;
+  primerNombre?: string;
+  segundoNombre?: string;
+  primerApellido?: string;
+  segundoApellido?: string;
+  telefono?: string;
+  email?: string;
+  eps?: string;
+  epsId?: number;
+  genero?: string;
+  fechaNacimiento?: string;
+  departamento?: string;
+  municipio?: string;
 };
 
 @Controller('patients')
@@ -28,8 +59,20 @@ export class PatientsController {
     return this.patientsService.findByUserId(req.user.sub);
   }
 
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Get()
-  findAll() {
-    return this.patientsService.findAll();
+  findAll(@Query('search') search?: string) {
+    return this.patientsService.findAll(search);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Patch('admin/:id')
+  updateByAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdatePatientByAdminDto,
+  ) {
+    return this.patientsService.updateById(id, body);
   }
 }

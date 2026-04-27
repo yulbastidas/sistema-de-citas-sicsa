@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   Sparkles,
   Stethoscope,
+  ClockIcon,
 } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { getToken, getUser } from "@/service/session";
@@ -76,6 +77,16 @@ type VerificationState =
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
+const getWaitlistBaseHour = (fecha: string) => {
+  const [year, month, day] = fecha.split("-").map(Number);
+  const weekDay = new Date(year, month - 1, day).getDay();
+
+  if (weekDay === 2 || weekDay === 3) return "08:00";
+  if (weekDay === 4 || weekDay === 5 || weekDay === 6) return "07:00";
+
+  return "08:00";
+};
+
 function normalizeRole(role: string | number | undefined): string | undefined {
   if (role === 1 || role === "1") return "admin";
   if (role === 2 || role === "2") return "patient";
@@ -106,6 +117,9 @@ export default function PatientAppointmentsPage() {
   const [loadingHours, setLoadingHours] = useState(false);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // ── LISTA DE ESPERA: estado nuevo ──
+  const [savingWaitlist, setSavingWaitlist] = useState(false);
 
   const [form, setForm] = useState({
     specialtyId: "",
@@ -541,6 +555,85 @@ export default function PatientAppointmentsPage() {
     }
   };
 
+  // ── LISTA DE ESPERA: handler nuevo ──
+  const handleJoinWaitlist = async () => {
+    const token = getToken();
+    if (!token) {
+      alert("Debes iniciar sesión");
+      return;
+    }
+
+    if (verificationStatus !== "approved") {
+      alert("Debes tener la verificación aprobada para unirte a la lista de espera");
+      return;
+    }
+
+    if (
+      !form.specialtyId ||
+      !form.fecha ||
+      !form.motivoConsulta ||
+      !form.epsId ||
+      !form.departamento ||
+      !form.municipio ||
+      !form.appointmentClassId
+    ) {
+      alert(
+        "Completa especialidad, fecha, motivo, EPS, municipio, departamento y clase de cita antes de unirte a la lista de espera",
+      );
+      return;
+    }
+
+    try {
+      setSavingWaitlist(true);
+
+      await createAppointment(token, {
+        specialtyId: Number(form.specialtyId),
+        fecha: form.fecha,
+        hora: getWaitlistBaseHour(form.fecha),
+        motivoConsulta: form.motivoConsulta,
+        eps: form.eps,
+        epsId: form.epsId ? Number(form.epsId) : undefined,
+        departamento: form.departamento,
+        municipio: form.municipio,
+        appointmentClassId: form.appointmentClassId
+          ? Number(form.appointmentClassId)
+          : undefined,
+        observaciones: form.observaciones,
+      });
+
+      alert(
+        "Te has unido a la lista de espera para este día. Serás notificado cuando se libere un horario.",
+      );
+
+      setForm({
+        specialtyId: "",
+        fecha: "",
+        hora: "",
+        motivoConsulta: "",
+        eps: "",
+        epsId: "",
+        departamento: "Nariño",
+        municipio: "",
+        appointmentClassId: "",
+        observaciones: "",
+      });
+
+      setAvailableHours([]);
+      await loadAppointments();
+      await loadVerificationStatus();
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("Error al unirte a la lista de espera");
+      }
+    } finally {
+      if (mountedRef.current) {
+        setSavingWaitlist(false);
+      }
+    }
+  };
+
   const handleCancelAppointment = async (id: number) => {
     const token = getToken();
     if (!token) return;
@@ -582,6 +675,11 @@ export default function PatientAppointmentsPage() {
 
     if (value === "atendida") {
       return "border border-sky-200 bg-sky-50 text-sky-700";
+    }
+
+    // ── LISTA DE ESPERA: badge nuevo ──
+    if (value === "lista_espera") {
+      return "border border-violet-200 bg-violet-50 text-violet-700";
     }
 
     return "border border-slate-200 bg-slate-50 text-slate-700";
@@ -669,6 +767,13 @@ export default function PatientAppointmentsPage() {
       hora: hour,
     }));
   };
+
+  // ── LISTA DE ESPERA: computed para saber si mostrar el botón ──
+  const showWaitlistButton =
+    canCreateAppointment &&
+    form.fecha &&
+    !loadingHours &&
+    availableHours.length === 0;
 
   if (checkingAuth) {
     return (
@@ -1007,9 +1112,45 @@ export default function PatientAppointmentsPage() {
                     Cargando horarios...
                   </p>
                 ) : availableHours.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-600">
-                    No hay horarios disponibles para este día.
-                  </p>
+                  <>
+                    <p className="mt-4 text-sm text-slate-600">
+                      No hay horarios disponibles para este día.
+                    </p>
+
+                    {/* ── LISTA DE ESPERA: botón que aparece cuando no hay horarios ── */}
+                    {showWaitlistButton && (
+                      <section className="mt-4 rounded-3xl border border-violet-200 bg-violet-50 p-4">
+                        <section className="flex items-center gap-2">
+                          <ClockIcon className="text-violet-700" size={18} />
+                          <p className="text-sm font-semibold text-violet-800">
+                            ¿Quieres un cupo si se libera alguno?
+                          </p>
+                        </section>
+                        <p className="mt-2 text-sm leading-6 text-violet-700">
+                          El sistema intentará asignarte automáticamente el
+                          primer cupo disponible según prioridad.
+                        </p>
+                        <button
+                          onClick={handleJoinWaitlist}
+                          disabled={
+                            savingWaitlist ||
+                            !form.specialtyId ||
+                            !form.fecha ||
+                            !form.motivoConsulta ||
+                            !form.epsId ||
+                            !form.departamento ||
+                            !form.municipio ||
+                            !form.appointmentClassId
+                          }
+                          className="mt-4 w-full rounded-3xl border border-violet-300 bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:opacity-70"
+                        >
+                          {savingWaitlist
+                            ? "Uniéndome..."
+                            : "Unirme a lista de espera para este día"}
+                        </button>
+                      </section>
+                    )}
+                  </>
                 ) : (
                   <section className="mt-4 flex flex-wrap gap-2">
                     {availableHours.map((hour) => {
@@ -1107,7 +1248,10 @@ export default function PatientAppointmentsPage() {
                             item.estado,
                           )}`}
                         >
-                          {item.estado || "pendiente"}
+                          {/* ── LISTA DE ESPERA: label amigable ── */}
+                          {status === "lista_espera"
+                            ? "En lista de espera"
+                            : item.estado || "pendiente"}
                         </span>
                       </section>
 
@@ -1118,7 +1262,10 @@ export default function PatientAppointmentsPage() {
                         </p>
                         <p className="flex items-center gap-2">
                           <Clock3 size={16} className="text-cyan-600" />
-                          {item.hora}
+                          {/* ── LISTA DE ESPERA: no mostrar 00:00 ── */}
+                          {status === "lista_espera"
+                            ? "Hora por asignar"
+                            : item.hora}
                         </p>
                         <p className="flex items-center gap-2">
                           <MapPin size={16} className="text-cyan-600" />
@@ -1127,6 +1274,23 @@ export default function PatientAppointmentsPage() {
                         <p>EPS: {item.eps || "No registrada"}</p>
                         <p>Departamento: {item.departamento || "-"}</p>
                       </section>
+
+                      {/* ── LISTA DE ESPERA: banner informativo ── */}
+                      {status === "lista_espera" && (
+                        <section className="mt-4 rounded-3xl border border-violet-200 bg-violet-50 p-4">
+                          <section className="flex items-center gap-2">
+                            <ClockIcon className="text-violet-600" size={16} />
+                            <p className="text-sm font-semibold text-violet-800">
+                              Estás en lista de espera
+                            </p>
+                          </section>
+                          <p className="mt-1 text-sm text-violet-700">
+                            Cuando alguien cancele un horario para este día, se
+                            te asignará automáticamente según tu prioridad y
+                            recibirás una notificación por correo.
+                          </p>
+                        </section>
+                      )}
 
                       <article className="mt-4 rounded-3xl border border-slate-200 bg-white p-4">
                         <p className="text-sm font-medium text-slate-500">

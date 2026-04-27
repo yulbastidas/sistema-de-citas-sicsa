@@ -44,8 +44,6 @@ export class CreateAdminAppointmentDto {
   @IsBoolean()
   fiebre?: boolean;
 
-  // 🔥 NUEVO (LO QUE FALTABA)
-
   @IsOptional()
   @IsString()
   eps?: string;
@@ -69,4 +67,9 @@ export class CreateAdminAppointmentDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+
+  // Requerido solo cuando appointmentClassId sea 4 (radiología)
+  @IsOptional()
+  @IsString()
+  ordenMedicaUrl?: string;
 }

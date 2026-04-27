@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import axios from 'axios';
 
 import { Appointment } from './entities/appointment.entity';
@@ -57,6 +57,8 @@ export type AppointmentWithPatient = Appointment & {
   medicalReport: MedicalReportSummary;
 };
 
+type AppointmentInput = CreateAppointmentDto | CreateAdminAppointmentDto;
+
 @Injectable()
 export class AppointmentsService {
   constructor(
@@ -78,7 +80,18 @@ export class AppointmentsService {
     data: CreateAppointmentDto,
     user: JwtUser,
   ): Promise<AppointmentWithPatient> {
-    await this.validateAvailableSlot(data.fecha, data.hora);
+    const duration = this.getAppointmentDuration(data.appointmentClassId);
+
+    this.validateBusinessSchedule(data.fecha, data.hora, duration);
+    this.validateRadiologyBase(data);
+
+    const slotAvailable = await this.isSlotAvailable(
+      data.fecha,
+      data.hora,
+      duration,
+    );
+
+    const appointmentStatus = slotAvailable ? 'confirmada' : 'lista_espera';
 
     const assignedDoctor = await this.findDoctorBySpecialty(data.specialtyId);
     const prioridadData = await this.getPrioridad(data);
@@ -97,7 +110,7 @@ export class AppointmentsService {
       sangrado: data.sangrado ?? false,
       dificultadRespiratoria: data.dificultadRespiratoria ?? false,
       fiebre: data.fiebre ?? false,
-      estado: 'pendiente',
+      estado: appointmentStatus,
       prioridad: prioridadData.prioridad,
       scorePrioridad: prioridadData.scorePrioridad,
       explicacionPrioridad: prioridadData.explicacionPrioridad,
@@ -107,6 +120,8 @@ export class AppointmentsService {
       municipio: data.municipio,
       appointmentClassId: data.appointmentClassId,
       observaciones: data.observaciones,
+      ordenMedicaUrl: data.ordenMedicaUrl,
+      approvedAt: appointmentStatus === 'confirmada' ? new Date() : undefined,
     };
 
     const appointment = this.appointmentRepo.create(appointmentData);
@@ -116,10 +131,15 @@ export class AppointmentsService {
     this.appointmentsGateway.emitAppointmentCreated(result);
     this.appointmentsGateway.emitQueueUpdated({
       fecha: saved.fecha,
-      message: 'Cola actualizada',
+      message:
+        saved.estado === 'lista_espera'
+          ? 'Cita agregada a lista de espera'
+          : 'Cola actualizada',
     });
 
-    await this.sendAppointmentCreatedToN8n(result);
+    if (saved.estado === 'confirmada') {
+      await this.sendAppointmentCreatedToN8n(result);
+    }
 
     return result;
   }
@@ -135,7 +155,18 @@ export class AppointmentsService {
       throw new NotFoundException('Paciente no encontrado');
     }
 
-    await this.validateAvailableSlot(data.fecha, data.hora);
+    const duration = this.getAppointmentDuration(data.appointmentClassId);
+
+    this.validateBusinessSchedule(data.fecha, data.hora, duration);
+    this.validateRadiologyBase(data);
+
+    const slotAvailable = await this.isSlotAvailable(
+      data.fecha,
+      data.hora,
+      duration,
+    );
+
+    const appointmentStatus = slotAvailable ? 'confirmada' : 'lista_espera';
 
     const assignedDoctor = await this.findDoctorBySpecialty(data.specialtyId);
     const prioridadData = await this.getPrioridad(data);
@@ -154,7 +185,7 @@ export class AppointmentsService {
       sangrado: data.sangrado ?? false,
       dificultadRespiratoria: data.dificultadRespiratoria ?? false,
       fiebre: data.fiebre ?? false,
-      estado: 'pendiente',
+      estado: appointmentStatus,
       prioridad: prioridadData.prioridad,
       scorePrioridad: prioridadData.scorePrioridad,
       explicacionPrioridad: prioridadData.explicacionPrioridad,
@@ -164,6 +195,8 @@ export class AppointmentsService {
       municipio: data.municipio ?? patient.municipio,
       appointmentClassId: data.appointmentClassId,
       observaciones: data.observaciones,
+      ordenMedicaUrl: data.ordenMedicaUrl,
+      approvedAt: appointmentStatus === 'confirmada' ? new Date() : undefined,
     };
 
     const appointment = this.appointmentRepo.create(appointmentData);
@@ -173,10 +206,15 @@ export class AppointmentsService {
     this.appointmentsGateway.emitAppointmentCreated(result);
     this.appointmentsGateway.emitQueueUpdated({
       fecha: saved.fecha,
-      message: 'Cola actualizada',
+      message:
+        saved.estado === 'lista_espera'
+          ? 'Cita agregada a lista de espera'
+          : 'Cola actualizada',
     });
 
-    await this.sendAppointmentCreatedToN8n(result);
+    if (saved.estado === 'confirmada') {
+      await this.sendAppointmentCreatedToN8n(result);
+    }
 
     return result;
   }
@@ -286,6 +324,12 @@ export class AppointmentsService {
       throw new BadRequestException('No puedes cancelar esta cita');
     }
 
+    const releasedFecha = appointment.fecha;
+    const releasedHora = appointment.hora;
+    const releasedDuration = this.getAppointmentDuration(
+      appointment.appointmentClassId,
+    );
+
     appointment.estado = 'cancelada';
 
     const saved = await this.appointmentRepo.save(appointment);
@@ -297,50 +341,37 @@ export class AppointmentsService {
       message: 'Cola actualizada',
     });
 
+    await this.assignReleasedSlotToWaitlist(
+      releasedFecha,
+      releasedHora,
+      releasedDuration,
+    );
+
     return result;
   }
 
-  async getAvailable(fecha: string): Promise<string[]> {
-    const allHours = [
-      '07:00',
-      '07:20',
-      '07:40',
-      '08:00',
-      '08:20',
-      '08:40',
-      '09:00',
-      '09:20',
-      '09:40',
-      '10:00',
-      '10:20',
-      '10:40',
-      '11:00',
-      '11:20',
-      '11:40',
-      '14:00',
-      '14:20',
-      '14:40',
-      '15:00',
-      '15:20',
-      '15:40',
-      '16:00',
-      '16:20',
-      '16:40',
-      '17:00',
-      '17:20',
-      '17:40',
-    ];
+  async getAvailable(
+    fecha: string,
+    appointmentClassId?: number,
+  ): Promise<string[]> {
+    const duration = this.getAppointmentDuration(appointmentClassId);
+    const hours = this.generateAvailableHoursByDate(fecha);
 
     const appointments = await this.appointmentRepo.find({
       where: {
         fecha,
-        estado: Not('cancelada'),
+        estado: In(this.getBlockingStates()),
       },
     });
 
-    const occupiedHours = appointments.map((appointment) => appointment.hora);
-
-    return allHours.filter((hour) => !occupiedHours.includes(hour));
+    return hours.filter((hour) => {
+      try {
+        this.validateBusinessSchedule(fecha, hour, duration);
+        return !this.hasScheduleConflict(hour, duration, appointments);
+      } catch {
+        return false;
+      }
+    });
   }
 
   async getQueue(
@@ -452,6 +483,262 @@ export class AppointmentsService {
     return await this.appointmentPdfService.generateMedicalReport(pdfData);
   }
 
+  private async assignReleasedSlotToWaitlist(
+    fecha: string,
+    hora: string,
+    releasedDuration: number,
+  ): Promise<void> {
+    const waitlistAppointments = await this.appointmentRepo.find({
+      where: {
+        fecha,
+        estado: 'lista_espera',
+      },
+      order: {
+        scorePrioridad: 'DESC',
+        hora: 'ASC',
+      },
+    });
+
+    for (const candidate of waitlistAppointments) {
+      const candidateDuration = this.getAppointmentDuration(
+        candidate.appointmentClassId,
+      );
+
+      if (candidateDuration > releasedDuration) {
+        continue;
+      }
+
+      try {
+        this.validateBusinessSchedule(fecha, hora, candidateDuration);
+      } catch {
+        continue;
+      }
+
+      const available = await this.isSlotAvailable(
+        fecha,
+        hora,
+        candidateDuration,
+      );
+
+      if (!available) {
+        continue;
+      }
+
+      candidate.hora = hora;
+      candidate.estado = 'confirmada';
+      candidate.approvedAt = new Date();
+
+      const savedCandidate = await this.appointmentRepo.save(candidate);
+      const result = await this.attachPatientData(savedCandidate);
+
+      this.appointmentsGateway.emitAppointmentUpdated(result);
+      this.appointmentsGateway.emitQueueUpdated({
+        fecha,
+        message: 'Cupo liberado asignado automáticamente',
+      });
+
+      await this.sendWaitlistAssignedToN8n(result);
+
+      return;
+    }
+  }
+
+  private validateBusinessSchedule(
+    fecha: string,
+    hora: string,
+    durationMinutes: number,
+  ): void {
+    const day = this.getDayOfWeek(fecha);
+    const startMinutes = this.timeToMinutes(hora);
+
+    if (day === 0 || day === 1) {
+      throw new BadRequestException(
+        'No se pueden agendar citas los domingos ni los lunes',
+      );
+    }
+
+    if (day === 2 || day === 3) {
+      const opening = this.timeToMinutes('08:00');
+      const closing = this.timeToMinutes('17:40');
+
+      if (startMinutes < opening || startMinutes > closing) {
+        throw new BadRequestException(
+          'Los martes y miércoles las citas inician desde las 08:00',
+        );
+      }
+    }
+
+    if (day === 4 || day === 5) {
+      const opening = this.timeToMinutes('07:00');
+      const closing = this.timeToMinutes('17:40');
+
+      if (startMinutes < opening || startMinutes > closing) {
+        throw new BadRequestException(
+          'Los jueves y viernes las citas inician desde las 07:00',
+        );
+      }
+    }
+
+    if (day === 6) {
+      const opening = this.timeToMinutes('07:00');
+      const closing = this.timeToMinutes('12:40');
+
+      if (startMinutes < opening || startMinutes > closing) {
+        throw new BadRequestException(
+          'Los sábados solo se pueden agendar citas hasta las 12:40',
+        );
+      }
+    }
+
+    void durationMinutes;
+  }
+
+  private generateAvailableHoursByDate(fecha: string): string[] {
+    const day = this.getDayOfWeek(fecha);
+
+    if (day === 0 || day === 1) {
+      return [];
+    }
+
+    if (day === 2 || day === 3) {
+      return this.generateHours('08:00', '17:40', 20);
+    }
+
+    if (day === 4 || day === 5) {
+      return this.generateHours('07:00', '17:40', 20);
+    }
+
+    if (day === 6) {
+      return this.generateHours('07:00', '12:40', 20);
+    }
+
+    return [];
+  }
+
+  private generateHours(
+    start: string,
+    end: string,
+    stepMinutes: number,
+  ): string[] {
+    const hours: string[] = [];
+    let current = this.timeToMinutes(start);
+    const limit = this.timeToMinutes(end);
+
+    while (current <= limit) {
+      hours.push(this.minutesToTime(current));
+      current += stepMinutes;
+    }
+
+    return hours;
+  }
+
+  private getBlockingStates(): string[] {
+    return ['confirmada', 'aprobada', 'pendiente', 'atendida'];
+  }
+
+  private async isSlotAvailable(
+    fecha: string,
+    hora: string,
+    durationMinutes: number,
+  ): Promise<boolean> {
+    const appointments = await this.appointmentRepo.find({
+      where: {
+        fecha,
+        estado: In(this.getBlockingStates()),
+      },
+    });
+
+    return !this.hasScheduleConflict(hora, durationMinutes, appointments);
+  }
+
+  private async validateAvailableSlot(
+    fecha: string,
+    hora: string,
+    durationMinutes: number,
+  ): Promise<void> {
+    const available = await this.isSlotAvailable(fecha, hora, durationMinutes);
+
+    if (!available) {
+      throw new BadRequestException('Ese horario ya está ocupado');
+    }
+  }
+
+  private hasScheduleConflict(
+    requestedHour: string,
+    requestedDuration: number,
+    appointments: Appointment[],
+  ): boolean {
+    const requestedStart = this.timeToMinutes(requestedHour);
+    const requestedEnd = requestedStart + requestedDuration;
+
+    return appointments.some((appointment) => {
+      const appointmentStart = this.timeToMinutes(appointment.hora);
+      const appointmentDuration = this.getAppointmentDuration(
+        appointment.appointmentClassId,
+      );
+      const appointmentEnd = appointmentStart + appointmentDuration;
+
+      return requestedStart < appointmentEnd && requestedEnd > appointmentStart;
+    });
+  }
+
+  private getAppointmentDuration(appointmentClassId?: number | null): number {
+    switch (appointmentClassId) {
+      case 1:
+        return 20;
+      case 2:
+        return 30;
+      case 3:
+        return 30;
+      case 4:
+        return 20;
+      case 5:
+        return 20;
+      case 6:
+        return 40;
+      default:
+        return 20;
+    }
+  }
+
+  private validateRadiologyBase(data: AppointmentInput): void {
+    const RADIOLOGY_CLASS_ID = 4;
+
+    if (data.appointmentClassId !== RADIOLOGY_CLASS_ID) {
+      return;
+    }
+
+    const hasMedicalOrder =
+      typeof data.ordenMedicaUrl === 'string' &&
+      data.ordenMedicaUrl.trim().length > 0;
+
+    if (!hasMedicalOrder) {
+      throw new BadRequestException(
+        'Para radiología se requiere una orden médica',
+      );
+    }
+  }
+
+  private getDayOfWeek(fecha: string): number {
+    const [year, month, day] = fecha.split('-').map(Number);
+    return new Date(year, month - 1, day).getDay();
+  }
+
+  private timeToMinutes(time: string): number {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
+  private minutesToTime(totalMinutes: number): string {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(
+      2,
+      '0',
+    )}`;
+  }
+
   private async sendAppointmentCreatedToN8n(
     appointment: AppointmentWithPatient,
   ): Promise<void> {
@@ -480,6 +767,41 @@ export class AppointmentsService {
     }
   }
 
+  private async sendWaitlistAssignedToN8n(
+    appointment: AppointmentWithPatient,
+  ): Promise<void> {
+    const webhookUrl =
+      process.env.N8N_WAITLIST_ASSIGNED_WEBHOOK_URL ??
+      'http://localhost:5678/webhook/lista-espera-asignada';
+
+    if (!appointment.patient?.email) {
+      console.warn(
+        'No se pudo enviar correo de lista de espera: paciente sin email',
+      );
+      return;
+    }
+
+    try {
+      await axios.post(webhookUrl, {
+        email: appointment.patient.email,
+        nombre: appointment.patient.nombre,
+        fecha: appointment.fecha,
+        hora: appointment.hora,
+        estado: appointment.estado,
+        mensaje: 'Se liberó un cupo y tu cita fue confirmada automáticamente.',
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error(
+          'Error enviando lista-espera-asignada a n8n:',
+          error.message,
+        );
+      } else {
+        console.error('Error enviando lista-espera-asignada a n8n:', error);
+      }
+    }
+  }
+
   private getTomorrowDate(): string {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -498,7 +820,6 @@ export class AppointmentsService {
     medicalReport: MedicalReport | null,
   ): MedicalReportPdfData {
     const patientRecord = patient as unknown as Record<string, unknown> | null;
-
     const doctorName = doctor?.nombre ?? 'No asignado';
 
     const specialtyName = doctor?.especialidadId
@@ -556,23 +877,6 @@ export class AppointmentsService {
     };
   }
 
-  private async validateAvailableSlot(
-    fecha: string,
-    hora: string,
-  ): Promise<void> {
-    const existingAppointment = await this.appointmentRepo.findOne({
-      where: {
-        fecha,
-        hora,
-        estado: Not('cancelada'),
-      },
-    });
-
-    if (existingAppointment) {
-      throw new BadRequestException('Ese horario ya está ocupado');
-    }
-  }
-
   private async findDoctorBySpecialty(specialtyId: number): Promise<Doctor> {
     const doctor = await this.doctorRepo.findOne({
       where: {
@@ -613,9 +917,7 @@ export class AppointmentsService {
     throw new NotFoundException('Doctor no encontrado');
   }
 
-  private async getPrioridad(
-    data: CreateAppointmentDto | CreateAdminAppointmentDto,
-  ): Promise<PriorityResult> {
+  private async getPrioridad(data: AppointmentInput): Promise<PriorityResult> {
     try {
       const response = await axios.post<{
         prioridad?: string;

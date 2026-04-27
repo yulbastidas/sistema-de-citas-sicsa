@@ -7,6 +7,7 @@ import {
   LogOut,
   ShieldCheck,
   Sparkles,
+  UsersRound,
 } from "lucide-react";
 import { logout } from "@/service/session";
 
@@ -24,6 +25,11 @@ export default function AdminSidebar() {
       label: "Citas",
       href: "/dashboard/admin/appointments",
       icon: CalendarDays,
+    },
+    {
+      label: "Pacientes",
+      href: "/dashboard/admin/patients",
+      icon: UsersRound,
     },
   ];
 
@@ -86,8 +92,8 @@ export default function AdminSidebar() {
         </header>
 
         <p className="mt-4 text-sm leading-6 text-slate-600">
-          Revisa verificaciones, administra citas y mantén control del flujo
-          operativo del sistema.
+          Revisa verificaciones, administra citas, actualiza datos de pacientes
+          y mantén control del flujo operativo del sistema.
         </p>
       </section>
 
@@ -105,8 +111,8 @@ export default function AdminSidebar() {
         </header>
 
         <p className="mt-3 text-sm leading-6 text-blue-800">
-          Este espacio está diseñado para el control de personal interno y
-          seguimiento administrativo.
+          Este espacio está diseñado para el control de personal interno,
+          trazabilidad y seguimiento administrativo.
         </p>
       </section>
 

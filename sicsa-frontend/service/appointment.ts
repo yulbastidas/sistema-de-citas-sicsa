@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 function authHeaders(token: string) {
   return {
@@ -28,7 +28,7 @@ function buildErrorMessage(result: unknown, fallback: string): string {
     'message' in result &&
     Array.isArray((result as { message?: unknown }).message)
   ) {
-    return ((result as { message: string[] }).message).join(', ');
+    return (result as { message: string[] }).message.join(', ');
   }
 
   if (
@@ -56,6 +56,7 @@ export async function createAppointment(
     municipio?: string;
     appointmentClassId?: number;
     observaciones?: string;
+    ordenMedicaUrl?: string;
   },
 ) {
   const response = await fetch(`${API_URL}/appointments`, {
@@ -91,9 +92,17 @@ export async function getMyAppointments(token: string) {
 export async function getAvailableAppointments(
   token: string,
   fecha: string,
+  appointmentClassId?: number,
 ) {
+  const params = new URLSearchParams();
+  params.set('fecha', fecha);
+
+  if (typeof appointmentClassId === 'number') {
+    params.set('appointmentClassId', String(appointmentClassId));
+  }
+
   const response = await fetch(
-    `${API_URL}/appointments/available?fecha=${encodeURIComponent(fecha)}`,
+    `${API_URL}/appointments/available?${params.toString()}`,
     {
       method: 'GET',
       headers: authHeaders(token),
@@ -115,7 +124,7 @@ export async function cancelAppointment(token: string, id: number) {
   const response = await fetch(`${API_URL}/appointments/cancel`, {
     method: 'POST',
     headers: authHeaders(token),
-    body: JSON.stringify({ id }),
+    body: JSON.stringify({ id: Number(id) }),
   });
 
   const result = await parseResponse(response);
@@ -144,10 +153,7 @@ export async function getAllAppointments(token: string) {
   return result;
 }
 
-export async function getDoctorAppointments(
-  token: string,
-  doctorId: number,
-) {
+export async function getDoctorAppointments(token: string, doctorId: number) {
   const response = await fetch(`${API_URL}/appointments/doctor/${doctorId}`, {
     method: 'GET',
     headers: authHeaders(token),
@@ -168,7 +174,7 @@ export async function approveAppointment(token: string, id: number) {
   const response = await fetch(`${API_URL}/appointments/approve`, {
     method: 'POST',
     headers: authHeaders(token),
-    body: JSON.stringify({ id }),
+    body: JSON.stringify({ id: Number(id) }),
   });
 
   const result = await parseResponse(response);
@@ -192,10 +198,13 @@ export async function getQueueAppointments(
     params.set('doctorId', String(doctorId));
   }
 
-  const response = await fetch(`${API_URL}/appointments/queue?${params.toString()}`, {
-    method: 'GET',
-    headers: authHeaders(token),
-  });
+  const response = await fetch(
+    `${API_URL}/appointments/queue?${params.toString()}`,
+    {
+      method: 'GET',
+      headers: authHeaders(token),
+    },
+  );
 
   const result = await parseResponse(response);
 
@@ -229,6 +238,7 @@ export async function adminCreateAppointment(
     municipio?: string;
     appointmentClassId?: number;
     observaciones?: string;
+    ordenMedicaUrl?: string;
   },
 ) {
   const response = await fetch(`${API_URL}/appointments/admin-create`, {
@@ -246,10 +256,7 @@ export async function adminCreateAppointment(
   return result;
 }
 
-export async function getMedicalReport(
-  token: string,
-  appointmentId: number,
-) {
+export async function getMedicalReport(token: string, appointmentId: number) {
   const response = await fetch(`${API_URL}/medical-reports/${appointmentId}`, {
     method: 'GET',
     headers: authHeaders(token),
@@ -313,7 +320,6 @@ export async function downloadAppointmentPdf(
 
   if (!response.ok) {
     const result = await parseResponse(response);
-
     throw new Error(buildErrorMessage(result, 'Error al descargar el PDF'));
   }
 
