@@ -1,7 +1,7 @@
 export class CreateUserDto {
-  email: string;
-  password: string;
-  role: 'admin' | 'patient' | 'doctor';
+  email!: string;
+  password!: string;
+  role!: 'admin' | 'patient' | 'doctor';
 
   tipoDocumento?: string;
   numeroDocumento?: string;

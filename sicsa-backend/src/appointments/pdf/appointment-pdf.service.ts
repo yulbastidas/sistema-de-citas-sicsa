@@ -39,70 +39,88 @@ export interface MedicalReportPdfData {
 export class AppointmentPdfService {
   async generateMedicalReport(data: MedicalReportPdfData): Promise<Buffer> {
     return await new Promise<Buffer>((resolve, reject) => {
-      const doc: PDFKit.PDFDocument = new PDFDocument({
+      const doc = new PDFDocument({
         size: 'A4',
         margin: 40,
+        bufferPages: true,
       });
 
-      const chunks: Buffer[] = [];
-
-      doc.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-
+      const chunks: Uint8Array[] = [];
+      doc.on('data', (chunk: Uint8Array) => chunks.push(chunk));
       doc.on('end', () => {
-        resolve(Buffer.concat(chunks));
+        // Solución al error de 'any' / unsafe-argument
+        const result = Buffer.concat(chunks);
+        resolve(result);
       });
 
-      doc.on('error', (error: Error) => {
-        reject(error);
+      doc.on('error', (err: Error) => {
+        // Solución al error de prefer-promise-reject-errors
+        reject(new Error(err.message));
       });
 
+      // --- ENCABEZADO INSTITUCIONAL ---
       this.addHeader(doc);
-      this.addAppointmentSection(doc, data);
-      this.addPatientSection(doc, data);
-      this.addDoctorSection(doc, data);
-      this.addClinicalSection(
-        doc,
-        'Motivo de consulta',
-        data.cita.motivoConsulta || 'No registrado',
-      );
-      this.addClinicalSection(
-        doc,
-        'Enfermedad actual',
-        data.historiaClinica.enfermedadActual,
-      );
-      this.addClinicalSection(
-        doc,
-        'Antecedentes',
-        data.historiaClinica.antecedentes,
-      );
-      this.addClinicalSection(
-        doc,
-        'Signos vitales',
-        data.historiaClinica.signosVitales,
-      );
-      this.addClinicalSection(
-        doc,
-        'Examen físico',
-        data.historiaClinica.examenFisico,
-      );
-      this.addClinicalSection(
-        doc,
-        'Diagnóstico',
-        data.historiaClinica.diagnostico,
-      );
-      this.addClinicalSection(
-        doc,
-        'Tratamiento',
-        data.historiaClinica.tratamiento,
-      );
-      this.addClinicalSection(
-        doc,
-        'Observaciones',
-        data.historiaClinica.observaciones,
-      );
-      this.addSignatureSection(doc);
+
+      // --- DATOS DEL PACIENTE ---
+      this.addTableSection(doc, 'DATOS DEL PACIENTE', [
+        [
+          'Nombre:',
+          data.paciente.nombre,
+          'Documento:',
+          data.paciente.documento,
+        ],
+        [
+          'Edad:',
+          String(data.paciente.edad),
+          'Teléfono:',
+          data.paciente.telefono,
+        ],
+        ['Correo:', data.paciente.email, 'EPS:', data.paciente.eps],
+      ]);
+
+      // --- DATOS DE ATENCIÓN ---
+      this.addTableSection(doc, 'DATOS DE ATENCIÓN', [
+        ['Fecha:', data.cita.fecha, 'Hora:', data.cita.hora],
+        ['Admisión:', `#${data.cita.id}`, 'Estado:', data.cita.estado],
+        [
+          'Prioridad:',
+          data.cita.prioridad,
+          'Score:',
+          String(data.cita.scorePrioridad),
+        ],
+      ]);
+
+      // --- ADMINISTRADORA / SERVICIO ---
+      this.addTableSection(doc, 'ADMINISTRADORA / SERVICIO', [
+        [
+          'Administradora:',
+          data.paciente.eps,
+          'Especialidad:',
+          data.doctor.especialidad,
+        ],
+        [
+          'Procedimiento:',
+          'Consulta Médica',
+          'Priorización:',
+          data.cita.explicacionPrioridad || 'N/A',
+        ],
+      ]);
+
+      // --- PROFESIONAL RESPONSABLE ---
+      this.addTableSection(doc, 'PROFESIONAL RESPONSABLE', [
+        [
+          'Doctor(a):',
+          data.doctor.nombre,
+          'Especialidad:',
+          data.doctor.especialidad,
+        ],
+      ]);
+
+      // --- INFORMACIÓN CLÍNICA ---
+      this.addClinicalContent(doc, data);
+
+      // --- FIRMA Y FOOTER ---
+      this.addSignature(doc);
       this.addFooter(doc);
 
       doc.end();
@@ -112,181 +130,120 @@ export class AppointmentPdfService {
   private addHeader(doc: PDFKit.PDFDocument): void {
     doc
       .font('Helvetica-Bold')
-      .fontSize(16)
-      .text('E.S.E. HOSPITAL CLARITA SANTOS', {
-        align: 'center',
-      });
-
+      .fontSize(14)
+      .text('E.S.E. Hospital Clarita Santos', { align: 'center' });
     doc
-      .moveDown(0.3)
-      .font('Helvetica')
-      .fontSize(11)
-      .text('Formato de atención médica / reporte clínico de cita', {
-        align: 'center',
-      });
-
-    doc.moveDown(0.5);
-
-    const y = doc.y;
-
-    doc.moveTo(40, y).lineTo(555, y).stroke();
-
+      .fontSize(10)
+      .text('SICSA - Reporte clínico de atención', { align: 'center' });
     doc.moveDown(1);
+    this.drawLine(doc);
   }
 
-  private addAppointmentSection(
-    doc: PDFKit.PDFDocument,
-    data: MedicalReportPdfData,
-  ): void {
-    this.addSectionTitle(doc, 'DATOS DE LA CITA');
-
-    this.addField(doc, 'ID de cita', String(data.cita.id));
-    this.addField(doc, 'Fecha', data.cita.fecha);
-    this.addField(doc, 'Hora', data.cita.hora);
-    this.addField(doc, 'Estado', data.cita.estado);
-    this.addField(doc, 'Prioridad', data.cita.prioridad);
-    this.addField(
-      doc,
-      'Puntaje de prioridad',
-      String(data.cita.scorePrioridad),
-    );
-    this.addField(
-      doc,
-      'Explicación de prioridad',
-      data.cita.explicacionPrioridad || 'No registrada',
-    );
-  }
-
-  private addPatientSection(
-    doc: PDFKit.PDFDocument,
-    data: MedicalReportPdfData,
-  ): void {
-    this.addSectionTitle(doc, 'DATOS DEL PACIENTE');
-
-    this.addField(doc, 'Nombre completo', data.paciente.nombre);
-    this.addField(doc, 'Documento', data.paciente.documento);
-    this.addField(doc, 'Edad', String(data.paciente.edad));
-    this.addField(doc, 'Teléfono', data.paciente.telefono);
-    this.addField(doc, 'Correo electrónico', data.paciente.email);
-    this.addField(doc, 'EPS', data.paciente.eps);
-  }
-
-  private addDoctorSection(
-    doc: PDFKit.PDFDocument,
-    data: MedicalReportPdfData,
-  ): void {
-    this.addSectionTitle(doc, 'DATOS DEL PROFESIONAL');
-
-    this.addField(doc, 'Doctor(a)', data.doctor.nombre);
-    this.addField(doc, 'Especialidad', data.doctor.especialidad);
-  }
-
-  private addClinicalSection(
+  private addTableSection(
     doc: PDFKit.PDFDocument,
     title: string,
-    content: string,
+    rows: string[][],
   ): void {
-    this.ensureSpace(doc, 110);
-
     doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').fontSize(11).text(title);
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#444').text(title);
+    doc.fillColor('black');
 
-    const startY = doc.y + 4;
-    const boxHeight = 70;
+    const startY = doc.y + 2;
+    const colWidth = 130;
+    const rowHeight = 14;
 
-    doc.rect(40, startY, 515, boxHeight).stroke();
-
-    doc
-      .font('Helvetica')
-      .fontSize(10)
-      .text(
-        content ||
-          '................................................................................',
-        48,
-        startY + 8,
-        {
-          width: 499,
-          align: 'justify',
-        },
-      );
-
-    doc.y = startY + boxHeight + 8;
-  }
-
-  private addSignatureSection(doc: PDFKit.PDFDocument): void {
-    this.ensureSpace(doc, 120);
-
-    doc.moveDown(1);
-    doc.font('Helvetica-Bold').fontSize(11).text('FIRMA');
-
-    const startY = doc.y + 10;
-
-    doc.rect(40, startY, 515, 60).stroke();
-
-    doc
-      .font('Helvetica')
-      .fontSize(10)
-      .text('Firma del profesional responsable:', 48, startY + 10);
-
-    doc
-      .moveTo(250, startY + 35)
-      .lineTo(500, startY + 35)
-      .stroke();
-
-    doc.y = startY + 75;
-  }
-
-  private addSectionTitle(doc: PDFKit.PDFDocument, title: string): void {
-    this.ensureSpace(doc, 80);
-
-    doc.moveDown(0.8);
-    doc.font('Helvetica-Bold').fontSize(12).text(title);
-    doc.moveDown(0.2);
-
-    const y = doc.y;
-    doc.moveTo(40, y).lineTo(555, y).stroke();
-    doc.moveDown(0.5);
-  }
-
-  private addField(
-    doc: PDFKit.PDFDocument,
-    label: string,
-    value: string,
-  ): void {
-    this.ensureSpace(doc, 30);
-
-    doc.font('Helvetica-Bold').fontSize(10).text(`${label}:`, {
-      continued: true,
+    rows.forEach((row, i) => {
+      let currentX = 40;
+      row.forEach((text, j) => {
+        const isLabel = j % 2 === 0;
+        doc
+          .font(isLabel ? 'Helvetica-Bold' : 'Helvetica')
+          .fontSize(8)
+          .text(text || '', currentX, startY + i * rowHeight, {
+            width: colWidth,
+            lineBreak: false,
+          });
+        currentX += colWidth;
+      });
     });
 
-    doc.font('Helvetica').text(` ${value || 'No registrado'}`);
-    doc.moveDown(0.2);
+    doc.y = startY + rows.length * rowHeight + 5;
+    this.drawLine(doc);
+  }
+
+  private addClinicalContent(
+    doc: PDFKit.PDFDocument,
+    data: MedicalReportPdfData,
+  ): void {
+    doc.moveDown(0.5);
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(9)
+      .fillColor('#444')
+      .text('INFORMACIÓN CLÍNICA');
+    doc.fillColor('black').moveDown(0.5);
+
+    const sections = [
+      { label: 'Motivo de consulta', content: data.cita.motivoConsulta },
+      {
+        label: 'Enfermedad actual',
+        content: data.historiaClinica.enfermedadActual,
+      },
+      { label: 'Antecedentes', content: data.historiaClinica.antecedentes },
+      { label: 'Signos vitales', content: data.historiaClinica.signosVitales },
+      { label: 'Examen físico', content: data.historiaClinica.examenFisico },
+      { label: 'Diagnóstico', content: data.historiaClinica.diagnostico },
+      { label: 'Tratamiento', content: data.historiaClinica.tratamiento },
+      { label: 'Observaciones', content: data.historiaClinica.observaciones },
+    ];
+
+    sections.forEach((s) => {
+      if (doc.y > 700) doc.addPage();
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(8)
+        .text(`${s.label.toUpperCase()}: `, { continued: true });
+      doc.font('Helvetica').text(s.content || 'Sin registros.');
+      doc.moveDown(0.4);
+    });
+  }
+
+  private addSignature(doc: PDFKit.PDFDocument): void {
+    if (doc.y > 650) doc.addPage();
+    doc.moveDown(3);
+    const y = doc.y;
+    doc.moveTo(40, y).lineTo(200, y).stroke();
+    doc
+      .fontSize(8)
+      .font('Helvetica-Bold')
+      .text('Firma del profesional responsable', 40, y + 5);
   }
 
   private addFooter(doc: PDFKit.PDFDocument): void {
-    const footerY = 770;
-
-    doc
-      .font('Helvetica')
-      .fontSize(8)
-      .text(
-        'Documento generado automáticamente por SICSA - Sistema Integral de Control y Seguimiento de Citas',
-        40,
-        footerY,
-        {
-          width: 515,
-          align: 'center',
-        },
-      );
+    const pages = doc.bufferedPageRange();
+    for (let i = 0; i < pages.count; i++) {
+      doc.switchToPage(i);
+      doc
+        .fontSize(7)
+        .fillColor('#777')
+        .text(
+          `Documento generado por SICSA para Hospital Clarita Santos | Página ${
+            i + 1
+          } de ${pages.count}`,
+          40,
+          doc.page.height - 30,
+          { align: 'center' },
+        );
+    }
   }
 
-  private ensureSpace(doc: PDFKit.PDFDocument, requiredHeight: number): void {
-    const pageHeight = doc.page.height;
-    const bottomMargin = doc.page.margins.bottom;
-    const availableSpace = pageHeight - bottomMargin - doc.y;
-
-    if (availableSpace < requiredHeight) {
-      doc.addPage();
-    }
+  private drawLine(doc: PDFKit.PDFDocument): void {
+    doc
+      .moveTo(40, doc.y)
+      .lineTo(555, doc.y)
+      .lineWidth(0.5)
+      .strokeColor('#ccc')
+      .stroke();
+    doc.moveDown(0.5);
   }
 }

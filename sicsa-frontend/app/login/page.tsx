@@ -4,22 +4,35 @@ import Image from "next/image";
 import Link from "next/link";
 import { HeartPulse, LogIn } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { loginUser } from "@/service/auth";
 import { logout, saveSession } from "@/service/session";
+
+const ALLOWED_ROLES = ["patient", "doctor", "admin"] as const;
+
+type AllowedRole = (typeof ALLOWED_ROLES)[number];
+
+const ROLE_LABELS: Record<AllowedRole, string> = {
+  patient: "Paciente",
+  doctor: "Médico",
+  admin: "Administrador",
+};
+
+function isAllowedRole(value: string | null): value is AllowedRole {
+  return value === "patient" || value === "doctor" || value === "admin";
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const role = searchParams.get("role") || "patient";
+  const rawRole = searchParams.get("role");
 
-  const roleLabel =
-    role === "doctor"
-      ? "Médico"
-      : role === "admin"
-        ? "Administrador"
-        : "Paciente";
+  const role = useMemo<AllowedRole>(() => {
+    return isAllowedRole(rawRole) ? rawRole : "patient";
+  }, [rawRole]);
+
+  const roleLabel = ROLE_LABELS[role];
 
   const [form, setForm] = useState({
     email: "",
@@ -27,7 +40,12 @@ export default function LoginPage() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [tapCount, setTapCount] = useState(0);
+
+  useEffect(() => {
+    if (!rawRole || !isAllowedRole(rawRole)) {
+      router.replace("/login?role=patient");
+    }
+  }, [rawRole, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({
@@ -36,23 +54,13 @@ export default function LoginPage() {
     }));
   };
 
-  const handleHiddenAccess = () => {
-    const nextCount = tapCount + 1;
-    setTapCount(nextCount);
-
-    if (nextCount >= 5) {
-      setTapCount(0);
-      router.push("/select-role");
-      return;
-    }
-
-    window.setTimeout(() => {
-      setTapCount(0);
-    }, 1800);
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isAllowedRole(rawRole)) {
+      router.replace("/login?role=patient");
+      return;
+    }
 
     if (!form.email || !form.password) {
       alert("Completa correo y contraseña");
@@ -61,7 +69,6 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-
       logout();
 
       const result = await loginUser(form.email, form.password);
@@ -78,6 +85,13 @@ export default function LoginPage() {
         return;
       }
 
+      if (savedUser.role !== role) {
+        alert("El rol seleccionado no coincide con el usuario");
+        logout();
+        router.replace("/login?role=patient");
+        return;
+      }
+
       if (savedUser.role === "patient") {
         router.replace("/dashboard/patient");
       } else if (savedUser.role === "doctor") {
@@ -85,7 +99,7 @@ export default function LoginPage() {
       } else if (savedUser.role === "admin") {
         router.replace("/dashboard/admin");
       } else {
-        router.replace("/");
+        router.replace("/login?role=patient");
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -110,6 +124,7 @@ export default function LoginPage() {
             <h1 className="mb-2 text-5xl font-extrabold text-slate-900">
               Bienvenido
             </h1>
+
             <p className="mb-10 text-lg text-slate-600">
               Inicia sesión como {roleLabel}
             </p>
@@ -166,16 +181,14 @@ export default function LoginPage() {
                 </p>
               )}
 
-              {role !== "patient" && (
-                <p>
-                  <Link
-                    href="/select-role"
-                    className="font-semibold text-slate-700 hover:underline"
-                  >
-                    Cambiar rol
-                  </Link>
-                </p>
-              )}
+              <p>
+                <Link
+                  href="/select-role"
+                  className="font-semibold text-slate-700 hover:underline"
+                >
+                  Cambiar rol
+                </Link>
+              </p>
             </section>
           </section>
         </section>
@@ -188,17 +201,13 @@ export default function LoginPage() {
             sizes="50vw"
             className="object-cover"
           />
+
           <section className="absolute inset-0 bg-blue-900/35" />
 
           <section className="absolute inset-0 flex flex-col items-center justify-center px-10 text-center text-white">
-            <button
-              type="button"
-              onClick={handleHiddenAccess}
-              className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-lg"
-              aria-label="Acceso interno"
-            >
+            <section className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-lg">
               <HeartPulse className="text-blue-600" size={48} />
-            </button>
+            </section>
 
             <h2 className="text-5xl font-extrabold leading-tight drop-shadow-lg">
               Sistema de Gestión

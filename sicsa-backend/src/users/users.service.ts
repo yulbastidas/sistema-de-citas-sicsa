@@ -16,9 +16,30 @@ export class UsersService {
     private patientRepo: Repository<Patient>,
   ) {}
 
+  private normalizeEmail(emailRaw: string): string {
+    if (!emailRaw || typeof emailRaw !== 'string') {
+      throw new BadRequestException('Correo inválido');
+    }
+
+    const email = emailRaw.trim().toLowerCase();
+
+    if (!email || email.length > 150) {
+      throw new BadRequestException('Correo inválido');
+    }
+
+    return email;
+  }
+
+  private normalizeText(value: string | undefined | null): string {
+    if (!value || typeof value !== 'string') return '';
+    return value.trim();
+  }
+
   async create(data: CreateUserDto) {
+    const email = this.normalizeEmail(data.email);
+
     const existingUser = await this.userRepo.findOne({
-      where: { email: data.email },
+      where: { email },
     });
 
     if (existingUser) {
@@ -26,7 +47,7 @@ export class UsersService {
     }
 
     const user = this.userRepo.create({
-      email: data.email,
+      email,
       password: data.password,
       role: data.role,
     });
@@ -36,15 +57,15 @@ export class UsersService {
     if (savedUser.role === 'patient') {
       const patient = this.patientRepo.create({
         userId: savedUser.id,
-        tipoDocumento: data.tipoDocumento ?? '',
-        numeroDocumento: data.numeroDocumento ?? '',
-        primerNombre: data.primerNombre ?? '',
-        segundoNombre: data.segundoNombre ?? '',
-        primerApellido: data.primerApellido ?? '',
-        segundoApellido: data.segundoApellido ?? '',
-        telefono: data.telefono ?? '',
-        email: data.email,
-        eps: data.eps ?? '',
+        tipoDocumento: this.normalizeText(data.tipoDocumento),
+        numeroDocumento: this.normalizeText(data.numeroDocumento),
+        primerNombre: this.normalizeText(data.primerNombre),
+        segundoNombre: this.normalizeText(data.segundoNombre),
+        primerApellido: this.normalizeText(data.primerApellido),
+        segundoApellido: this.normalizeText(data.segundoApellido),
+        telefono: this.normalizeText(data.telefono),
+        email,
+        eps: this.normalizeText(data.eps),
       });
 
       await this.patientRepo.save(patient);
@@ -56,7 +77,9 @@ export class UsersService {
     };
   }
 
-  async findByEmail(email: string) {
+  async findByEmail(emailRaw: string) {
+    const email = this.normalizeEmail(emailRaw);
+
     return this.userRepo.findOne({
       where: { email },
     });

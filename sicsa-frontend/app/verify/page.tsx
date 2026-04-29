@@ -36,7 +36,9 @@ function VerifyContent() {
         code,
       });
 
-      setMessage("✅ Correo verificado correctamente. Redirigiendo al login...");
+      setMessage(
+        "✅ Correo verificado correctamente. Redirigiendo al login...",
+      );
 
       setTimeout(() => {
         router.push("/login?role=patient");

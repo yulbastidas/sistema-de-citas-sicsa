@@ -34,7 +34,7 @@ export default function StaffAccessPage() {
         <section className="grid gap-8 md:grid-cols-2">
           {roles.map((role) => (
             <Link
-              key={role.title}
+              key={role.href}
               href={role.href}
               className="rounded-3xl bg-white p-10 shadow-lg transition hover:-translate-y-1 hover:shadow-2xl"
             >
@@ -53,6 +53,15 @@ export default function StaffAccessPage() {
               </p>
             </Link>
           ))}
+        </section>
+
+        <section className="mt-10 text-center">
+          <Link
+            href="/login?role=patient"
+            className="font-semibold text-blue-700 hover:underline"
+          >
+            Entrar como paciente
+          </Link>
         </section>
       </section>
     </main>

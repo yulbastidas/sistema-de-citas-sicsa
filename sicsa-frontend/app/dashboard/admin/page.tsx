@@ -175,7 +175,8 @@ export default function AdminDashboard() {
 
   const pendingItems = useMemo(() => {
     return items.filter(
-      (item) => (item.estado || item.status || "").toLowerCase() === "pendiente",
+      (item) =>
+        (item.estado || item.status || "").toLowerCase() === "pendiente",
     );
   }, [items]);
 
@@ -187,7 +188,8 @@ export default function AdminDashboard() {
 
   const rejectedItems = useMemo(() => {
     return items.filter(
-      (item) => (item.estado || item.status || "").toLowerCase() === "rechazado",
+      (item) =>
+        (item.estado || item.status || "").toLowerCase() === "rechazado",
     );
   }, [items]);
 
@@ -233,12 +235,16 @@ export default function AdminDashboard() {
 
               <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
                 <p className="text-sm text-slate-200">Aprobadas</p>
-                <p className="mt-1 text-2xl font-bold">{approvedItems.length}</p>
+                <p className="mt-1 text-2xl font-bold">
+                  {approvedItems.length}
+                </p>
               </article>
 
               <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
                 <p className="text-sm text-slate-200">Rechazadas</p>
-                <p className="mt-1 text-2xl font-bold">{rejectedItems.length}</p>
+                <p className="mt-1 text-2xl font-bold">
+                  {rejectedItems.length}
+                </p>
               </article>
             </section>
           </section>

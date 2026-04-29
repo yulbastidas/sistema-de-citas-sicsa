@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -30,6 +31,18 @@ interface JwtUser {
 type RequestWithUser = Request & {
   user: JwtUser;
 };
+
+function parseOptionalNumber(value: string | undefined, fieldName: string) {
+  if (value === undefined || value === '') return undefined;
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new BadRequestException(`${fieldName} debe ser un número válido`);
+  }
+
+  return parsed;
+}
 
 @Controller('appointments')
 export class AppointmentsController {
@@ -99,9 +112,14 @@ export class AppointmentsController {
     @Query('fecha') fecha: string,
     @Query('appointmentClassId') appointmentClassId?: string,
   ) {
+    const parsedAppointmentClassId = parseOptionalNumber(
+      appointmentClassId,
+      'appointmentClassId',
+    );
+
     return this.appointmentsService.getAvailable(
       fecha,
-      appointmentClassId ? Number(appointmentClassId) : undefined,
+      parsedAppointmentClassId,
     );
   }
 
@@ -112,10 +130,9 @@ export class AppointmentsController {
     @Query('fecha') fecha: string,
     @Query('doctorId') doctorId?: string,
   ) {
-    return this.appointmentsService.getQueue(
-      fecha,
-      doctorId ? Number(doctorId) : undefined,
-    );
+    const parsedDoctorId = parseOptionalNumber(doctorId, 'doctorId');
+
+    return this.appointmentsService.getQueue(fecha, parsedDoctorId);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

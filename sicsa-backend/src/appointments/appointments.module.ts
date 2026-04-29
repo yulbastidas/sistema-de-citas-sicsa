@@ -9,6 +9,11 @@ import { Patient } from '../patients/entities/patient.entity';
 import { AppointmentPdfService } from './pdf/appointment-pdf.service';
 import { MedicalReportsModule } from '../medical-reports/medical-reports.module';
 import { Doctor } from '../doctors/entities/doctor.entity';
+import { AppointmentScheduleService } from './services/appointment-schedule.service';
+import { AppointmentWaitlistService } from './services/appointment-waitlist.service';
+import { AppointmentNotificationService } from './services/appointment-notification.service';
+import { AppointmentPriorityService } from './services/appointment-priority.service';
+import { AppointmentMapperService } from './services/appointment-mapper.service';
 
 @Module({
   imports: [
@@ -16,6 +21,15 @@ import { Doctor } from '../doctors/entities/doctor.entity';
     MedicalReportsModule,
   ],
   controllers: [AppointmentsController],
-  providers: [AppointmentsService, AppointmentsGateway, AppointmentPdfService],
+  providers: [
+    AppointmentsService,
+    AppointmentsGateway,
+    AppointmentPdfService,
+    AppointmentScheduleService,
+    AppointmentWaitlistService,
+    AppointmentNotificationService,
+    AppointmentPriorityService,
+    AppointmentMapperService,
+  ],
 })
 export class AppointmentsModule {}

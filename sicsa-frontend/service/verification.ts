@@ -18,7 +18,7 @@ export async function requestVerification(
   data: {
     documento: string;
     eps: string;
-  }
+  },
 ) {
   const response = await fetch(`${API_URL}/verifications/request`, {
     method: "POST",
@@ -32,7 +32,7 @@ export async function requestVerification(
     throw new Error(
       Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result?.message || "Error al solicitar verificación"
+        : result?.message || "Error al solicitar verificación",
     );
   }
 
@@ -51,7 +51,7 @@ export async function getAllVerifications(token: string) {
     throw new Error(
       Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result?.message || "Error al consultar verificaciones"
+        : result?.message || "Error al consultar verificaciones",
     );
   }
 
@@ -71,7 +71,7 @@ export async function approveVerification(token: string, id: number) {
     throw new Error(
       Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result?.message || "Error al aprobar verificación"
+        : result?.message || "Error al aprobar verificación",
     );
   }
 
@@ -81,7 +81,7 @@ export async function approveVerification(token: string, id: number) {
 export async function rejectVerification(
   token: string,
   id: number,
-  motivoRechazo: string
+  motivoRechazo: string,
 ) {
   const response = await fetch(`${API_URL}/verifications/reject`, {
     method: "POST",
@@ -95,7 +95,7 @@ export async function rejectVerification(
     throw new Error(
       Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result?.message || "Error al rechazar verificación"
+        : result?.message || "Error al rechazar verificación",
     );
   }
 
@@ -114,7 +114,7 @@ export async function getMyVerification(token: string) {
     throw new Error(
       Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result?.message || "Error al consultar mi verificación"
+        : result?.message || "Error al consultar mi verificación",
     );
   }
 
@@ -133,7 +133,7 @@ export async function expireMyVerification(token: string) {
     throw new Error(
       Array.isArray(result?.message)
         ? result.message.join(", ")
-        : result?.message || "Error al expirar verificación"
+        : result?.message || "Error al expirar verificación",
     );
   }
 

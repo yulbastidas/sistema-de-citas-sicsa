@@ -2,7 +2,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 function authHeaders(token: string) {
   return {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
   };
 }
@@ -24,18 +24,18 @@ async function parseResponse(response: Response) {
 function buildErrorMessage(result: unknown, fallback: string): string {
   if (
     result &&
-    typeof result === 'object' &&
-    'message' in result &&
+    typeof result === "object" &&
+    "message" in result &&
     Array.isArray((result as { message?: unknown }).message)
   ) {
-    return ((result as { message: string[] }).message).join(', ');
+    return (result as { message: string[] }).message.join(", ");
   }
 
   if (
     result &&
-    typeof result === 'object' &&
-    'message' in result &&
-    typeof (result as { message?: unknown }).message === 'string'
+    typeof result === "object" &&
+    "message" in result &&
+    typeof (result as { message?: unknown }).message === "string"
   ) {
     return (result as { message: string }).message;
   }
@@ -45,7 +45,7 @@ function buildErrorMessage(result: unknown, fallback: string): string {
 
 export async function getSpecialties(token: string) {
   const response = await fetch(`${API_URL}/specialties`, {
-    method: 'GET',
+    method: "GET",
     headers: authHeaders(token),
   });
 
@@ -53,7 +53,7 @@ export async function getSpecialties(token: string) {
 
   if (!response.ok) {
     throw new Error(
-      buildErrorMessage(result, 'Error al consultar especialidades'),
+      buildErrorMessage(result, "Error al consultar especialidades"),
     );
   }
 
