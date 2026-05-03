@@ -7,7 +7,7 @@ function authHeaders(token: string) {
   };
 }
 
-// 🔥 helper para evitar error de JSON vacío
+//  helper para evitar error de JSON vacío
 async function safeJson(response: Response) {
   const text = await response.text();
   return text ? JSON.parse(text) : null;

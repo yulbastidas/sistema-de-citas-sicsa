@@ -130,8 +130,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           estado == 'lista_espera';
     }).length;
   }
-
-  // 🔴 SOLO cambié colores → AppColors (tu lógica intacta)
   Color _statusColor(String estado) {
     switch (estado.toLowerCase()) {
       case 'confirmada':
@@ -184,7 +182,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         normalized == 'lista_espera';
   }
 
-  // 🔒 MANTENIDOS TAL CUAL (robustez backend)
   String _getSpecialtyName(Map<String, dynamic> item) {
     final specialty = item['specialty'] ?? item['especialidad'];
 
@@ -305,7 +302,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               const Text(
                 'Historial de citas',
                 style: TextStyle(
-                  color: AppColors.textPrimary, // ✅
+                  color: AppColors.textPrimary, 
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                 ),

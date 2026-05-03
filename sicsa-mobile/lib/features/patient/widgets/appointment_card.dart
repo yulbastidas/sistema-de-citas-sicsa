@@ -48,7 +48,7 @@ class AppointmentCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// 🔝 HEADER
+          ///  HEADER
           Row(
             children: [
               Container(
@@ -67,7 +67,7 @@ class AppointmentCard extends StatelessWidget {
 
               const SizedBox(width: 14),
 
-              /// 🧠 INFO PRINCIPAL
+              ///  INFO PRINCIPAL
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,7 +92,7 @@ class AppointmentCard extends StatelessWidget {
                 ),
               ),
 
-              /// 🏷️ BADGE ESTADO
+              ///  BADGE ESTADO
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -116,7 +116,7 @@ class AppointmentCard extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          /// 📄 INFO
+          ///  INFO
           _InfoRow(
             icon: Icons.person_outline,
             label: 'Paciente',
@@ -131,7 +131,7 @@ class AppointmentCard extends StatelessWidget {
             value: motivo,
           ),
 
-          /// 🔵 LISTA DE ESPERA
+          ///  LISTA DE ESPERA
           if (isWaitList) ...[
             const SizedBox(height: 14),
             Container(
@@ -151,7 +151,7 @@ class AppointmentCard extends StatelessWidget {
             ),
           ],
 
-          /// 🔴 BOTÓN CANCELAR
+          ///  BOTÓN CANCELAR
           if (canCancel) ...[
             const SizedBox(height: 18),
             SizedBox(

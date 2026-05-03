@@ -41,8 +41,6 @@ export class CreateAppointmentDto {
   @IsBoolean()
   fiebre?: boolean;
 
-  // 🔥 NUEVO (LO QUE TE FALTABA)
-
   @IsOptional()
   @IsString()
   eps?: string;

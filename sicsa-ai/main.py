@@ -19,7 +19,7 @@ def analizar_motivo(motivo: str):
     score = 0
     razones = []
 
-    # 🔥 Palabras clave críticas
+    # Palabras clave críticas
     if any(p in motivo for p in ["infarto", "dolor en el pecho", "opresión"]):
         score += 6
         razones.append("posible evento cardíaco")
@@ -51,7 +51,7 @@ def calcular_prioridad(data: AppointmentData):
     score = 0
     razones = []
 
-    # 🔥 Signos clínicos críticos
+    #  Signos clínicos críticos
     if data.dificultadRespiratoria:
         score += 6
         razones.append("dificultad respiratoria")
@@ -68,7 +68,7 @@ def calcular_prioridad(data: AppointmentData):
         score += 2
         razones.append("fiebre")
 
-    # 🔥 Condiciones especiales
+    #  Condiciones especiales
     if data.embarazada:
         score += 3
         razones.append("embarazo")
@@ -77,7 +77,7 @@ def calcular_prioridad(data: AppointmentData):
         score += 2
         razones.append("discapacidad")
 
-    # 🔥 Edad
+    #  Edad
     if data.edad:
         if data.edad > 65:
             score += 3
@@ -86,12 +86,12 @@ def calcular_prioridad(data: AppointmentData):
             score += 2
             razones.append("menor de 5 años")
 
-    # 🔥 Análisis del motivo (NUEVO)
+    #  Análisis del motivo (NUEVO)
     motivo_score, motivo_razones = analizar_motivo(data.motivoConsulta)
     score += motivo_score
     razones.extend(motivo_razones)
 
-    # 🔥 Clasificación más realista
+    #  Clasificación más realista
     if score >= 10:
         prioridad = "alta"
     elif score >= 5:
