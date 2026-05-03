@@ -1,0 +1,70 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: sicsa-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 1230809075
+      MYSQL_DATABASE: sicsa
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  backend:
+    build:
+      context: ./sicsa-backend
+    container_name: sicsa-backend
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - ai
+      - n8n
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: 1230809075
+      DB_DATABASE: sicsa
+      JWT_SECRET: dev_secret_only
+      JWT_EXPIRES_IN: 1h
+      AI_SERVICE_URL: http://ai:8000
+      N8N_EMAIL_WEBHOOK_URL: http://n8n:5678/webhook/6302018d-5b4e-433a-a17b-b9939043ce13
+      N8N_WAITLIST_ASSIGNED_WEBHOOK_URL: http://n8n:5678/webhook/lista-espera-asignada
+
+  frontend:
+    build:
+      context: ./sicsa-frontend
+    container_name: sicsa-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3001:3001"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+      NEXT_PUBLIC_SOCKET_URL: http://localhost:3000
+
+  ai:
+    build:
+      context: ./sicsa-ai
+    container_name: sicsa-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: sicsa-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  mysql_data:
+  n8n_data:
