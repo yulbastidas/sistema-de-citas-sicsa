@@ -20,7 +20,7 @@ export class Appointment {
   @Column()
   hora!: string;
 
-  @Column({ default: 'pendiente' })
+  @Column({ default: 'confirmada' })
   estado!: string;
 
   @Column({ type: 'text', nullable: true })
@@ -56,8 +56,6 @@ export class Appointment {
   @Column({ type: 'text', nullable: true })
   explicacionPrioridad!: string;
 
-  // 🔥 NUEVO (lo que faltaba del sistema real)
-
   @Column({ nullable: true })
   eps!: string;
 
@@ -75,11 +73,7 @@ export class Appointment {
 
   @Column({ type: 'text', nullable: true })
   observaciones!: string;
-  @Column({ nullable: true })
-  approvedByAdminId!: number;
 
-  @Column({ type: 'datetime', nullable: true })
-  approvedAt!: Date;
   @Column({ nullable: true })
   ordenMedicaUrl?: string;
 }

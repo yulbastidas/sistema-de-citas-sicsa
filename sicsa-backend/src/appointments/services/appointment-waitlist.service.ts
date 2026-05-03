@@ -67,7 +67,6 @@ export class AppointmentWaitlistService {
 
       candidate.hora = hora;
       candidate.estado = 'confirmada';
-      candidate.approvedAt = new Date();
 
       const savedCandidate = await this.appointmentRepo.save(candidate);
       const result = await this.mapperService.attachPatientData(savedCandidate);

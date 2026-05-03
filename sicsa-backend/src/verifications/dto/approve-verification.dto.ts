@@ -1,4 +1,4 @@
 export class ApproveVerificationDto {
-  id: number;
-  adminId: number;
+  id!: number;
+  adminId!: number;
 }

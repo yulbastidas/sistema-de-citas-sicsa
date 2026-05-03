@@ -79,7 +79,6 @@ export class AppointmentsService {
     data: CreateAppointmentDto,
     user: JwtUser,
   ): Promise<AppointmentWithPatient> {
-    // 1. BUSCAR AL PACIENTE PARA OBTENER SUS DATOS REGISTRADOS
     const patient = await this.patientRepo.findOne({
       where: { userId: user.sub },
     });
@@ -110,7 +109,6 @@ export class AppointmentsService {
     const assignedDoctor = await this.findDoctorBySpecialty(data.specialtyId);
     const prioridadData = await this.priorityService.getPrioridad(data);
 
-    // 2. CONSTRUIR LA CITA ARRASTRANDO DATOS DEL PERFIL
     const appointmentData: Partial<Appointment> = {
       patientId: user.sub,
       doctorId: assignedDoctor.id,
@@ -129,7 +127,6 @@ export class AppointmentsService {
       prioridad: prioridadData.prioridad,
       scorePrioridad: prioridadData.scorePrioridad,
       explicacionPrioridad: prioridadData.explicacionPrioridad,
-      // DATOS AUTO-LLENADOS DESDE LA ENTIDAD PATIENT
       eps: patient.eps,
       epsId: patient.epsId,
       departamento: patient.departamento,
@@ -138,7 +135,6 @@ export class AppointmentsService {
       appointmentClassId: data.appointmentClassId,
       observaciones: data.observaciones,
       ordenMedicaUrl: data.ordenMedicaUrl,
-      approvedAt: appointmentStatus === 'confirmada' ? new Date() : undefined,
     };
 
     const appointment = this.appointmentRepo.create(appointmentData);
@@ -219,7 +215,6 @@ export class AppointmentsService {
       appointmentClassId: data.appointmentClassId,
       observaciones: data.observaciones,
       ordenMedicaUrl: data.ordenMedicaUrl,
-      approvedAt: appointmentStatus === 'confirmada' ? new Date() : undefined,
     };
 
     const appointment = this.appointmentRepo.create(appointmentData);
@@ -315,31 +310,6 @@ export class AppointmentsService {
         appointment.estado?.toLowerCase() === 'atendida' ||
         appointment.medicalReport?.exists,
     );
-  }
-
-  async approve(id: number, user: JwtUser): Promise<AppointmentWithPatient> {
-    const appointment = await this.appointmentRepo.findOne({
-      where: { id },
-    });
-
-    if (!appointment) {
-      throw new NotFoundException('Cita no encontrada');
-    }
-
-    appointment.estado = 'confirmada';
-    appointment.approvedByAdminId = user.sub;
-    appointment.approvedAt = new Date();
-
-    const saved = await this.appointmentRepo.save(appointment);
-    const result = await this.mapperService.attachPatientData(saved);
-
-    this.appointmentsGateway.emitAppointmentUpdated(result);
-    this.appointmentsGateway.emitQueueUpdated({
-      fecha: saved.fecha,
-      message: 'Cola actualizada',
-    });
-
-    return result;
   }
 
   async cancel(id: number, user: JwtUser): Promise<AppointmentWithPatient> {

@@ -59,11 +59,8 @@ export function AppointmentFilters({
           className="w-full rounded-2xl border border-slate-300 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500"
         >
           <option value="todos">Todos</option>
-          <option value="pendiente">Pendientes</option>
-          <option value="aprobada">Aprobadas</option>
           <option value="confirmada">Confirmadas</option>
           <option value="cancelada">Canceladas</option>
-          <option value="atendida">Atendidas</option>
         </select>
       </article>
     </section>

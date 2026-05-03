@@ -17,7 +17,6 @@ import { AuthGuard } from '@nestjs/passport';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/appointment.dto';
 import { CreateAdminAppointmentDto } from './dto/create-admin-appointment.dto';
-import { ApproveAppointmentDto } from './dto/approve-appointment.dto';
 import { CancelAppointmentDto } from './dto/cancel-appointment.dto';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -91,13 +90,6 @@ export class AppointmentsController {
   @Get('doctor/:id/history')
   findHistoryByDoctor(@Param('id', ParseIntPipe) id: number) {
     return this.appointmentsService.findHistoryByDoctor(id);
-  }
-
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
-  @Post('approve')
-  approve(@Body() body: ApproveAppointmentDto, @Req() req: RequestWithUser) {
-    return this.appointmentsService.approve(body.id, req.user);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
