@@ -90,9 +90,7 @@ export class VerificationsService {
 
   async findAll() {
     const verifications = await this.verificationRepo.find({
-      order: {
-        id: 'DESC',
-      },
+      order: { id: 'DESC' },
     });
 
     const result = await Promise.all(
@@ -145,19 +143,31 @@ export class VerificationsService {
     });
 
     if (patient) {
-      try {
-        await axios.post(
-          'http://localhost:5678/webhook/verificacion-aprobada',
-          {
+      const webhookUrl = process.env.N8N_EMAIL_WEBHOOK_URL;
+
+      if (!webhookUrl) {
+        console.warn('N8N_EMAIL_WEBHOOK_URL no está configurada');
+      } else {
+        try {
+          await axios.post(webhookUrl, {
             nombre: patient.primerNombre,
             email: patient.email,
-          },
-        );
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          console.error('Error enviando webhook a n8n:', error.message);
-        } else {
-          console.error('Error enviando webhook a n8n:', error);
+            documento: patient.numeroDocumento,
+            eps: patient.eps,
+          });
+
+          console.log('Webhook verificacion-aprobada enviado a n8n');
+        } catch (error: unknown) {
+          if (axios.isAxiosError(error)) {
+            console.error(
+              'Error enviando webhook a n8n:',
+              error.response?.data || error.message,
+            );
+          } else if (error instanceof Error) {
+            console.error('Error enviando webhook a n8n:', error.message);
+          } else {
+            console.error('Error enviando webhook a n8n:', error);
+          }
         }
       }
     } else {
@@ -192,9 +202,7 @@ export class VerificationsService {
   async getByPatient(userId: number) {
     const verification = await this.verificationRepo.findOne({
       where: { patientId: userId },
-      order: {
-        id: 'DESC',
-      },
+      order: { id: 'DESC' },
     });
 
     const checkedVerification = await this.expireIfNeeded(verification);
@@ -205,9 +213,7 @@ export class VerificationsService {
   async expireMyVerification(userId: number) {
     const verification = await this.verificationRepo.findOne({
       where: { patientId: userId },
-      order: {
-        id: 'DESC',
-      },
+      order: { id: 'DESC' },
     });
 
     if (!verification) {

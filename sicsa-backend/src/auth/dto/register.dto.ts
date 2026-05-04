@@ -5,7 +5,35 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  Validate,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
+
+// --- VALIDADOR PERSONALIZADO PARA LA FECHA ---
+@ValidatorConstraint({ name: 'isRealBirthDate', async: false })
+export class IsRealBirthDateConstraint implements ValidatorConstraintInterface {
+  validate(value: string) {
+    const birthDate = new Date(value);
+    const today = new Date();
+    // Si la fecha es inválida, no pasa
+    if (isNaN(birthDate.getTime())) return false;
+
+    // No puede ser una fecha futura
+    if (birthDate > today) return false;
+
+    // No puede tener más de 120 años
+    const minDate = new Date();
+    minDate.setFullYear(today.getFullYear() - 120);
+    if (birthDate < minDate) return false;
+
+    return true;
+  }
+
+  defaultMessage() {
+    return 'La fecha de nacimiento no es válida (no puede ser futura ni mayor a 120 años)';
+  }
+}
 
 export class RegisterDto {
   @IsEmail({}, { message: 'Correo electrónico no válido' })
@@ -55,8 +83,10 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'El género es obligatorio' })
   genero!: string;
 
-  @IsString({ message: 'La fecha de nacimiento es obligatoria' })
+  // --- VALIDACIÓN APLICADA AQUÍ ---
   @IsNotEmpty({ message: 'La fecha de nacimiento es obligatoria' })
+  @IsString({ message: 'La fecha de nacimiento debe ser un texto válido' })
+  @Validate(IsRealBirthDateConstraint)
   fechaNacimiento!: string;
 
   @IsString({ message: 'El departamento es obligatorio' })

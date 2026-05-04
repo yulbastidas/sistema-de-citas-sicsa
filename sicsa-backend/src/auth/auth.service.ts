@@ -36,12 +36,31 @@ export class AuthService {
     return String(role);
   }
 
+  private normalizeEmail(emailRaw: string): string {
+    if (!emailRaw || typeof emailRaw !== 'string') {
+      throw new BadRequestException('Correo inválido');
+    }
+
+    const email = emailRaw.trim().toLowerCase();
+
+    if (!email || email.length > 150) {
+      throw new BadRequestException('Correo inválido');
+    }
+
+    return email;
+  }
+
+  private normalizeText(value: string | undefined | null): string {
+    if (!value || typeof value !== 'string') return '';
+    return value.trim();
+  }
+
   private generateCode(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
   private async sendCodeToN8n(email: string, code: string): Promise<void> {
-    const webhookUrl = process.env.N8N_EMAIL_WEBHOOK_URL;
+    const webhookUrl = process.env.N8N_VERIFICATION_CODE_WEBHOOK_URL;
 
     if (!webhookUrl) {
       throw new BadRequestException('No está configurada la URL de n8n');
@@ -50,10 +69,7 @@ export class AuthService {
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        code,
-      }),
+      body: JSON.stringify({ email, code }),
     });
 
     if (!response.ok) {
@@ -86,22 +102,19 @@ export class AuthService {
   }
 
   async register(data: RegisterDto) {
-    const email = data.email.trim().toLowerCase();
-
-    console.log('EMAIL RECIBIDO:', email);
+    const email = this.normalizeEmail(data.email);
+    const numeroDocumento = this.normalizeText(data.numeroDocumento);
 
     const existingUser = await this.userRepo.findOne({
       where: { email },
     });
-
-    console.log('USUARIO ENCONTRADO:', existingUser);
 
     if (existingUser) {
       throw new BadRequestException('El correo ya está registrado');
     }
 
     const existingPatient = await this.patientRepo.findOne({
-      where: { numeroDocumento: data.numeroDocumento },
+      where: { numeroDocumento },
     });
 
     if (existingPatient) {
@@ -121,20 +134,20 @@ export class AuthService {
 
     const patient = this.patientRepo.create({
       userId: savedUser.id,
-      tipoDocumento: data.tipoDocumento,
-      numeroDocumento: data.numeroDocumento,
-      primerNombre: data.primerNombre,
-      segundoNombre: data.segundoNombre ?? '',
-      primerApellido: data.primerApellido,
-      segundoApellido: data.segundoApellido ?? '',
-      telefono: data.telefono,
+      tipoDocumento: this.normalizeText(data.tipoDocumento),
+      numeroDocumento,
+      primerNombre: this.normalizeText(data.primerNombre),
+      segundoNombre: this.normalizeText(data.segundoNombre),
+      primerApellido: this.normalizeText(data.primerApellido),
+      segundoApellido: this.normalizeText(data.segundoApellido),
+      telefono: this.normalizeText(data.telefono),
       email,
-      eps: data.eps,
+      eps: this.normalizeText(data.eps),
       epsId: data.epsId,
-      genero: data.genero,
+      genero: this.normalizeText(data.genero),
       fechaNacimiento: data.fechaNacimiento,
-      departamento: data.departamento,
-      municipio: data.municipio,
+      departamento: this.normalizeText(data.departamento),
+      municipio: this.normalizeText(data.municipio),
     });
 
     await this.patientRepo.save(patient);
@@ -151,7 +164,7 @@ export class AuthService {
   }
 
   async sendVerificationCode(emailRaw: string) {
-    const email = emailRaw.trim().toLowerCase();
+    const email = this.normalizeEmail(emailRaw);
 
     const user = await this.userRepo.findOne({
       where: { email },
@@ -174,8 +187,13 @@ export class AuthService {
     };
   }
 
-  async verifyEmailCode(emailRaw: string, code: string) {
-    const email = emailRaw.trim().toLowerCase();
+  async verifyEmailCode(emailRaw: string, codeRaw: string) {
+    const email = this.normalizeEmail(emailRaw);
+    const code = this.normalizeText(codeRaw);
+
+    if (!/^\d{6}$/.test(code)) {
+      throw new BadRequestException('Código inválido');
+    }
 
     const user = await this.userRepo.findOne({
       where: { email },
@@ -217,18 +235,22 @@ export class AuthService {
   }
 
   async login(emailRaw: string, password: string) {
-    const email = emailRaw.trim().toLowerCase();
+    const email = this.normalizeEmail(emailRaw);
+
+    if (!password || typeof password !== 'string') {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
 
     const user = await this.usersService.findByEmail(email);
 
     if (!user) {
-      throw new UnauthorizedException('Usuario no encontrado');
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordMatch) {
-      throw new UnauthorizedException('Contraseña incorrecta');
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
     const normalizedRole = this.normalizeRole(user.role);

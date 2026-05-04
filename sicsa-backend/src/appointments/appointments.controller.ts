@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -16,7 +17,6 @@ import { AuthGuard } from '@nestjs/passport';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/appointment.dto';
 import { CreateAdminAppointmentDto } from './dto/create-admin-appointment.dto';
-import { ApproveAppointmentDto } from './dto/approve-appointment.dto';
 import { CancelAppointmentDto } from './dto/cancel-appointment.dto';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -31,13 +31,25 @@ type RequestWithUser = Request & {
   user: JwtUser;
 };
 
+function parseOptionalNumber(value: string | undefined, fieldName: string) {
+  if (value === undefined || value === '') return undefined;
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new BadRequestException(`${fieldName} debe ser un número válido`);
+  }
+
+  return parsed;
+}
+
 @Controller('appointments')
 export class AppointmentsController {
   constructor(private appointmentsService: AppointmentsService) {}
 
   @Get('n8n/reminders')
   getRemindersForN8n() {
-    return this.appointmentsService.getTomorrowReminders();
+    return this.appointmentsService.getTomorrowRemindersForN8n();
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -81,13 +93,6 @@ export class AppointmentsController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
-  @Post('approve')
-  approve(@Body() body: ApproveAppointmentDto, @Req() req: RequestWithUser) {
-    return this.appointmentsService.approve(body.id, req.user);
-  }
-
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Post('cancel')
   cancel(@Body() body: CancelAppointmentDto, @Req() req: RequestWithUser) {
     return this.appointmentsService.cancel(body.id, req.user);
@@ -99,9 +104,14 @@ export class AppointmentsController {
     @Query('fecha') fecha: string,
     @Query('appointmentClassId') appointmentClassId?: string,
   ) {
+    const parsedAppointmentClassId = parseOptionalNumber(
+      appointmentClassId,
+      'appointmentClassId',
+    );
+
     return this.appointmentsService.getAvailable(
       fecha,
-      appointmentClassId ? Number(appointmentClassId) : undefined,
+      parsedAppointmentClassId,
     );
   }
 
@@ -112,10 +122,9 @@ export class AppointmentsController {
     @Query('fecha') fecha: string,
     @Query('doctorId') doctorId?: string,
   ) {
-    return this.appointmentsService.getQueue(
-      fecha,
-      doctorId ? Number(doctorId) : undefined,
-    );
+    const parsedDoctorId = parseOptionalNumber(doctorId, 'doctorId');
+
+    return this.appointmentsService.getQueue(fecha, parsedDoctorId);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

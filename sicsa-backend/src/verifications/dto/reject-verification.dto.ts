@@ -1,5 +1,5 @@
 export class RejectVerificationDto {
-  id: number;
-  adminId: number;
-  motivo: string;
+  id!: number;
+  adminId!: number;
+  motivo!: string;
 }

@@ -45,12 +45,12 @@ export class AppointmentsGateway
   }
 
   // ─── Verificaciones ───────────────────────────────────
-  // ✅ NUEVO: el paciente solicitó verificación → avisa al admin en tiempo real
+  // el paciente solicitó verificación → avisa al admin en tiempo real
   emitVerificationRequested(data: unknown) {
     this.server.emit('verificationRequested', data);
   }
 
-  // ✅ NUEVO: admin aprobó o rechazó → avisa al paciente en tiempo real
+  //  admin aprobó o rechazó → avisa al paciente en tiempo real
   emitVerificationUpdated(data: unknown) {
     this.server.emit('verificationUpdated', data);
   }

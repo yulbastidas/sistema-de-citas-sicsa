@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  ParseIntPipe,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -51,24 +59,17 @@ export class VerificationsController {
 
   @Roles('admin')
   @Post('approve')
-  approve(@Body() body: { id: number }, @Req() req: RequestWithUser) {
-    return this.verificationsService.approve(body.id, req.user);
+  approve(@Body('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    return this.verificationsService.approve(id, req.user);
   }
 
   @Roles('admin')
   @Post('reject')
   reject(
-    @Body()
-    body: {
-      id: number;
-      motivoRechazo: string;
-    },
+    @Body('id', ParseIntPipe) id: number,
+    @Body('motivoRechazo') motivoRechazo: string,
     @Req() req: RequestWithUser,
   ) {
-    return this.verificationsService.reject(
-      body.id,
-      body.motivoRechazo,
-      req.user,
-    );
+    return this.verificationsService.reject(id, motivoRechazo, req.user);
   }
 }
