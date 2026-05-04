@@ -10,6 +10,7 @@ import {
   requestVerification,
 } from "@/service/verification";
 import { getMyAppointments } from "@/service/appointment";
+import { getMyPatient } from "@/service/patient";
 
 import type {
   AppointmentItem,
@@ -49,7 +50,7 @@ export function usePatientDashboard() {
   }, []);
 
   const fillVerificationForm = useCallback(
-    (verification: VerificationResponse, savedUser?: SessionUser | null) => {
+    (verification: VerificationResponse | null, savedUser?: SessionUser | null) => {
       if (!mountedRef.current) return;
 
       setForm((prev) => ({
@@ -69,8 +70,27 @@ export function usePatientDashboard() {
     [],
   );
 
+  const loadPatientData = useCallback(async () => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      const patient = await getMyPatient(token);
+
+      if (!mountedRef.current) return;
+
+      setForm((prev) => ({
+        documento: patient?.numeroDocumento || prev.documento || "",
+        eps: patient?.eps || prev.eps || "",
+        epsId: patient?.epsId?.toString() || prev.epsId || "",
+      }));
+    } catch (error) {
+      console.error("Error cargando paciente:", error);
+    }
+  }, []);
+
   const applyVerificationState = useCallback(
-    (verification: VerificationResponse) => {
+    (verification: VerificationResponse | null) => {
       if (!mountedRef.current) return;
 
       if (!verification) {
@@ -160,7 +180,11 @@ export function usePatientDashboard() {
 
       setUser(savedUser);
 
-      await Promise.all([loadVerificationStatus(), loadAppointments()]);
+      await Promise.all([
+        loadPatientData(),
+        loadVerificationStatus(),
+        loadAppointments(),
+      ]);
 
       if (mountedRef.current) {
         setCheckingAuth(false);
@@ -168,18 +192,19 @@ export function usePatientDashboard() {
     };
 
     void init();
-  }, [router, loadVerificationStatus, loadAppointments]);
+  }, [router, loadPatientData, loadVerificationStatus, loadAppointments]);
 
   useEffect(() => {
     if (checkingAuth) return;
 
     const intervalId = setInterval(() => {
+      void loadPatientData();
       void loadVerificationStatus();
       void loadAppointments();
     }, 5000);
 
     return () => clearInterval(intervalId);
-  }, [checkingAuth, loadVerificationStatus, loadAppointments]);
+  }, [checkingAuth, loadPatientData, loadVerificationStatus, loadAppointments]);
 
   useEffect(() => {
     if (checkingAuth) return;

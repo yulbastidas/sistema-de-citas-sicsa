@@ -17,6 +17,23 @@ export type PatientUpdateData = {
   municipio?: string;
 };
 
+export async function getMyPatient(token: string) {
+  const response = await fetch(`${API_URL}/patients/me`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message || "Error cargando datos del paciente");
+  }
+
+  return result;
+}
+
 export async function getPatients(token: string, search = "") {
   const query = search ? `?search=${encodeURIComponent(search)}` : "";
 

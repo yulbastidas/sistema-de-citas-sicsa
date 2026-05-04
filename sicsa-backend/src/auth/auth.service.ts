@@ -60,7 +60,7 @@ export class AuthService {
   }
 
   private async sendCodeToN8n(email: string, code: string): Promise<void> {
-    const webhookUrl = process.env.N8N_EMAIL_WEBHOOK_URL;
+    const webhookUrl = process.env.N8N_VERIFICATION_CODE_WEBHOOK_URL;
 
     if (!webhookUrl) {
       throw new BadRequestException('No está configurada la URL de n8n');

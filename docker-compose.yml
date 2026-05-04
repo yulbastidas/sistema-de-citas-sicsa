@@ -7,7 +7,7 @@ services:
       MYSQL_ROOT_PASSWORD: 1230809075
       MYSQL_DATABASE: sicsa
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
 
@@ -32,12 +32,17 @@ services:
       JWT_SECRET: dev_secret_only
       JWT_EXPIRES_IN: 1h
       AI_SERVICE_URL: http://ai:8000
-      N8N_EMAIL_WEBHOOK_URL: http://n8n:5678/webhook/6302018d-5b4e-433a-a17b-b9939043ce13
-      N8N_WAITLIST_ASSIGNED_WEBHOOK_URL: http://n8n:5678/webhook/lista-espera-asignada
-
+      N8N_EMAIL_WEBHOOK_URL: http://host.docker.internal:5678/webhook/verificacion-aprobada
+      N8N_VERIFICATION_CODE_WEBHOOK_URL: http://host.docker.internal:5678/webhook/verificacion-codigo-email
+      N8N_APPOINTMENT_CREATED_WEBHOOK_URL: http://host.docker.internal:5678/webhook/cita-creada
+      N8N_WAITLIST_ASSIGNED_WEBHOOK_URL: http://host.docker.internal:5678/webhook/lista-espera-asignada
+      N8N_REMINDER_WEBHOOK_URL: http://host.docker.internal:5678/webhook/recordatorio-cita
   frontend:
     build:
       context: ./sicsa-frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3000
+        NEXT_PUBLIC_SOCKET_URL: http://localhost:3000
     container_name: sicsa-frontend
     restart: unless-stopped
     depends_on:
@@ -61,7 +66,7 @@ services:
     container_name: sicsa-n8n
     restart: unless-stopped
     ports:
-      - "5678:5678"
+      - "5679:5678"
     volumes:
       - n8n_data:/home/node/.n8n
 

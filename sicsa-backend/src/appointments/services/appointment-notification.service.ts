@@ -17,7 +17,7 @@ export class AppointmentNotificationService {
   ): Promise<void> {
     const webhookUrl =
       process.env.N8N_APPOINTMENT_CREATED_WEBHOOK_URL ??
-      'http://localhost:5678/webhook/cita-creada';
+      'http://host.docker.internal:5678/webhook/cita-creada';
 
     if (!appointment.patient?.email) {
       console.warn('No se pudo enviar correo de cita: paciente sin email');
@@ -45,7 +45,7 @@ export class AppointmentNotificationService {
   ): Promise<void> {
     const webhookUrl =
       process.env.N8N_WAITLIST_ASSIGNED_WEBHOOK_URL ??
-      'http://localhost:5678/webhook/lista-espera-asignada';
+      'http://host.docker.internal:5678/webhook/lista-espera-asignada';
 
     if (!appointment.patient?.email) {
       console.warn(

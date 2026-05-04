@@ -1,8 +1,23 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2023",
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+
+    "declaration": false,
+    "sourceMap": true,
+    "removeComments": true,
+
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+
+    "noEmit": false
   },
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "test", "dist", "**/*.spec.ts"]
 }

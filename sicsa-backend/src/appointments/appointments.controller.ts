@@ -49,7 +49,7 @@ export class AppointmentsController {
 
   @Get('n8n/reminders')
   getRemindersForN8n() {
-    return this.appointmentsService.getTomorrowReminders();
+    return this.appointmentsService.getTomorrowRemindersForN8n();
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
