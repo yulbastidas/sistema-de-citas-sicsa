@@ -66,7 +66,7 @@ export function useMedicalReport(appointmentId: number) {
         }
 
         const response = await fetch(
-          `http://localhost:3000/medical-reports/${appointmentId}`,
+          `http://74.161.42.39:3000/medical-reports/${appointmentId}`,
           {
             method: "GET",
             headers: {
@@ -148,7 +148,7 @@ export function useMedicalReport(appointmentId: number) {
         return;
       }
 
-      const response = await fetch("http://localhost:3000/medical-reports", {
+      const response = await fetch("http://74.161.42.39:3000/medical-reports", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -193,7 +193,7 @@ export function useMedicalReport(appointmentId: number) {
       }
 
       const response = await fetch(
-        `http://localhost:3000/appointments/${appointmentId}/pdf`,
+        `http://74.161.42.39:3000/appointments/${appointmentId}/pdf`,
         {
           method: "GET",
           headers: {

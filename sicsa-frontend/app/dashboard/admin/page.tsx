@@ -44,7 +44,7 @@ type VerificationItem = {
 };
 
 const SOCKET_URL =
-  process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
+  process.env.NEXT_PUBLIC_SOCKET_URL || "http://74.161.42.39:3000";
 
 export default function AdminDashboard() {
   const router = useRouter();

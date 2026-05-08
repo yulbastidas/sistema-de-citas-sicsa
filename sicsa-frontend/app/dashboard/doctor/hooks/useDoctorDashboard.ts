@@ -12,7 +12,7 @@ import { getToken, getUser, logout } from "@/service/session";
 import { AppointmentItem, SessionUser } from "../types";
 
 const SOCKET_URL =
-  process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
+  process.env.NEXT_PUBLIC_SOCKET_URL || "http://74.161.42.39:3000";
 
 export function normalizeRole(
   role: string | number | undefined,

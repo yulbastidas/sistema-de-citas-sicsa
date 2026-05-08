@@ -31,7 +31,7 @@ function VerifyContent() {
       setLoading(true);
       setMessage("");
 
-      await axios.post("http://localhost:3000/auth/verify-email-code", {
+      await axios.post("http://74.161.42.39:3000/auth/verify-email-code", {
         email,
         code,
       });
@@ -60,7 +60,7 @@ function VerifyContent() {
       setLoading(true);
       setMessage("");
 
-      await axios.post("http://localhost:3000/auth/send-verification-code", {
+      await axios.post("http://74.161.42.39:3000/auth/send-verification-code", {
         email,
       });
 
