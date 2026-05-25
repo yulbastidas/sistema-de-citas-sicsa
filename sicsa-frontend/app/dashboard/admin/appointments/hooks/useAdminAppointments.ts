@@ -219,19 +219,7 @@ export function useAdminAppointments() {
     void loadAvailableHours(form.fecha);
   }, [form.fecha]);
 
-  useEffect(() => {
-    if (checkingAuth) return;
-
-    const intervalId = setInterval(() => {
-      void loadAppointments();
-      void loadQueue(selectedDate);
-      if (form.fecha) void loadAvailableHours(form.fecha);
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [checkingAuth, selectedDate, form.fecha]);
-
-  // ── Socket ──
+  // ── Socket (fuente de verdad para actualizaciones en tiempo real) ──
   useEffect(() => {
     if (checkingAuth) return;
 

@@ -1,5 +1,4 @@
 "use client";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
@@ -14,7 +13,6 @@ import {
   getMyAppointments,
   cancelAppointment,
 } from "@/service/appointment";
-
 import type {
   AppointmentClassItem,
   AppointmentForm,
@@ -32,10 +30,8 @@ const SOCKET_URL =
 export const getWaitlistBaseHour = (fecha: string) => {
   const [year, month, day] = fecha.split("-").map(Number);
   const weekDay = new Date(year, month - 1, day).getDay();
-
   if (weekDay === 2 || weekDay === 3) return "08:00";
   if (weekDay === 4 || weekDay === 5 || weekDay === 6) return "07:00";
-
   return "08:00";
 };
 
@@ -64,18 +60,14 @@ export function usePatientAppointments() {
   const router = useRouter();
   const socketRef = useRef<Socket | null>(null);
   const mountedRef = useRef(true);
-
-  // Ref para acceder a form.fecha dentro del socket sin recrearlo
   const fechaRef = useRef<string>("");
-
-  // Debounce ref para agrupar ráfagas de eventos del socket en una sola llamada
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevFechaRef = useRef<string>("");
 
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [verificationStatus, setVerificationStatus] =
     useState<VerificationState>("none");
-
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [specialties, setSpecialties] = useState<SpecialtyItem[]>([]);
   const [epsList, setEpsList] = useState<EpsItem[]>([]);
@@ -83,23 +75,16 @@ export function usePatientAppointments() {
     AppointmentClassItem[]
   >([]);
   const [availableHours, setAvailableHours] = useState<string[]>([]);
-
-  const [loadingAppointments, setLoadingAppointments] = useState(true);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [loadingHours, setLoadingHours] = useState(false);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingWaitlist, setSavingWaitlist] = useState(false);
-
   const [form, setForm] = useState<AppointmentForm>(EMPTY_FORM);
 
-  // Mantener fechaRef sincronizado con form.fecha para usarlo en el socket
-  // sin necesidad de recrear los listeners cada vez que cambia la fecha.
   useEffect(() => {
     fechaRef.current = form.fecha;
   }, [form.fecha]);
-
-  // Ref para evitar re-ejecutar el efecto de horas si la fecha no cambió realmente
-  const prevFechaRef = useRef<string>("");
 
   useEffect(() => {
     mountedRef.current = true;
@@ -108,31 +93,25 @@ export function usePatientAppointments() {
     };
   }, []);
 
-  // ─── Loaders ────────────────────────────────────────────────────────────────
-
   const fillFormWithPatientData = useCallback(
     (verification: VerificationResponse, savedUser?: SessionUser | null) => {
       if (!verification || !mountedRef.current) return;
-
       const verificationData = verification as VerificationResponse & {
         department?: string;
         departamentoNombre?: string;
         municipioNombre?: string;
         city?: string;
       };
-
       const epsName =
         typeof verification.eps === "string"
           ? verification.eps
           : verification.eps?.nombre || savedUser?.eps || "";
-
       const epsId =
         typeof verification.eps === "object"
           ? verification.eps?.id?.toString() || ""
           : verification.epsId?.toString() ||
             savedUser?.epsId?.toString() ||
             "";
-
       setForm((prev) => {
         const nextDep =
           verificationData.departamento ||
@@ -141,7 +120,6 @@ export function usePatientAppointments() {
           savedUser?.departamento ||
           prev.departamento ||
           "Nariño";
-
         const nextMun =
           verificationData.municipio ||
           verificationData.municipioNombre ||
@@ -149,11 +127,8 @@ export function usePatientAppointments() {
           savedUser?.municipio ||
           prev.municipio ||
           "Pasto";
-
         const nextEps = epsName || prev.eps;
         const nextEpsId = epsId || prev.epsId;
-
-        // Si nada cambió, devolver la misma referencia → React no agenda re-render
         if (
           prev.departamento === nextDep &&
           prev.municipio === nextMun &&
@@ -162,7 +137,6 @@ export function usePatientAppointments() {
         ) {
           return prev;
         }
-
         return {
           ...prev,
           departamento: nextDep,
@@ -178,18 +152,15 @@ export function usePatientAppointments() {
   const applyVerificationState = useCallback(
     (verification: VerificationResponse) => {
       if (!mountedRef.current) return;
-
       if (!verification) {
         setVerificationStatus("none");
         return;
       }
-
       const estado = (
         verification.estado ||
         verification.status ||
         ""
       ).toLowerCase();
-
       if (estado === "aprobado") {
         setVerificationStatus("approved");
       } else if (estado === "pendiente") {
@@ -205,61 +176,38 @@ export function usePatientAppointments() {
     [],
   );
 
-  const loadingVerificationRef = useRef(false);
-
   const loadVerificationStatus = useCallback(async () => {
     const token = getToken();
     const savedUser = getUser() as SessionUser | null;
-
     if (!token) return;
-
-    // Guard: si ya hay una petición en curso, no lanzar otra
-    if (loadingVerificationRef.current) return;
-
-    loadingVerificationRef.current = true;
-
     try {
       const verification: VerificationResponse = await getMyVerification(token);
-
+      if (!mountedRef.current) return;
       applyVerificationState(verification);
       fillFormWithPatientData(verification, savedUser);
     } catch (error) {
       console.error("Error al consultar verificación:", error);
-    } finally {
-      loadingVerificationRef.current = false;
     }
   }, [applyVerificationState, fillFormWithPatientData]);
-
-  const loadingAppointmentsRef = useRef(false);
 
   const loadAppointments = useCallback(async () => {
     const token = getToken();
     if (!token) return;
-
-    // Guard: si ya hay una petición en curso, no lanzar otra
-    if (loadingAppointmentsRef.current) return;
-
-    loadingAppointmentsRef.current = true;
     setLoadingAppointments(true);
-
     try {
       const result = await getMyAppointments(token);
       const items = Array.isArray(result) ? result : result?.data || [];
-
       if (mountedRef.current) {
         setAppointments(items);
       }
     } catch (error: unknown) {
       if (mountedRef.current) setAppointments([]);
-
       if (error instanceof Error) {
         alert(error.message);
       } else {
         alert("Error al consultar tus citas");
       }
     } finally {
-      loadingAppointmentsRef.current = false;
-
       if (mountedRef.current) {
         setLoadingAppointments(false);
       }
@@ -269,27 +217,22 @@ export function usePatientAppointments() {
   const loadCatalogs = useCallback(async () => {
     const token = getToken();
     if (!token) return;
-
     try {
       setLoadingCatalogs(true);
-
       const [specialtiesResult, epsResult, classesResult] = await Promise.all([
         getSpecialties(token),
         getEpsCatalog(),
         getAppointmentClasses(),
       ]);
-
       if (mountedRef.current) {
         setSpecialties(
           Array.isArray(specialtiesResult)
             ? specialtiesResult
             : specialtiesResult?.data || [],
         );
-
         setEpsList(
           Array.isArray(epsResult) ? epsResult : epsResult?.data || [],
         );
-
         setAppointmentClasses(
           Array.isArray(classesResult)
             ? classesResult
@@ -302,7 +245,6 @@ export function usePatientAppointments() {
         setEpsList([]);
         setAppointmentClasses([]);
       }
-
       if (error instanceof Error) {
         alert(error.message);
       } else {
@@ -317,24 +259,19 @@ export function usePatientAppointments() {
 
   const loadAvailableHours = useCallback(async (fecha: string) => {
     const token = getToken();
-
     if (!token || !fecha) {
       if (mountedRef.current) setAvailableHours([]);
       return;
     }
-
     try {
       setLoadingHours(true);
-
       const result = await getAvailableAppointments(token, fecha);
       const hours = Array.isArray(result) ? result : result?.data || [];
-
       if (mountedRef.current) {
         setAvailableHours(hours);
       }
     } catch (error: unknown) {
       if (mountedRef.current) setAvailableHours([]);
-
       if (error instanceof Error) {
         alert(error.message);
       } else {
@@ -347,51 +284,37 @@ export function usePatientAppointments() {
     }
   }, []);
 
-  // ─── Init ────────────────────────────────────────────────────────────────────
-
+  // ── Init (solo una vez) ──
   useEffect(() => {
     const init = async () => {
       const token = getToken();
       const savedUser = getUser() as SessionUser | null;
-
       if (!token || !savedUser) {
         router.replace("/login?role=patient");
         return;
       }
-
       const normalizedRole = normalizeRole(savedUser.role);
-
       if (normalizedRole !== "patient") {
         router.replace("/login?role=patient");
         return;
       }
-
       if (mountedRef.current) {
         setUser({ ...savedUser, role: normalizedRole });
       }
-
       await Promise.all([
         loadVerificationStatus(),
         loadAppointments(),
         loadCatalogs(),
       ]);
-
       if (mountedRef.current) {
         setCheckingAuth(false);
       }
     };
-
     void init();
-    // Solo se ejecuta al montar — las dependencias son estables (useCallback sin deps cambiantes)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Socket ──────────────────────────────────────────────────────────────────
-  // Se crea UNA sola vez cuando termina la autenticación.
-  // Usa fechaRef para leer form.fecha sin necesitar recrear los listeners.
-  // debouncedRefresh agrupa ráfagas de eventos del socket (500ms) para evitar
-  // que el backend dispare eventos en respuesta a cada GET, generando un loop.
-
+  // ── Socket (sin loadVerificationStatus/loadAppointments/loadAvailableHours en deps) ──
   useEffect(() => {
     if (checkingAuth) return;
 
@@ -399,10 +322,8 @@ export function usePatientAppointments() {
       transports: ["websocket"],
       withCredentials: true,
     });
-
     socketRef.current = socket;
 
-    // Helper: agrupa llamadas en una ventana de 500ms
     const debouncedRefresh = (fn: () => void) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(fn, 500);
@@ -412,15 +333,8 @@ export function usePatientAppointments() {
       console.log("Socket paciente-citas conectado:", socket.id);
     });
 
-    // DEBUG: loguear todos los eventos entrantes para detectar loops desde el servidor
-    socket.onAny((event: string, ...args: unknown[]) => {
-      console.log("[SOCKET EVENT]", event, args);
-    });
-
     socket.on("verificationRequested", () => {
-      debouncedRefresh(() => {
-        void loadVerificationStatus();
-      });
+      debouncedRefresh(() => void loadVerificationStatus());
     });
 
     socket.on("verificationUpdated", () => {
@@ -439,7 +353,6 @@ export function usePatientAppointments() {
     };
 
     socket.on("appointmentCreated", refreshAppointmentsAndHours);
-    socket.on("appointmentUpdated", refreshAppointmentsAndHours);
     socket.on("appointmentCancelled", refreshAppointmentsAndHours);
     socket.on("queueUpdated", refreshAppointmentsAndHours);
 
@@ -449,106 +362,74 @@ export function usePatientAppointments() {
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      socket.offAny();
       socket.off("connect");
       socket.off("verificationRequested");
       socket.off("verificationUpdated");
       socket.off("appointmentCreated", refreshAppointmentsAndHours);
-      socket.off("appointmentUpdated", refreshAppointmentsAndHours);
       socket.off("appointmentCancelled", refreshAppointmentsAndHours);
       socket.off("queueUpdated", refreshAppointmentsAndHours);
       socket.off("disconnect");
       socket.disconnect();
       socketRef.current = null;
     };
-    // Solo depende de checkingAuth y de los loaders (estables por useCallback)
-  }, [checkingAuth, loadVerificationStatus, loadAppointments, loadAvailableHours]);
+    // Solo checkingAuth: el socket se monta una vez tras auth y usa refs/callbacks estables
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkingAuth]);
 
-  // ─── Efectos de formulario ───────────────────────────────────────────────────
-
-  // Recargar horas disponibles cuando cambia la fecha (solo si está aprobado)
+  // ── Horarios al cambiar fecha ──
   useEffect(() => {
     if (verificationStatus !== "approved") {
       setAvailableHours([]);
       return;
     }
-
     if (!form.fecha) {
       setAvailableHours([]);
       return;
     }
-
-    // Guard: solo actuar si la fecha realmente cambió
     if (form.fecha === prevFechaRef.current) return;
     prevFechaRef.current = form.fecha;
-
-    // Solo limpiar hora si realmente tiene un valor, para no generar re-render innecesario
-    setForm((prev) =>
-      prev.hora === "" ? prev : { ...prev, hora: "" },
-    );
-
+    setForm((prev) => (prev.hora === "" ? prev : { ...prev, hora: "" }));
     void loadAvailableHours(form.fecha);
   }, [form.fecha, verificationStatus, loadAvailableHours]);
 
-  // Resolver epsId a partir del nombre eps cuando llega de la verificación
+  // ── Auto-completar epsId desde nombre ──
   useEffect(() => {
     if (!form.eps || form.epsId || epsList.length === 0) return;
-
     const normalizedFormEps = form.eps.trim().toLowerCase();
-
     const selectedEps = epsList.find(
       (item) => item.nombre?.trim().toLowerCase() === normalizedFormEps,
     );
-
     if (!selectedEps) return;
-
-    setForm((prev) => ({
-      ...prev,
-      epsId: String(selectedEps.id),
-    }));
+    setForm((prev) => ({ ...prev, epsId: String(selectedEps.id) }));
   }, [form.eps, form.epsId, epsList]);
 
-  // ─── Handlers ───────────────────────────────────────────────────────────────
-
+  // ── Handlers ──
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >,
   ) => {
     const { name, value } = e.target;
-
     if (name === "epsId") {
       const selectedEps = epsList.find((item) => String(item.id) === value);
-
       setForm((prev) => ({
         ...prev,
         epsId: value,
         eps: selectedEps?.nombre || prev.eps,
       }));
-
       return;
     }
-
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSelectWeekDay = (date: string) => {
     if (verificationStatus !== "approved") return;
-
-    setForm((prev) => ({
-      ...prev,
-      fecha: date,
-      hora: "",
-    }));
+    setForm((prev) => ({ ...prev, fecha: date, hora: "" }));
   };
 
   const handleSelectHour = (hour: string) => {
     if (verificationStatus !== "approved") return;
-
-    setForm((prev) => ({
-      ...prev,
-      hora: hour,
-    }));
+    setForm((prev) => ({ ...prev, hora: hour }));
   };
 
   const resetFormKeepingPatientData = () => {
@@ -563,36 +444,21 @@ export function usePatientAppointments() {
 
   const handleCreateAppointment = async () => {
     const token = getToken();
-
-    if (!token) {
-      alert("Debes iniciar sesión");
-      return;
-    }
-
+    if (!token) { alert("Debes iniciar sesión"); return; }
     if (verificationStatus !== "approved") {
       alert("Debes tener la verificación aprobada para agendar citas");
       return;
     }
-
     if (
-      !form.specialtyId ||
-      !form.fecha ||
-      !form.hora ||
-      !form.motivoConsulta ||
-      !form.eps ||
-      !form.departamento ||
-      !form.municipio ||
-      !form.appointmentClassId
+      !form.specialtyId || !form.fecha || !form.hora ||
+      !form.motivoConsulta || !form.eps || !form.departamento ||
+      !form.municipio || !form.appointmentClassId
     ) {
-      alert(
-        "Completa especialidad, fecha, hora, motivo, EPS, municipio, departamento y clase de cita",
-      );
+      alert("Completa especialidad, fecha, hora, motivo, EPS, municipio, departamento y clase de cita");
       return;
     }
-
     try {
       setSaving(true);
-
       await createAppointment(token, {
         specialtyId: Number(form.specialtyId),
         fecha: form.fecha,
@@ -605,60 +471,35 @@ export function usePatientAppointments() {
         appointmentClassId: Number(form.appointmentClassId),
         observaciones: form.observaciones,
       });
-
       alert("Cita creada correctamente");
-
       resetFormKeepingPatientData();
       setAvailableHours([]);
-
       await loadAppointments();
       await loadVerificationStatus();
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert("Error al crear la cita");
-      }
+      if (error instanceof Error) { alert(error.message); }
+      else { alert("Error al crear la cita"); }
     } finally {
-      if (mountedRef.current) {
-        setSaving(false);
-      }
+      if (mountedRef.current) setSaving(false);
     }
   };
 
   const handleJoinWaitlist = async () => {
     const token = getToken();
-
-    if (!token) {
-      alert("Debes iniciar sesión");
-      return;
-    }
-
+    if (!token) { alert("Debes iniciar sesión"); return; }
     if (verificationStatus !== "approved") {
-      alert(
-        "Debes tener la verificación aprobada para unirte a la lista de espera",
-      );
+      alert("Debes tener la verificación aprobada para unirte a la lista de espera");
       return;
     }
-
     if (
-      !form.specialtyId ||
-      !form.fecha ||
-      !form.motivoConsulta ||
-      !form.eps ||
-      !form.departamento ||
-      !form.municipio ||
-      !form.appointmentClassId
+      !form.specialtyId || !form.fecha || !form.motivoConsulta ||
+      !form.eps || !form.departamento || !form.municipio || !form.appointmentClassId
     ) {
-      alert(
-        "Completa especialidad, fecha, motivo, EPS, municipio, departamento y clase de cita antes de unirte a la lista de espera",
-      );
+      alert("Completa especialidad, fecha, motivo, EPS, municipio, departamento y clase de cita antes de unirte a la lista de espera");
       return;
     }
-
     try {
       setSavingWaitlist(true);
-
       await createAppointment(token, {
         specialtyId: Number(form.specialtyId),
         fecha: form.fecha,
@@ -671,56 +512,34 @@ export function usePatientAppointments() {
         appointmentClassId: Number(form.appointmentClassId),
         observaciones: form.observaciones,
       });
-
-      alert(
-        "Te has unido a la lista de espera para este día. Serás notificado cuando se libere un horario.",
-      );
-
+      alert("Te has unido a la lista de espera para este día. Serás notificado cuando se libere un horario.");
       resetFormKeepingPatientData();
       setAvailableHours([]);
-
       await loadAppointments();
       await loadVerificationStatus();
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert("Error al unirte a la lista de espera");
-      }
+      if (error instanceof Error) { alert(error.message); }
+      else { alert("Error al unirte a la lista de espera"); }
     } finally {
-      if (mountedRef.current) {
-        setSavingWaitlist(false);
-      }
+      if (mountedRef.current) setSavingWaitlist(false);
     }
   };
 
   const handleCancelAppointment = async (id: number) => {
     const token = getToken();
     if (!token) return;
-
     const confirmed = window.confirm("¿Deseas cancelar esta cita?");
     if (!confirmed) return;
-
     try {
       await cancelAppointment(token, id);
-
       alert("Cita cancelada correctamente");
-
       await loadAppointments();
-
-      if (form.fecha) {
-        await loadAvailableHours(form.fecha);
-      }
+      if (form.fecha) await loadAvailableHours(form.fecha);
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert("Error al cancelar cita");
-      }
+      if (error instanceof Error) { alert(error.message); }
+      else { alert("Error al cancelar cita"); }
     }
   };
-
-  // ─── Derivados ───────────────────────────────────────────────────────────────
 
   const canCreateAppointment = verificationStatus === "approved";
 
