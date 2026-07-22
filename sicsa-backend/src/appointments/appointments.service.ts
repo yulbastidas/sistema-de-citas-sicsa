@@ -325,6 +325,35 @@ export class AppointmentsService {
       throw new BadRequestException('No puedes cancelar esta cita');
     }
 
+    const currentStatus = (appointment.estado || '').trim().toLowerCase();
+
+    if (currentStatus === 'cancelada') {
+      throw new BadRequestException('La cita ya se encuentra cancelada');
+    }
+
+    if (currentStatus === 'atendida') {
+      throw new BadRequestException(
+        'No puedes cancelar una cita que ya fue atendida',
+      );
+    }
+
+    if (currentStatus === 'no_asistida' || currentStatus === 'no asistida') {
+      throw new BadRequestException(
+        'No puedes cancelar una cita marcada como no asistida',
+      );
+    }
+
+    const appointmentDateTime = this.getAppointmentDateTime(
+      appointment.fecha,
+      appointment.hora,
+    );
+
+    if (appointmentDateTime.getTime() <= Date.now()) {
+      throw new BadRequestException(
+        'No puedes cancelar una cita cuya fecha y hora ya pasaron',
+      );
+    }
+
     const releasedFecha = appointment.fecha;
     const releasedHora = appointment.hora;
     const releasedDuration = this.scheduleService.getAppointmentDuration(
@@ -503,6 +532,31 @@ export class AppointmentsService {
     }
 
     throw new NotFoundException('Doctor no encontrado');
+  }
+
+  private getAppointmentDateTime(fecha: string, hora: string): Date {
+    const normalizedFecha = fecha?.trim();
+    let normalizedHora = hora?.trim();
+
+    if (!normalizedFecha || !normalizedHora) {
+      throw new BadRequestException('La cita no tiene una fecha u hora válida');
+    }
+
+    if (/^\d{2}:\d{2}$/.test(normalizedHora)) {
+      normalizedHora = `${normalizedHora}:00`;
+    }
+
+    const appointmentDateTime = new Date(
+      `${normalizedFecha}T${normalizedHora}-05:00`,
+    );
+
+    if (Number.isNaN(appointmentDateTime.getTime())) {
+      throw new BadRequestException(
+        'La fecha u hora de la cita no tiene un formato válido',
+      );
+    }
+
+    return appointmentDateTime;
   }
 
   private getTomorrowDate(): string {

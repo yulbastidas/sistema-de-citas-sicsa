@@ -9,10 +9,10 @@ import {
   MapPin,
   ShieldCheck,
   Stethoscope,
-  XCircle,
 } from "lucide-react";
 
 import type { AppointmentItem } from "../types";
+import { isAppointmentCancellable } from "../../../../../utils/appointment-date";
 
 type PatientAppointmentListProps = {
   appointments: AppointmentItem[];
@@ -198,7 +198,6 @@ export function PatientAppointmentList({
           <section className="grid gap-5">
             {appointments.map((item) => {
               const status = (item.estado || "").toLowerCase();
-              const isCancelled = status === "cancelada";
               const isWaitlist = status === "lista_espera";
 
               return (
@@ -236,13 +235,8 @@ export function PatientAppointmentList({
                         </section>
                       </section>
 
-                      {!isCancelled && (
-                        <button
-                          type="button"
-                          onClick={() => onCancel(item.id)}
-                          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 lg:w-auto"
-                        >
-                          <XCircle size={17} />
+                      {isAppointmentCancellable(item) && (
+                        <button onClick={() => onCancel(item.id)}>
                           Cancelar cita
                         </button>
                       )}

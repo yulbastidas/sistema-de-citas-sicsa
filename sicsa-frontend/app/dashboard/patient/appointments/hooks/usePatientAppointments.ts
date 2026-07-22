@@ -23,6 +23,7 @@ import type {
   VerificationResponse,
   VerificationState,
 } from "../types";
+import { isAppointmentUpcoming } from '@/utils/appointment-date';
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL || "http://74.161.42.39:3000";
@@ -545,12 +546,20 @@ export function usePatientAppointments() {
 
   const activeAppointments = useMemo(
     () =>
-      appointments.filter(
-        (item) => (item.estado || "").toLowerCase() !== "cancelada",
-      ),
+      appointments.filter((item) => {
+        const status = (item.estado || '').trim().toLowerCase();
+
+        const isInactiveStatus = [
+          'cancelada',
+          'atendida',
+          'no_asistida',
+          'no asistida',
+        ].includes(status);
+
+        return !isInactiveStatus && isAppointmentUpcoming(item);
+      }),
     [appointments],
   );
-
   const showWaitlistButton =
     canCreateAppointment &&
     !!form.fecha &&

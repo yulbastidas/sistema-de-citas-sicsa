@@ -11,6 +11,7 @@ import {
 } from "@/service/verification";
 import { getMyAppointments } from "@/service/appointment";
 import { getMyPatient } from "@/service/patient";
+import { isAppointmentUpcoming } from '@/utils/appointment-date';
 
 import type {
   AppointmentItem,
@@ -312,23 +313,42 @@ export function usePatientDashboard() {
     }
   };
 
-  const nextActiveAppointment = useMemo(() => {
-    return appointments.find(
-      (item) => (item.estado || "").toLowerCase() !== "cancelada",
-    );
+  const futureActiveAppointments = useMemo(() => {
+    return appointments
+      .filter((item) => {
+        const status = (item.estado || "").trim().toLowerCase();
+
+        const isInactiveStatus = [
+          "cancelada",
+          "atendida",
+          "no_asistida",
+          "no asistida",
+        ].includes(status);
+
+        return !isInactiveStatus && isAppointmentUpcoming(item);
+      })
+      .sort((a, b) => {
+        const dateA = new Date(
+          `${a.fecha}T${a.hora.length === 5 ? `${a.hora}:00` : a.hora}-05:00`,
+        );
+
+        const dateB = new Date(
+          `${b.fecha}T${b.hora.length === 5 ? `${b.hora}:00` : b.hora}-05:00`,
+        );
+
+        return dateA.getTime() - dateB.getTime();
+      });
   }, [appointments]);
 
-  const activeAppointments = useMemo(() => {
-    return appointments.filter(
-      (item) => (item.estado || "").toLowerCase() !== "cancelada",
-    ).length;
-  }, [appointments]);
+  const nextActiveAppointment = futureActiveAppointments[0];
 
-  const isApproved = verificationStatus === "approved";
-  const isPending = verificationStatus === "pending";
-  const isRejected = verificationStatus === "rejected";
-  const hasNoRequest =
-    verificationStatus === "none" || verificationStatus === "expired";
+  const activeAppointments = futureActiveAppointments.length;
+
+    const isApproved = verificationStatus === "approved";
+    const isPending = verificationStatus === "pending";
+    const isRejected = verificationStatus === "rejected";
+    const hasNoRequest =
+      verificationStatus === "none" || verificationStatus === "expired";
 
   return {
     checkingAuth,
