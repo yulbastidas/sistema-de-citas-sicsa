@@ -1,10 +1,16 @@
 "use client";
 
-import { Clock3, Sparkles } from "lucide-react";
-import { AppointmentItem, SessionUser } from "../types";
+import {
+  ArrowRight,
+  Clock3,
+  FileText,
+  UserRound,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+
+import { AppointmentItem } from "../types";
 
 type DoctorSidebarProps = {
-  user: SessionUser | null;
   loadingAppointments: boolean;
   totalConfirmed: number;
   savedReportsCount: number;
@@ -12,93 +18,112 @@ type DoctorSidebarProps = {
 };
 
 export function DoctorSidebar({
-  user,
   loadingAppointments,
   totalConfirmed,
   savedReportsCount,
   nextAppointment,
 }: DoctorSidebarProps) {
+  const router = useRouter();
+
+  const pendingReports = Math.max(
+    totalConfirmed - savedReportsCount,
+    0,
+  );
+
   return (
-    <section className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-      <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-        <header className="flex items-start justify-between gap-4">
-          <section>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-700">
-              Resumen del turno
-            </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              Próxima atención
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Vista rápida del siguiente paciente confirmado.
-            </p>
+    <section className="mt-6 overflow-hidden rounded-2xl border border-cyan-200 bg-white shadow-sm">
+      <section className="grid lg:grid-cols-[1fr_auto]">
+        <article className="p-5 sm:p-6">
+          <header className="flex items-start gap-3">
+            <figure className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-700 text-white">
+              <Clock3 size={21} />
+            </figure>
+
+            <section>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-700">
+                Próxima atención
+              </p>
+
+              <h2 className="mt-1 text-xl font-bold text-slate-950">
+                {loadingAppointments
+                  ? "Cargando paciente..."
+                  : nextAppointment?.patient?.nombre ||
+                    "No hay una cita pendiente"}
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                {nextAppointment
+                  ? "Paciente confirmado y listo para iniciar la atención."
+                  : "No se encontraron citas confirmadas para la jornada."}
+              </p>
+            </section>
+          </header>
+
+          {nextAppointment && (
+            <section className="mt-5 flex flex-wrap gap-x-7 gap-y-3">
+              <p className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <Clock3 size={16} className="text-cyan-700" />
+                <span className="font-semibold">
+                  {nextAppointment.hora || "Sin hora"}
+                </span>
+              </p>
+
+              <p className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <UserRound size={16} className="text-cyan-700" />
+                Documento:
+                <span className="font-semibold">
+                  {nextAppointment.patient?.documento || "-"}
+                </span>
+              </p>
+
+              <p className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <FileText size={16} className="text-cyan-700" />
+                {nextAppointment.medicalReport?.exists
+                  ? "Reporte registrado"
+                  : "Reporte pendiente"}
+              </p>
+            </section>
+          )}
+        </article>
+
+        <aside className="flex flex-col justify-center gap-3 border-t border-cyan-100 bg-cyan-50 p-5 lg:min-w-72 lg:border-l lg:border-t-0">
+          <section className="grid grid-cols-2 gap-3">
+            <article>
+              <p className="text-xs font-medium text-slate-500">
+                Citas del día
+              </p>
+              <p className="mt-1 text-2xl font-bold text-slate-950">
+                {loadingAppointments ? "..." : totalConfirmed}
+              </p>
+            </article>
+
+            <article>
+              <p className="text-xs font-medium text-slate-500">
+                Sin reporte
+              </p>
+              <p className="mt-1 text-2xl font-bold text-slate-950">
+                {loadingAppointments ? "..." : pendingReports}
+              </p>
+            </article>
           </section>
 
-          <figure className="rounded-3xl bg-slate-100 p-3 text-slate-700">
-            <Clock3 size={22} />
-          </figure>
-        </header>
+          <button
+            type="button"
+            disabled={!nextAppointment}
+            onClick={() => {
+              if (!nextAppointment) return;
 
-        <section className="mt-6 grid gap-4 md:grid-cols-2">
-          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-            <p className="text-sm font-medium text-slate-500">Hora</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {loadingAppointments
-                ? "..."
-                : nextAppointment?.hora || "Sin horario"}
-            </p>
-          </article>
-
-          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-            <p className="text-sm font-medium text-slate-500">Paciente</p>
-            <p className="mt-2 text-xl font-semibold text-slate-900">
-              {loadingAppointments
-                ? "Cargando..."
-                : nextAppointment?.patient?.nombre || "Sin próxima cita"}
-            </p>
-          </article>
-        </section>
-      </article>
-
-      <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-        <header className="flex items-start justify-between gap-4">
-          <section>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-violet-700">
-              Estado general
-            </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              Actividad del día
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Control visual del flujo clínico actual.
-            </p>
-          </section>
-
-          <figure className="rounded-3xl bg-slate-100 p-3 text-slate-700">
-            <Sparkles size={22} />
-          </figure>
-        </header>
-
-        <section className="mt-6 space-y-4">
-          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-medium text-slate-500">
-              Pendientes de reporte
-            </p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">
-              {loadingAppointments ? "..." : totalConfirmed - savedReportsCount}
-            </p>
-          </article>
-
-          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-medium text-slate-500">
-              Correo de sesión
-            </p>
-            <p className="mt-2 break-all text-sm font-semibold text-slate-800">
-              {user?.email || "No disponible"}
-            </p>
-          </article>
-        </section>
-      </article>
+              router.push(
+                `/dashboard/doctor/report/${nextAppointment.id}`,
+              );
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            Iniciar atención
+            <ArrowRight size={17} />
+          </button>
+        </aside>
+      </section>
     </section>
   );
 }

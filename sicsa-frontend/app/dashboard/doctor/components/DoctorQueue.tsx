@@ -1,8 +1,16 @@
 "use client";
 
-import { ClipboardList, FileBadge2, FileText, Mail, Phone } from "lucide-react";
-import { AppointmentItem } from "../types";
+import {
+  ClipboardList,
+  FileBadge2,
+  FileText,
+  Mail,
+  Phone,
+  UserRound,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
+
+import { AppointmentItem } from "../types";
 
 type DoctorQueueProps = {
   loadingQueue: boolean;
@@ -11,30 +19,34 @@ type DoctorQueueProps = {
   onOpenPdf: (id: number) => Promise<void>;
 };
 
-function getPriorityBadgeClass(priority: string | number | undefined) {
+function getPriorityStyles(priority: string | number | undefined) {
   const value = String(priority || "").toLowerCase();
 
   if (value.includes("alta") || value === "3") {
-    return "border border-red-200 bg-red-50 text-red-700";
+    return {
+      badge: "border-red-200 bg-red-50 text-red-700",
+      marker: "bg-red-500",
+    };
   }
 
   if (value.includes("media") || value === "2") {
-    return "border border-amber-200 bg-amber-50 text-amber-700";
+    return {
+      badge: "border-amber-200 bg-amber-50 text-amber-700",
+      marker: "bg-amber-500",
+    };
   }
 
   if (value.includes("baja") || value === "1") {
-    return "border border-emerald-200 bg-emerald-50 text-emerald-700";
+    return {
+      badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      marker: "bg-emerald-500",
+    };
   }
 
-  return "border border-slate-200 bg-slate-50 text-slate-700";
-}
-
-function getReportBadgeClass(exists: boolean | undefined) {
-  if (exists) {
-    return "border border-cyan-200 bg-cyan-50 text-cyan-700";
-  }
-
-  return "border border-amber-200 bg-amber-50 text-amber-700";
+  return {
+    badge: "border-slate-200 bg-slate-50 text-slate-700",
+    marker: "bg-slate-400",
+  };
 }
 
 export function DoctorQueue({
@@ -46,139 +58,162 @@ export function DoctorQueue({
   const router = useRouter();
 
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-7 shadow-sm">
-      <header className="mb-6 flex items-start gap-3">
-        <figure className="rounded-2xl bg-violet-50 p-3 text-violet-700">
-          <ClipboardList size={22} />
-        </figure>
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
+        <section className="flex items-start gap-3">
+          <figure className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
+            <ClipboardList size={20} />
+          </figure>
 
-        <section>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-            Cola priorizada del día
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Orden clínico de atención según prioridad y horario.
-          </p>
+          <section>
+            <h2 className="text-lg font-bold text-slate-950">
+              Cola priorizada
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Orden de atención según prioridad clínica y horario.
+            </p>
+          </section>
         </section>
+
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+          {loadingQueue ? "..." : queueItems.length}
+        </span>
       </header>
 
       {loadingQueue ? (
-        <p className="text-slate-600">Cargando cola...</p>
+        <section className="p-6">
+          <p className="text-sm font-medium text-slate-500">
+            Cargando cola clínica...
+          </p>
+        </section>
       ) : queueItems.length === 0 ? (
-        <article className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-          <p className="text-base font-semibold text-slate-700">
-            No hay pacientes en la cola de hoy.
-          </p>
-          <p className="mt-2 text-sm text-slate-500">
-            Cuando existan citas confirmadas del día aparecerán aquí.
-          </p>
-        </article>
+        <section className="p-6">
+          <article className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+            <figure className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
+              <ClipboardList size={22} />
+            </figure>
+
+            <p className="mt-4 font-semibold text-slate-700">
+              No hay pacientes en cola
+            </p>
+
+            <p className="mt-1 max-w-sm text-sm text-slate-500">
+              Los pacientes confirmados y priorizados aparecerán aquí.
+            </p>
+          </article>
+        </section>
       ) : (
-        <section className="space-y-5">
-          {queueItems.map((item, index) => (
-            <article
-              key={item.id}
-              className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-50"
-            >
-              <header className="border-b border-slate-200 bg-white px-5 py-4">
-                <section className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <section className="flex flex-wrap items-center gap-3">
-                    <h3 className="text-xl font-bold text-slate-900">
-                      #{index + 1} {item.patient?.nombre || "Paciente"}
-                    </h3>
+        <section className="divide-y divide-slate-200">
+          {queueItems.map((item, index) => {
+            const priorityStyles = getPriorityStyles(item.prioridad);
 
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${getPriorityBadgeClass(item.prioridad)}`}
-                    >
-                      Prioridad: {item.prioridad || "-"}
-                    </span>
+            return (
+              <article
+                key={item.id}
+                className="relative p-5 transition hover:bg-slate-50 sm:p-6"
+              >
+                <span
+                  className={`absolute bottom-5 left-0 top-5 w-1 rounded-r-full ${priorityStyles.marker}`}
+                />
 
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${getReportBadgeClass(item.medicalReport?.exists)}`}
-                    >
-                      {item.medicalReport?.exists
-                        ? "Reporte guardado"
-                        : "Sin reporte"}
-                    </span>
+                <section className="flex flex-col gap-5">
+                  <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <section className="flex items-start gap-3">
+                      <figure className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700">
+                        {index + 1}
+                      </figure>
+
+                      <section>
+                        <h3 className="text-base font-bold text-slate-950">
+                          {item.patient?.nombre || "Paciente"}
+                        </h3>
+
+                        <section className="mt-2 flex flex-wrap gap-2">
+                          <span
+                            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${priorityStyles.badge}`}
+                          >
+                            Prioridad {item.prioridad || "sin definir"}
+                          </span>
+
+                          <span
+                            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                              item.medicalReport?.exists
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-amber-200 bg-amber-50 text-amber-700"
+                            }`}
+                          >
+                            {item.medicalReport?.exists
+                              ? "Reporte guardado"
+                              : "Reporte pendiente"}
+                          </span>
+                        </section>
+                      </section>
+                    </section>
+
+                    <section className="flex items-center gap-3">
+                      <article className="text-right">
+                        <p className="text-xs font-medium text-slate-500">
+                          Hora
+                        </p>
+                        <p className="text-lg font-bold text-slate-950">
+                          {item.hora || "-"}
+                        </p>
+                      </article>
+
+                      <article className="rounded-xl bg-slate-100 px-3 py-2 text-center">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                          Score
+                        </p>
+                        <p className="text-lg font-bold text-slate-950">
+                          {item.scorePrioridad ?? "-"}
+                        </p>
+                      </article>
+                    </section>
+                  </header>
+
+                  <section className="grid gap-3 sm:grid-cols-2">
+                    <p className="inline-flex items-center gap-2 text-sm text-slate-600">
+                      <UserRound size={15} className="text-slate-400" />
+                      Documento:
+                      <span className="font-semibold text-slate-800">
+                        {item.patient?.documento || "-"}
+                      </span>
+                    </p>
+
+                    <p className="inline-flex items-center gap-2 text-sm text-slate-600">
+                      <Phone size={15} className="text-slate-400" />
+                      {item.patient?.telefono || "Sin teléfono"}
+                    </p>
+
+                    <p className="inline-flex items-center gap-2 text-sm text-slate-600 sm:col-span-2">
+                      <Mail size={15} className="text-slate-400" />
+                      <span className="break-all">
+                        {item.patient?.email || "Sin correo"}
+                      </span>
+                    </p>
                   </section>
 
-                  <aside className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Score
-                    </p>
-                    <p className="mt-1 text-3xl font-bold text-slate-900">
-                      {item.scorePrioridad ?? "-"}
-                    </p>
-                  </aside>
-                </section>
-              </header>
-
-              <section className="grid gap-5 p-5 xl:grid-cols-[1fr_0.9fr]">
-                <section className="space-y-4">
-                  <article className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-4 md:grid-cols-2">
-                    <p className="text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">
-                        Hora:
-                      </span>{" "}
-                      {item.hora || "-"}
-                    </p>
-                    <p className="text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">
-                        Documento:
-                      </span>{" "}
-                      {item.patient?.documento || "-"}
-                    </p>
-                    <p className="text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">EPS:</span>{" "}
-                      {item.patient?.eps || "-"}
-                    </p>
-                    <p className="text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">
-                        Teléfono:
-                      </span>{" "}
-                      {item.patient?.telefono || "-"}
-                    </p>
-                  </article>
-
-                  <article className="rounded-3xl border border-slate-200 bg-white p-4">
-                    <p className="text-sm font-semibold text-slate-500">
+                  <article className="rounded-xl bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Motivo de consulta
                     </p>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                      {item.motivoConsulta || "Sin detalle"}
+                    <p className="mt-1 text-sm leading-6 text-slate-700">
+                      {item.motivoConsulta || "Sin información registrada"}
                     </p>
                   </article>
-                </section>
 
-                <section className="space-y-4">
-                  <article className="rounded-3xl border border-slate-200 bg-white p-4">
-                    <p className="text-sm font-semibold text-slate-500">
-                      Contacto rápido
-                    </p>
-
-                    <section className="mt-3 space-y-3">
-                      <p className="inline-flex items-center gap-2 text-sm text-slate-700">
-                        <Phone size={15} className="text-slate-400" />
-                        {item.patient?.telefono || "Sin teléfono"}
-                      </p>
-
-                      <p className="inline-flex items-center gap-2 break-all text-sm text-slate-700">
-                        <Mail size={15} className="text-slate-400" />
-                        {item.patient?.email || "Sin correo"}
-                      </p>
-                    </section>
-                  </article>
-
-                  <footer className="flex flex-wrap gap-3">
+                  <footer className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => {
-                        router.push(`/dashboard/doctor/report/${item.id}`);
+                        router.push(
+                          `/dashboard/doctor/report/${item.id}`,
+                        );
                       }}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                      className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-800"
                     >
                       <FileText size={16} />
-                      Ver reporte
+                      Atender paciente
                     </button>
 
                     <button
@@ -187,20 +222,21 @@ export function DoctorQueue({
                         void onOpenPdf(item.id);
                       }}
                       disabled={
-                        downloadingId === item.id || !item.medicalReport?.exists
+                        downloadingId === item.id ||
+                        !item.medicalReport?.exists
                       }
-                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <FileBadge2 size={16} />
                       {downloadingId === item.id
-                        ? "Descargando PDF..."
+                        ? "Descargando..."
                         : "Descargar PDF"}
                     </button>
                   </footer>
                 </section>
-              </section>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </section>
       )}
     </section>

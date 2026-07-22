@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { CalendarDays, FolderOpen } from "lucide-react";
+import { CalendarDays, History } from "lucide-react";
+import Link from "next/link";
 
 import { useDoctorDashboard } from "./hooks/useDoctorDashboard";
 import { DoctorHeader } from "./components/DoctorHeader";
@@ -30,6 +31,7 @@ export default function DoctorDashboardPage() {
   const highPriorityCount = useMemo(() => {
     return queueItems.filter((item) => {
       const value = String(item.prioridad || "").toLowerCase();
+
       return value.includes("alta") || value === "3";
     }).length;
   }, [queueItems]);
@@ -44,33 +46,38 @@ export default function DoctorDashboardPage() {
 
   if (checkingAuth) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100">
-        <p className="text-lg font-semibold text-slate-600">Cargando...</p>
+      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+        <section className="rounded-2xl border border-slate-200 bg-white px-8 py-6 shadow-sm">
+          <p className="text-sm font-semibold text-slate-600">
+            Cargando panel médico...
+          </p>
+        </section>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-5 py-6 lg:px-8">
-      <header className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-        <DoctorHeader user={user} today={today} onLogout={handleLogout} />
+    <main className="min-h-screen bg-slate-50">
+      <DoctorHeader user={user} today={today} onLogout={handleLogout} />
 
-        <section className="border-t border-slate-200 bg-slate-50 px-6 py-5">
-          <nav className="flex flex-wrap gap-3">
-            <button className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white">
-              <CalendarDays size={16} />
-              Agenda del día
-            </button>
+      <section className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
+        <nav className="mb-6 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm"
+          >
+            <CalendarDays size={17} />
+            Agenda del día
+          </button>
 
-            <a
-              href="/dashboard/doctor/history"
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
-              <FolderOpen size={16} />
-              Historial de atenciones
-            </a>
-          </nav>
-        </section>
+          <Link
+            href="/dashboard/doctor/history"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800"
+          >
+            <History size={17} />
+            Historial clínico
+          </Link>
+        </nav>
 
         <DoctorStats
           loadingAppointments={loadingAppointments}
@@ -80,30 +87,29 @@ export default function DoctorDashboardPage() {
           highPriorityCount={highPriorityCount}
           savedReportsCount={savedReportsCount}
         />
-      </header>
 
-      <DoctorSidebar
-        user={user}
-        loadingAppointments={loadingAppointments}
-        totalConfirmed={totalConfirmed}
-        savedReportsCount={savedReportsCount}
-        nextAppointment={nextAppointment}
-      />
-
-      <section className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <DoctorQueue
-          loadingQueue={loadingQueue}
-          queueItems={queueItems}
-          downloadingId={downloadingId}
-          onOpenPdf={openMedicalReportPdf}
-        />
-
-        <TodayAppointments
+        <DoctorSidebar
           loadingAppointments={loadingAppointments}
-          appointments={appointments}
-          downloadingId={downloadingId}
-          onOpenPdf={openMedicalReportPdf}
+          totalConfirmed={totalConfirmed}
+          savedReportsCount={savedReportsCount}
+          nextAppointment={nextAppointment}
         />
+
+        <section className="mt-6 grid items-start gap-6 xl:grid-cols-[1.12fr_0.88fr]">
+          <DoctorQueue
+            loadingQueue={loadingQueue}
+            queueItems={queueItems}
+            downloadingId={downloadingId}
+            onOpenPdf={openMedicalReportPdf}
+          />
+
+          <TodayAppointments
+            loadingAppointments={loadingAppointments}
+            appointments={appointments}
+            downloadingId={downloadingId}
+            onOpenPdf={openMedicalReportPdf}
+          />
+        </section>
       </section>
     </main>
   );

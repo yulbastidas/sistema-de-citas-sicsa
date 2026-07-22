@@ -177,10 +177,22 @@ export function usePatientRegister() {
       return;
     }
 
-    const parsedCredentials = JSON.parse(credentials) as {
+    let parsedCredentials: {
       email: string;
       password: string;
     };
+
+    try {
+      parsedCredentials = JSON.parse(credentials) as {
+        email: string;
+        password: string;
+      };
+    } catch {
+      localStorage.removeItem("register_credentials");
+      alert("Los datos del primer paso no son válidos. Intenta nuevamente.");
+      router.push("/register");
+      return;
+    }
 
     if (
       !form.tipoDocumento ||
@@ -195,6 +207,33 @@ export function usePatientRegister() {
       !form.municipio
     ) {
       alert("Completa todos los campos obligatorios");
+      return;
+    }
+
+    /*
+     * Validación de la fecha de nacimiento.
+     * Se agrega T00:00:00 para evitar diferencias por zona horaria.
+     */
+    const birthDate = new Date(`${form.fechaNacimiento}T00:00:00`);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (Number.isNaN(birthDate.getTime())) {
+      alert("Ingresa una fecha de nacimiento válida");
+      return;
+    }
+
+    if (birthDate > today) {
+      alert("La fecha de nacimiento no puede ser futura");
+      return;
+    }
+
+    const oldestAllowedDate = new Date(today);
+    oldestAllowedDate.setFullYear(today.getFullYear() - 120);
+
+    if (birthDate < oldestAllowedDate) {
+      alert("La fecha de nacimiento no puede superar los 120 años");
       return;
     }
 
@@ -226,7 +265,9 @@ export function usePatientRegister() {
         "Registro completado con éxito. Revisa tu correo e ingresa el código de verificación.",
       );
 
-      router.push(`/verify?email=${encodeURIComponent(parsedCredentials.email)}`);
+      router.push(
+        `/verify?email=${encodeURIComponent(parsedCredentials.email)}`,
+      );
     } catch (error: unknown) {
       if (error instanceof Error) {
         alert(error.message);

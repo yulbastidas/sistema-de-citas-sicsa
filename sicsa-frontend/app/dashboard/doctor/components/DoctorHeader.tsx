@@ -4,10 +4,10 @@ import {
   CalendarDays,
   LogOut,
   ShieldCheck,
-  Sparkles,
   Stethoscope,
   UserRound,
 } from "lucide-react";
+
 import { SessionUser } from "../types";
 
 type DoctorHeaderProps = {
@@ -16,57 +16,74 @@ type DoctorHeaderProps = {
   onLogout: () => void;
 };
 
-export function DoctorHeader({ user, today, onLogout }: DoctorHeaderProps) {
+function formatDate(date: string) {
+  if (!date) return "";
+
+  const [year, month, day] = date.split("-").map(Number);
+
+  return new Intl.DateTimeFormat("es-CO", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, month - 1, day));
+}
+
+export function DoctorHeader({
+  user,
+  today,
+  onLogout,
+}: DoctorHeaderProps) {
   return (
-    <section className="bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-900 px-8 py-8 text-white">
-      <section className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-        <article className="flex items-start gap-4">
-          <figure className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/10 backdrop-blur">
-            <Stethoscope size={30} className="text-white" />
+    <header className="border-b border-slate-200 bg-white">
+      <section className="mx-auto flex max-w-[1500px] flex-col gap-5 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <section className="flex min-w-0 items-center gap-4">
+          <figure className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-cyan-700 text-white shadow-sm">
+            <Stethoscope size={28} />
           </figure>
 
-          <section>
-            <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-cyan-100">
-              <Sparkles size={14} />
-              Jornada médica activa
+          <section className="min-w-0">
+            <section className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                Panel médico
+              </h1>
+
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                <ShieldCheck size={13} />
+                Jornada activa
+              </span>
+            </section>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Consulta tu agenda, prioriza pacientes y registra la atención
+              clínica.
             </p>
 
-            <h1 className="mt-3 text-3xl font-bold tracking-tight lg:text-4xl">
-              Panel del doctor
-            </h1>
-
-            <p className="mt-2 max-w-2xl text-sm text-slate-200 lg:text-base">
-              Agenda del día, priorización clínica, citas activas y acceso a
-              reportes en PDF.
-            </p>
-
-            <section className="mt-5 flex flex-wrap items-center gap-3 text-sm text-slate-200">
-              <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2">
-                <UserRound size={15} />
-                <span>{user?.email || "Doctor"}</span>
+            <section className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
+              <p className="inline-flex items-center gap-2">
+                <UserRound size={15} className="text-slate-400" />
+                <span className="truncate">
+                  {user?.email || "Médico"}
+                </span>
               </p>
 
-              <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2">
-                <ShieldCheck size={15} />
-                <span>Rol médico activo</span>
-              </p>
-
-              <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2">
-                <CalendarDays size={15} />
-                <span>{today}</span>
+              <p className="inline-flex items-center gap-2 capitalize">
+                <CalendarDays size={15} className="text-slate-400" />
+                {formatDate(today)}
               </p>
             </section>
           </section>
-        </article>
+        </section>
 
         <button
+          type="button"
           onClick={onLogout}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+          className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 lg:self-auto"
         >
           <LogOut size={16} />
           Cerrar sesión
         </button>
       </section>
-    </section>
+    </header>
   );
 }

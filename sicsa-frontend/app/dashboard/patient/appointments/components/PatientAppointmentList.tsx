@@ -4,9 +4,14 @@ import {
   CalendarDays,
   Clock3,
   ClockIcon,
+  FileText,
   HeartPulse,
   MapPin,
+  ShieldCheck,
+  Stethoscope,
+  XCircle,
 } from "lucide-react";
+
 import type { AppointmentItem } from "../types";
 
 type PatientAppointmentListProps = {
@@ -21,19 +26,57 @@ function getStatusBadgeClass(status: string | undefined): string {
   if (value === "confirmada" || value === "aprobada") {
     return "border border-emerald-200 bg-emerald-50 text-emerald-700";
   }
+
   if (value === "pendiente") {
     return "border border-amber-200 bg-amber-50 text-amber-700";
   }
+
   if (value === "cancelada") {
     return "border border-rose-200 bg-rose-50 text-rose-700";
   }
+
   if (value === "atendida") {
     return "border border-sky-200 bg-sky-50 text-sky-700";
   }
+
   if (value === "lista_espera") {
     return "border border-violet-200 bg-violet-50 text-violet-700";
   }
+
   return "border border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function getStatusLabel(status: string | undefined): string {
+  const value = (status || "").toLowerCase();
+
+  if (value === "lista_espera") {
+    return "Lista de espera";
+  }
+
+  if (!status) {
+    return "Pendiente";
+  }
+
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function formatAppointmentDate(dateValue: string): string {
+  if (!dateValue) {
+    return "Fecha no registrada";
+  }
+
+  const date = new Date(`${dateValue}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return dateValue;
+  }
+
+  return date.toLocaleDateString("es-CO", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 export function PatientAppointmentList({
@@ -42,129 +85,295 @@ export function PatientAppointmentList({
   onCancel,
 }: PatientAppointmentListProps) {
   return (
-    <section className="mt-6 rounded-[2rem] border border-cyan-100 bg-white/90 p-8 shadow-lg backdrop-blur">
-      <header className="mb-6 flex items-center gap-3">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-100">
-          <HeartPulse className="text-cyan-700" size={22} />
-        </span>
-        <section>
-          <h2 className="text-2xl font-semibold text-slate-900">Mis citas</h2>
-          <p className="mt-1 text-slate-600">
-            Consulta el estado de tus solicitudes y cancela una cita si aún está
-            activa.
-          </p>
+    <section className="mt-6 overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-xl">
+      <header className="border-b border-slate-100 bg-gradient-to-r from-white via-sky-50/50 to-cyan-50/70 px-6 py-6 sm:px-8">
+        <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <section className="flex items-start gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 shadow-md shadow-blue-100">
+              <HeartPulse className="text-white" size={23} />
+            </span>
+
+            <section>
+              <h2 className="text-2xl font-bold text-slate-900">Mis citas</h2>
+
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+                Consulta el estado de tus solicitudes, revisa sus detalles y
+                cancela las citas que aún se encuentren activas.
+              </p>
+            </section>
+          </section>
+
+          <section className="flex w-fit items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
+              <CalendarDays className="text-blue-600" size={18} />
+            </span>
+
+            <section>
+              <p className="text-xs font-medium text-slate-500">
+                Citas registradas
+              </p>
+
+              <p className="text-xl font-bold text-slate-900">
+                {appointments.length}
+              </p>
+            </section>
+          </section>
         </section>
       </header>
 
-      {loadingAppointments ? (
-        <article className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-          <p className="text-slate-600">Cargando citas...</p>
-        </article>
-      ) : appointments.length === 0 ? (
-        <article className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-          <p className="text-slate-600">Aún no tienes citas registradas.</p>
-        </article>
-      ) : (
-        <section className="space-y-4">
-          {appointments.map((item) => {
-            const status = (item.estado || "").toLowerCase();
+      <section className="p-6 sm:p-8">
+        {loadingAppointments ? (
+          <article className="flex min-h-[220px] items-center justify-center rounded-[1.75rem] border border-slate-200 bg-slate-50/70">
+            <section className="text-center">
+              <span className="mx-auto flex h-14 w-14 animate-pulse items-center justify-center rounded-2xl bg-blue-100">
+                <CalendarDays className="text-blue-600" size={25} />
+              </span>
 
-            return (
-              <article
-                key={item.id}
-                className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm"
-              >
-                <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <section className="flex-1">
-                    <section className="flex flex-wrap items-center gap-3">
-                      <p className="text-xl font-bold text-slate-900">
-                        Solicitud #{item.id}
-                      </p>
+              <p className="mt-4 font-semibold text-slate-800">
+                Cargando tus citas
+              </p>
 
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(item.estado)}`}
-                      >
-                        {status === "lista_espera"
-                          ? "En lista de espera"
-                          : item.estado || "pendiente"}
-                      </span>
-                    </section>
+              <p className="mt-1 text-sm text-slate-500">
+                Estamos consultando tus solicitudes registradas.
+              </p>
+            </section>
+          </article>
+        ) : appointments.length === 0 ? (
+          <article className="relative overflow-hidden rounded-[1.75rem] border border-dashed border-blue-200 bg-gradient-to-br from-blue-50/80 via-white to-cyan-50/70 px-6 py-12">
+            <span className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-blue-100/60 blur-2xl" />
 
-                    <section className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-3">
-                      <p className="flex items-center gap-2">
-                        <CalendarDays size={16} className="text-cyan-600" />
-                        {item.fecha}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Clock3 size={16} className="text-cyan-600" />
-                        {status === "lista_espera"
-                          ? "Hora por asignar"
-                          : item.hora}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <MapPin size={16} className="text-cyan-600" />
-                        {item.municipio || "Municipio no registrado"}
-                      </p>
-                      <p>EPS: {item.eps || "No registrada"}</p>
-                      <p>Departamento: {item.departamento || "-"}</p>
-                    </section>
+            <span className="absolute -bottom-12 -left-10 h-36 w-36 rounded-full bg-cyan-100/60 blur-2xl" />
 
-                    {status === "lista_espera" && (
-                      <section className="mt-4 rounded-3xl border border-violet-200 bg-violet-50 p-4">
-                        <section className="flex items-center gap-2">
-                          <ClockIcon className="text-violet-600" size={16} />
-                          <p className="text-sm font-semibold text-violet-800">
-                            Estás en lista de espera
+            <section className="relative mx-auto max-w-xl text-center">
+              <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 shadow-lg shadow-blue-100">
+                <CalendarDays className="text-white" size={28} />
+              </span>
+
+              <h3 className="mt-5 text-xl font-bold text-slate-900">
+                Aún no tienes citas registradas
+              </h3>
+
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
+                Cuando solicites una cita, podrás consultar aquí su fecha,
+                horario, estado, motivo y demás información.
+              </p>
+
+              <section className="mx-auto mt-6 grid max-w-lg gap-3 sm:grid-cols-3">
+                <article className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm">
+                  <CalendarDays
+                    className="mx-auto text-blue-600"
+                    size={20}
+                  />
+
+                  <p className="mt-2 text-xs font-semibold text-slate-700">
+                    Fecha y hora
+                  </p>
+                </article>
+
+                <article className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm">
+                  <ShieldCheck
+                    className="mx-auto text-emerald-600"
+                    size={20}
+                  />
+
+                  <p className="mt-2 text-xs font-semibold text-slate-700">
+                    Estado de la cita
+                  </p>
+                </article>
+
+                <article className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm">
+                  <FileText
+                    className="mx-auto text-cyan-600"
+                    size={20}
+                  />
+
+                  <p className="mt-2 text-xs font-semibold text-slate-700">
+                    Detalles clínicos
+                  </p>
+                </article>
+              </section>
+            </section>
+          </article>
+        ) : (
+          <section className="grid gap-5">
+            {appointments.map((item) => {
+              const status = (item.estado || "").toLowerCase();
+              const isCancelled = status === "cancelada";
+              const isWaitlist = status === "lista_espera";
+
+              return (
+                <article
+                  key={item.id}
+                  className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg"
+                >
+                  <section className="h-1.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-400" />
+
+                  <section className="p-5 sm:p-6">
+                    <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <section className="flex min-w-0 items-start gap-4">
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50">
+                          <Stethoscope className="text-blue-600" size={22} />
+                        </span>
+
+                        <section className="min-w-0">
+                          <section className="flex flex-wrap items-center gap-3">
+                            <h3 className="text-xl font-bold text-slate-900">
+                              Cita #{item.id}
+                            </h3>
+
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusBadgeClass(
+                                item.estado,
+                              )}`}
+                            >
+                              {getStatusLabel(item.estado)}
+                            </span>
+                          </section>
+
+                          <p className="mt-1 text-sm capitalize text-slate-500">
+                            {formatAppointmentDate(item.fecha)}
                           </p>
                         </section>
-                        <p className="mt-1 text-sm text-violet-700">
-                          Cuando alguien cancele un horario para este día, se te
-                          asignará automáticamente según tu prioridad y
-                          recibirás una notificación por correo.
+                      </section>
+
+                      {!isCancelled && (
+                        <button
+                          type="button"
+                          onClick={() => onCancel(item.id)}
+                          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 lg:w-auto"
+                        >
+                          <XCircle size={17} />
+                          Cancelar cita
+                        </button>
+                      )}
+                    </header>
+
+                    <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <section className="flex items-center gap-2">
+                          <CalendarDays className="text-blue-600" size={17} />
+
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Fecha
+                          </p>
+                        </section>
+
+                        <p className="mt-2 text-sm font-bold capitalize text-slate-900">
+                          {formatAppointmentDate(item.fecha)}
                         </p>
+                      </article>
+
+                      <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <section className="flex items-center gap-2">
+                          <Clock3 className="text-cyan-600" size={17} />
+
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Hora
+                          </p>
+                        </section>
+
+                        <p className="mt-2 text-sm font-bold text-slate-900">
+                          {isWaitlist ? "Por asignar" : item.hora || "-"}
+                        </p>
+                      </article>
+
+                      <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <section className="flex items-center gap-2">
+                          <MapPin className="text-emerald-600" size={17} />
+
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Ubicación
+                          </p>
+                        </section>
+
+                        <p className="mt-2 text-sm font-bold text-slate-900">
+                          {item.municipio || "No registrado"}
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          {item.departamento || "Departamento no registrado"}
+                        </p>
+                      </article>
+
+                      <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <section className="flex items-center gap-2">
+                          <ShieldCheck
+                            className="text-violet-600"
+                            size={17}
+                          />
+
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            EPS
+                          </p>
+                        </section>
+
+                        <p className="mt-2 text-sm font-bold text-slate-900">
+                          {item.eps || "No registrada"}
+                        </p>
+                      </article>
+                    </section>
+
+                    {isWaitlist && (
+                      <section className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                        <section className="flex items-start gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100">
+                            <ClockIcon
+                              className="text-violet-700"
+                              size={18}
+                            />
+                          </span>
+
+                          <section>
+                            <p className="text-sm font-bold text-violet-800">
+                              Estás en lista de espera
+                            </p>
+
+                            <p className="mt-1 text-sm leading-6 text-violet-700">
+                              Cuando se libere un horario para esta fecha, el
+                              sistema podrá asignarlo automáticamente según tu
+                              prioridad.
+                            </p>
+                          </section>
+                        </section>
                       </section>
                     )}
 
-                    <article className="mt-4 rounded-3xl border border-slate-200 bg-white p-4">
-                      <p className="text-sm font-medium text-slate-500">
-                        Motivo de consulta
-                      </p>
-                      <p className="mt-2 text-sm text-slate-700">
-                        {item.motivoConsulta || "Sin detalle"}
-                      </p>
-                    </article>
+                    <section className="mt-5 grid gap-4 lg:grid-cols-2">
+                      <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <section className="flex items-center gap-2">
+                          <Stethoscope className="text-blue-600" size={17} />
 
-                    <article className="mt-3 rounded-3xl border border-slate-200 bg-white p-4">
-                      <p className="text-sm font-medium text-slate-500">
-                        Observaciones
-                      </p>
-                      <p className="mt-2 text-sm text-slate-700">
-                        {item.observaciones || "Sin observaciones"}
-                      </p>
-                    </article>
-                  </section>
+                          <p className="text-sm font-bold text-slate-900">
+                            Motivo de consulta
+                          </p>
+                        </section>
 
-                  <aside className="w-full max-w-[220px] rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Acción disponible
-                    </p>
-                    <section className="mt-4 flex flex-wrap gap-2">
-                      {status !== "cancelada" && (
-                        <button
-                          onClick={() => onCancel(item.id)}
-                          className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
-                        >
-                          Cancelar
-                        </button>
-                      )}
+                        <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">
+                          {item.motivoConsulta || "Sin detalle registrado"}
+                        </p>
+                      </article>
+
+                      <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <section className="flex items-center gap-2">
+                          <FileText className="text-cyan-600" size={17} />
+
+                          <p className="text-sm font-bold text-slate-900">
+                            Observaciones
+                          </p>
+                        </section>
+
+                        <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">
+                          {item.observaciones || "Sin observaciones adicionales"}
+                        </p>
+                      </article>
                     </section>
-                  </aside>
-                </header>
-              </article>
-            );
-          })}
-        </section>
-      )}
+                  </section>
+                </article>
+              );
+            })}
+          </section>
+        )}
+      </section>
     </section>
   );
 }

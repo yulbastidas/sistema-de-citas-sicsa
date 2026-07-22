@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import { useParams } from "next/navigation";
+import { LoaderCircle } from "lucide-react";
 
 import { useMedicalReport } from "./hooks/useMedicalReport";
 import { ReportHeader } from "./components/ReportHeader";
@@ -25,40 +27,60 @@ export default function DoctorMedicalReportPage() {
     router,
   } = useMedicalReport(appointmentId);
 
+  const completedFields = useMemo(() => {
+    return Object.values(form).filter((value) => value.trim().length > 0).length;
+  }, [form]);
+
+  const totalFields = Object.keys(form).length;
+
   if (checkingAuth || loadingData) {
     return (
-      <main className="min-h-screen bg-slate-100 px-6 py-8">
-        <p className="text-lg font-semibold text-slate-600">
-          Cargando reporte clínico...
-        </p>
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+        <section className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+          <LoaderCircle
+            size={22}
+            className="animate-spin text-cyan-700"
+          />
+
+          <p className="text-sm font-semibold text-slate-600">
+            Cargando reporte clínico...
+          </p>
+        </section>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-6 py-8">
+    <main className="min-h-screen bg-slate-50">
       <ReportHeader
         appointmentId={appointmentId}
+        completedFields={completedFields}
+        totalFields={totalFields}
         onBack={() => router.push("/dashboard/doctor")}
       />
 
-      <PatientSummaryCard appointmentId={appointmentId} />
-
-      <form
-        onSubmit={handleSave}
-        className="mx-auto mt-6 max-w-5xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm"
-      >
-        <MedicalReportForm form={form} onChange={handleChange} />
-
-        <ReportActions
-          saving={saving}
-          downloading={downloading}
-          message={message}
-          onDownloadPdf={() => {
-            void handleDownloadPdf();
-          }}
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <PatientSummaryCard
+          appointmentId={appointmentId}
+          completedFields={completedFields}
+          totalFields={totalFields}
         />
-      </form>
+
+        <form onSubmit={handleSave} className="mt-6">
+          <MedicalReportForm form={form} onChange={handleChange} />
+
+          <ReportActions
+            saving={saving}
+            downloading={downloading}
+            message={message}
+            completedFields={completedFields}
+            totalFields={totalFields}
+            onDownloadPdf={() => {
+              void handleDownloadPdf();
+            }}
+          />
+        </form>
+      </section>
     </main>
   );
 }

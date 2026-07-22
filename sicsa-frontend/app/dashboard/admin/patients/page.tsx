@@ -2,7 +2,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Search, UsersRound } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  CheckCircle2,
+  FileText,
+  HeartPulse,
+  LoaderCircle,
+  Mail,
+  MapPin,
+  Phone,
+  Save,
+  Search,
+  ShieldCheck,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
+
 import { getToken, getUser } from "@/service/session";
 import { getPatients, updatePatientByAdmin } from "@/service/patient";
 
@@ -60,7 +76,9 @@ export default function AdminPatientsPage() {
 
       try {
         setLoading(true);
+
         const result = await getPatients(token, searchValue);
+
         setPatients(Array.isArray(result) ? result : []);
       } catch (error) {
         console.error("Error cargando pacientes:", error);
@@ -150,7 +168,9 @@ export default function AdminPatientsPage() {
       setSelectedPatient(updated);
 
       setPatients((prev) =>
-        prev.map((patient) => (patient.id === updated.id ? updated : patient)),
+        prev.map((patient) =>
+          patient.id === updated.id ? updated : patient,
+        ),
       );
 
       alert("Datos del paciente actualizados correctamente");
@@ -167,183 +187,498 @@ export default function AdminPatientsPage() {
     }
   };
 
-  const fields: Array<[keyof typeof form, string, string]> = [
+  const personalFields: Array<[keyof typeof form, string, string]> = [
     ["tipoDocumento", "Tipo de documento", "CC, TI, CE..."],
     ["numeroDocumento", "Número de documento", "Número de identificación"],
     ["primerNombre", "Primer nombre", "Primer nombre"],
     ["segundoNombre", "Segundo nombre", "Segundo nombre"],
     ["primerApellido", "Primer apellido", "Primer apellido"],
     ["segundoApellido", "Segundo apellido", "Segundo apellido"],
+  ];
+
+  const contactFields: Array<[keyof typeof form, string, string]> = [
     ["telefono", "Teléfono", "Teléfono de contacto"],
     ["email", "Correo electrónico", "Correo del paciente"],
+  ];
+
+  const healthFields: Array<[keyof typeof form, string, string]> = [
     ["eps", "EPS", "Entidad promotora de salud"],
     ["genero", "Género", "Femenino, Masculino, Otro"],
     ["fechaNacimiento", "Fecha de nacimiento", "Fecha de nacimiento"],
+  ];
+
+  const locationFields: Array<[keyof typeof form, string, string]> = [
     ["departamento", "Departamento", "Departamento"],
     ["municipio", "Municipio", "Municipio"],
   ];
 
+  const getPatientFullName = (patient: Patient) =>
+    [
+      patient.primerNombre,
+      patient.segundoNombre,
+      patient.primerApellido,
+      patient.segundoApellido,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+  const inputClassName =
+    "w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100";
+
+  const labelClassName =
+    "mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600";
+
+  const renderField = (
+    field: keyof typeof form,
+    label: string,
+    placeholder: string,
+  ) => (
+    <article key={field}>
+      <label htmlFor={field} className={labelClassName}>
+        {label}
+      </label>
+
+      <input
+        id={field}
+        name={field}
+        value={form[field]}
+        onChange={handleChange}
+        type={field === "fechaNacimiento" ? "date" : "text"}
+        placeholder={placeholder}
+        className={inputClassName}
+      />
+    </article>
+  );
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50 p-6">
-      <section className="mx-auto max-w-7xl">
+    <main className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-blue-50 px-4 py-5 sm:px-6 lg:px-8">
+      <section className="mx-auto w-full max-w-[1500px]">
         <button
+          type="button"
           onClick={() => router.push("/dashboard/admin")}
-          className="mb-6 inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          className="mb-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
         >
-          <ArrowLeft size={16} />
-          Volver al panel admin
+          <ArrowLeft size={17} />
+          Volver al panel administrativo
         </button>
 
-        <header className="rounded-[2rem] bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 px-8 py-8 text-white shadow-xl">
-          <section className="flex items-start gap-4">
-            <figure className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/20">
-              <UsersRound size={30} />
-            </figure>
+        {/* Encabezado */}
+        <header className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-blue-900 px-6 py-7 text-white shadow-xl sm:px-8 lg:px-10">
+          <span className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-blue-400/10 blur-3xl" />
+          <span className="pointer-events-none absolute -bottom-24 left-1/3 h-60 w-60 rounded-full bg-indigo-400/10 blur-3xl" />
 
-            <section>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-100">
-                Gestión administrativa
-              </p>
-              <h1 className="mt-2 text-4xl font-bold">
-                Actualización de datos del paciente
-              </h1>
-              <p className="mt-2 max-w-3xl text-blue-50">
-                Busca pacientes registrados y actualiza su información personal,
-                datos de contacto, EPS y ubicación desde el rol administrador.
-              </p>
+          <section className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <section className="flex items-start gap-4">
+              <figure className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 backdrop-blur sm:h-16 sm:w-16">
+                <UsersRound size={30} />
+              </figure>
+
+              <section>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-200 sm:text-sm">
+                  Gestión administrativa
+                </p>
+
+                <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+                  Actualización de pacientes
+                </h1>
+
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200 sm:text-base">
+                  Busca pacientes registrados y actualiza información personal,
+                  contacto, EPS y ubicación desde el panel administrativo.
+                </p>
+              </section>
             </section>
+
+            <article className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
+                <ShieldCheck size={22} />
+              </span>
+
+              <section>
+                <p className="text-sm text-slate-300">Pacientes encontrados</p>
+                <p className="mt-0.5 text-2xl font-bold">{patients.length}</p>
+              </section>
+            </article>
           </section>
         </header>
 
-        <section className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-lg">
-            <h2 className="text-2xl font-bold text-slate-900">
-              Buscar paciente
-            </h2>
+        {/* Contenido principal */}
+        <section className="mt-5 grid items-start gap-5 xl:grid-cols-[430px_minmax(0,1fr)]">
+          {/* Lista de pacientes */}
+          <aside className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <header className="border-b border-slate-200 bg-gradient-to-r from-white to-slate-50 px-5 py-5">
+              <section className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                  <Search size={21} />
+                </span>
 
-            <section className="mt-5 flex gap-3">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Documento, nombre, correo, teléfono o EPS"
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
-              />
-
-              <button
-                onClick={handleSearch}
-                className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
-              >
-                <Search size={16} />
-                Buscar
-              </button>
-            </section>
-
-            <section className="mt-5 max-h-[620px] space-y-3 overflow-y-auto pr-2">
-              {loading ? (
-                <p className="text-sm text-slate-500">Cargando pacientes...</p>
-              ) : patients.length === 0 ? (
-                <p className="text-sm text-slate-500">
-                  No se encontraron pacientes.
-                </p>
-              ) : (
-                patients.map((patient) => (
-                  <button
-                    key={patient.id}
-                    onClick={() => handleSelectPatient(patient)}
-                    className={`w-full rounded-2xl border p-4 text-left transition ${
-                      selectedPatient?.id === patient.id
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-slate-200 bg-slate-50 hover:bg-slate-100"
-                    }`}
-                  >
-                    <p className="font-semibold text-slate-900">
-                      {patient.primerNombre} {patient.segundoNombre}{" "}
-                      {patient.primerApellido} {patient.segundoApellido}
-                    </p>
-
-                    <p className="mt-1 text-sm text-slate-600">
-                      {patient.tipoDocumento} {patient.numeroDocumento}
-                    </p>
-
-                    <p className="text-sm text-slate-600">{patient.email}</p>
-
-                    <p className="text-sm text-slate-600">
-                      Teléfono: {patient.telefono || "No registrado"}
-                    </p>
-
-                    <p className="text-sm text-slate-600">
-                      EPS: {patient.eps || "No registrada"}
-                    </p>
-
-                    <p className="text-sm text-slate-600">
-                      Ubicación: {patient.municipio || "Sin municipio"},{" "}
-                      {patient.departamento || "Sin departamento"}
-                    </p>
-                  </button>
-                ))
-              )}
-            </section>
-          </article>
-
-          <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-lg">
-            <h2 className="text-2xl font-bold text-slate-900">
-              Editar información
-            </h2>
-
-            {!selectedPatient ? (
-              <p className="mt-5 text-sm text-slate-500">
-                Selecciona un paciente para actualizar sus datos.
-              </p>
-            ) : (
-              <>
-                <section className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="font-semibold text-slate-900">
-                    {selectedPatient.primerNombre}{" "}
-                    {selectedPatient.segundoNombre}{" "}
-                    {selectedPatient.primerApellido}{" "}
-                    {selectedPatient.segundoApellido}
-                  </p>
+                <section>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    Buscar paciente
+                  </h2>
 
                   <p className="mt-1 text-sm text-slate-600">
-                    Documento: {selectedPatient.tipoDocumento}{" "}
-                    {selectedPatient.numeroDocumento}
-                  </p>
-
-                  <p className="text-sm text-slate-600">
-                    Correo: {selectedPatient.email}
+                    Selecciona un resultado para editarlo.
                   </p>
                 </section>
+              </section>
+            </header>
 
-                <section className="mt-5 grid gap-4 md:grid-cols-2">
-                  {fields.map(([field, label, placeholder]) => (
-                    <article key={field}>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        {label}
-                      </label>
+            <section className="p-5">
+              <section className="flex gap-2">
+                <article className="relative min-w-0 flex-1">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    size={18}
+                  />
 
-                      <input
-                        name={field}
-                        value={form[field]}
-                        onChange={handleChange}
-                        type={field === "fechaNacimiento" ? "date" : "text"}
-                        placeholder={placeholder}
-                        className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
-                      />
-                    </article>
-                  ))}
-                </section>
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleSearch();
+                      }
+                    }}
+                    placeholder="Documento, nombre, correo, teléfono o EPS"
+                    className={`${inputClassName} pl-10`}
+                  />
+                </article>
 
                 <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-70"
+                  type="button"
+                  onClick={handleSearch}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
                 >
-                  <Save size={16} />
-                  {saving ? "Guardando..." : "Guardar cambios"}
+                  <Search size={17} />
+                  <span className="hidden sm:inline">Buscar</span>
                 </button>
-              </>
+              </section>
+
+              <section className="mt-4 flex items-center justify-between border-b border-slate-200 pb-3">
+                <p className="text-sm font-semibold text-slate-700">
+                  Resultados
+                </p>
+
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                  {patients.length}
+                </span>
+              </section>
+
+              <section className="mt-3 max-h-[690px] space-y-3 overflow-y-auto pr-1">
+                {loading ? (
+                  <article className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                    <LoaderCircle
+                      className="animate-spin text-blue-600"
+                      size={32}
+                    />
+
+                    <p className="mt-4 font-semibold text-slate-700">
+                      Cargando pacientes...
+                    </p>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Consultando la información registrada.
+                    </p>
+                  </article>
+                ) : patients.length === 0 ? (
+                  <article className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
+                      <UsersRound size={27} />
+                    </span>
+
+                    <h3 className="mt-4 font-bold text-slate-900">
+                      No se encontraron pacientes
+                    </h3>
+
+                    <p className="mt-2 text-sm leading-5 text-slate-500">
+                      Intenta buscar por documento, nombre, correo, teléfono o
+                      EPS.
+                    </p>
+                  </article>
+                ) : (
+                  patients.map((patient) => {
+                    const isSelected = selectedPatient?.id === patient.id;
+
+                    return (
+                      <button
+                        key={patient.id}
+                        type="button"
+                        onClick={() => handleSelectPatient(patient)}
+                        className={`group w-full rounded-2xl border p-4 text-left transition ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-100"
+                            : "border-slate-200 bg-slate-50 hover:border-blue-200 hover:bg-white hover:shadow-sm"
+                        }`}
+                      >
+                        <header className="flex items-start justify-between gap-3">
+                          <section className="flex min-w-0 items-center gap-3">
+                            <span
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                                isSelected
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white text-slate-500 shadow-sm"
+                              }`}
+                            >
+                              <UserRound size={20} />
+                            </span>
+
+                            <section className="min-w-0">
+                              <p className="truncate font-bold capitalize text-slate-900">
+                                {getPatientFullName(patient)}
+                              </p>
+
+                              <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                                {patient.tipoDocumento}{" "}
+                                {patient.numeroDocumento}
+                              </p>
+                            </section>
+                          </section>
+
+                          {isSelected && (
+                            <CheckCircle2
+                              size={20}
+                              className="shrink-0 text-blue-600"
+                            />
+                          )}
+                        </header>
+
+                        <section className="mt-4 space-y-2">
+                          <p className="flex items-center gap-2 text-sm text-slate-600">
+                            <Mail
+                              size={15}
+                              className="shrink-0 text-slate-400"
+                            />
+
+                            <span className="truncate">
+                              {patient.email || "Correo no registrado"}
+                            </span>
+                          </p>
+
+                          <p className="flex items-center gap-2 text-sm text-slate-600">
+                            <Phone
+                              size={15}
+                              className="shrink-0 text-slate-400"
+                            />
+
+                            <span>
+                              {patient.telefono || "Teléfono no registrado"}
+                            </span>
+                          </p>
+
+                          <p className="flex items-center gap-2 text-sm text-slate-600">
+                            <HeartPulse
+                              size={15}
+                              className="shrink-0 text-slate-400"
+                            />
+
+                            <span className="truncate">
+                              {patient.eps || "EPS no registrada"}
+                            </span>
+                          </p>
+
+                          <p className="flex items-center gap-2 text-sm text-slate-600">
+                            <MapPin
+                              size={15}
+                              className="shrink-0 text-slate-400"
+                            />
+
+                            <span className="truncate">
+                              {patient.municipio || "Sin municipio"},{" "}
+                              {patient.departamento || "Sin departamento"}
+                            </span>
+                          </p>
+                        </section>
+                      </button>
+                    );
+                  })
+                )}
+              </section>
+            </section>
+          </aside>
+
+          {/* Formulario de edición */}
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <header className="border-b border-slate-200 bg-gradient-to-r from-white to-blue-50 px-5 py-5 sm:px-6">
+              <section className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-200">
+                  <FileText size={21} />
+                </span>
+
+                <section>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    Editar información
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-600">
+                    Actualiza los datos administrativos del paciente.
+                  </p>
+                </section>
+              </section>
+            </header>
+
+            {!selectedPatient ? (
+              <article className="flex min-h-[620px] flex-col items-center justify-center p-8 text-center">
+                <span className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+                  <UserRound size={36} />
+                </span>
+
+                <h3 className="mt-5 text-xl font-bold text-slate-900">
+                  Selecciona un paciente
+                </h3>
+
+                <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+                  Elige un paciente de la lista ubicada a la izquierda para
+                  consultar y actualizar su información.
+                </p>
+              </article>
+            ) : (
+              <section className="p-5 sm:p-6">
+                {/* Paciente seleccionado */}
+                <article className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-white p-4">
+                  <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <section className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white">
+                        <UserRound size={23} />
+                      </span>
+
+                      <section className="min-w-0">
+                        <p className="truncate text-lg font-bold capitalize text-slate-900">
+                          {getPatientFullName(selectedPatient)}
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-600">
+                          {selectedPatient.tipoDocumento}{" "}
+                          {selectedPatient.numeroDocumento}
+                        </p>
+                      </section>
+                    </section>
+
+                    <span className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                      <CheckCircle2 size={15} />
+                      Paciente seleccionado
+                    </span>
+                  </section>
+                </article>
+
+                {/* Información personal */}
+                <section className="mt-6">
+                  <header className="mb-4 flex items-center gap-2">
+                    <UserRound size={18} className="text-blue-600" />
+
+                    <section>
+                      <h3 className="font-bold text-slate-900">
+                        Información personal
+                      </h3>
+
+                      <p className="text-xs text-slate-500">
+                        Documento, nombres y apellidos.
+                      </p>
+                    </section>
+                  </header>
+
+                  <section className="grid gap-4 md:grid-cols-2">
+                    {personalFields.map(([field, label, placeholder]) =>
+                      renderField(field, label, placeholder),
+                    )}
+                  </section>
+                </section>
+
+                <div className="my-6 h-px bg-slate-200" />
+
+                {/* Contacto */}
+                <section>
+                  <header className="mb-4 flex items-center gap-2">
+                    <Phone size={18} className="text-blue-600" />
+
+                    <section>
+                      <h3 className="font-bold text-slate-900">
+                        Información de contacto
+                      </h3>
+
+                      <p className="text-xs text-slate-500">
+                        Teléfono y correo electrónico.
+                      </p>
+                    </section>
+                  </header>
+
+                  <section className="grid gap-4 md:grid-cols-2">
+                    {contactFields.map(([field, label, placeholder]) =>
+                      renderField(field, label, placeholder),
+                    )}
+                  </section>
+                </section>
+
+                <div className="my-6 h-px bg-slate-200" />
+
+                {/* Salud */}
+                <section>
+                  <header className="mb-4 flex items-center gap-2">
+                    <HeartPulse size={18} className="text-blue-600" />
+
+                    <section>
+                      <h3 className="font-bold text-slate-900">
+                        Información de salud
+                      </h3>
+
+                      <p className="text-xs text-slate-500">
+                        EPS, género y fecha de nacimiento.
+                      </p>
+                    </section>
+                  </header>
+
+                  <section className="grid gap-4 md:grid-cols-2">
+                    {healthFields.map(([field, label, placeholder]) =>
+                      renderField(field, label, placeholder),
+                    )}
+                  </section>
+                </section>
+
+                <div className="my-6 h-px bg-slate-200" />
+
+                {/* Ubicación */}
+                <section>
+                  <header className="mb-4 flex items-center gap-2">
+                    <Building2 size={18} className="text-blue-600" />
+
+                    <section>
+                      <h3 className="font-bold text-slate-900">
+                        Información de ubicación
+                      </h3>
+
+                      <p className="text-xs text-slate-500">
+                        Departamento y municipio de residencia.
+                      </p>
+                    </section>
+                  </header>
+
+                  <section className="grid gap-4 md:grid-cols-2">
+                    {locationFields.map(([field, label, placeholder]) =>
+                      renderField(field, label, placeholder),
+                    )}
+                  </section>
+                </section>
+
+                {/* Acción */}
+                <footer className="mt-7 flex justify-end border-t border-slate-200 pt-5">
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-slate-950 to-blue-900 px-6 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-70 sm:w-auto"
+                  >
+                    {saving ? (
+                      <LoaderCircle className="animate-spin" size={18} />
+                    ) : (
+                      <Save size={18} />
+                    )}
+
+                    {saving ? "Guardando cambios..." : "Guardar cambios"}
+                  </button>
+                </footer>
+              </section>
             )}
-          </article>
+          </section>
         </section>
       </section>
     </main>

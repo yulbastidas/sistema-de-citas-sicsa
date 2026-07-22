@@ -178,14 +178,6 @@ export default function LoginClient() {
                 </p>
               )}
 
-              <p>
-                <Link
-                  href="/select-role"
-                  className="font-semibold text-slate-700 hover:underline"
-                >
-                  Cambiar rol
-                </Link>
-              </p>
             </section>
           </section>
         </section>
@@ -196,7 +188,7 @@ export default function LoginClient() {
             alt="Hospital"
             fill
             priority
-            sizes="50vw"
+            sizes="35vw"
             className="object-cover"
           />
 

@@ -1,6 +1,11 @@
 "use client";
 
-import { ClipboardList } from "lucide-react";
+import {
+  CalendarCheck2,
+  ClipboardList,
+  Clock3,
+  ShieldAlert,
+} from "lucide-react";
 import AdminSidebar from "@/app/components/AdminSidebar";
 import { useAdminAppointments } from "./hooks/useAdminAppointments";
 import { AdminAppointmentFormPanel } from "./components/AdminAppointmentForm";
@@ -45,7 +50,13 @@ export default function AdminAppointmentsPage() {
   if (checkingAuth) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-100">
-        <p className="text-lg font-semibold text-slate-600">Cargando...</p>
+        <section className="flex flex-col items-center gap-4">
+          <span className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
+
+          <p className="text-base font-semibold text-slate-600">
+            Cargando panel administrativo...
+          </p>
+        </section>
       </main>
     );
   }
@@ -54,100 +65,159 @@ export default function AdminAppointmentsPage() {
     <main className="flex min-h-screen bg-slate-100">
       <AdminSidebar />
 
-      <section className="flex-1 px-6 py-8">
-        <header className="rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-blue-900 px-8 py-8 text-white shadow-xl">
-          <section className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
-            <article className="flex items-start gap-4">
-              <figure className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 backdrop-blur">
-                <ClipboardList className="text-white" size={30} />
-              </figure>
+      <section className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
+        <section className="mx-auto w-full max-w-[1600px]">
+          {/* Encabezado principal */}
+          <header className="overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-blue-900 text-white shadow-xl">
+            <section className="relative px-6 py-7 sm:px-8 lg:px-10">
+              <span className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
+              <span className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
 
-              <section>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-100">
-                  Panel administrativo
-                </p>
-                <h1 className="mt-2 text-4xl font-bold tracking-tight">
-                  Gestión integral de citas
-                </h1>
-                <p className="mt-2 max-w-3xl text-slate-200">
-                  Controla la agenda clínica, registra citas manuales, revisa la
-                  cola priorizada y administra el estado operativo del servicio.
-                </p>
+              <section className="relative flex flex-col gap-7 2xl:flex-row 2xl:items-center 2xl:justify-between">
+                <article className="flex max-w-4xl items-start gap-4 sm:gap-5">
+                  <figure className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 shadow-lg backdrop-blur sm:h-16 sm:w-16">
+                    <ClipboardList className="text-white" size={30} />
+                  </figure>
+
+                  <section>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-200 sm:text-sm">
+                      Panel administrativo
+                    </p>
+
+                    <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+                      Gestión integral de citas
+                    </h1>
+
+                    <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200 sm:text-base">
+                      Controla la agenda clínica, registra citas manuales,
+                      revisa la cola priorizada y administra el estado operativo
+                      del servicio.
+                    </p>
+                  </section>
+                </article>
+
+                {/* Contadores */}
+                <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 2xl:min-w-[510px]">
+                  <article className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 shadow-sm backdrop-blur transition hover:bg-white/[0.14]">
+                    <section className="flex items-center justify-between gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400/15 text-amber-200">
+                        <Clock3 size={20} />
+                      </span>
+
+                      <p className="text-3xl font-bold text-white">
+                        {pendingCount}
+                      </p>
+                    </section>
+
+                    <p className="mt-3 text-sm font-medium text-slate-200">
+                      Citas pendientes
+                    </p>
+                  </article>
+
+                  <article className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 shadow-sm backdrop-blur transition hover:bg-white/[0.14]">
+                    <section className="flex items-center justify-between gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-200">
+                        <CalendarCheck2 size={20} />
+                      </span>
+
+                      <p className="text-3xl font-bold text-white">
+                        {confirmedCount}
+                      </p>
+                    </section>
+
+                    <p className="mt-3 text-sm font-medium text-slate-200">
+                      Citas confirmadas
+                    </p>
+                  </article>
+
+                  <article className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 shadow-sm backdrop-blur transition hover:bg-white/[0.14]">
+                    <section className="flex items-center justify-between gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-400/15 text-red-200">
+                        <ShieldAlert size={20} />
+                      </span>
+
+                      <p className="text-3xl font-bold text-white">
+                        {highPriorityCount}
+                      </p>
+                    </section>
+
+                    <p className="mt-3 text-sm font-medium text-slate-200">
+                      Prioridad alta
+                    </p>
+                  </article>
+                </section>
               </section>
-            </article>
-
-            <section className="grid gap-3 sm:grid-cols-3">
-              <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
-                <p className="text-sm text-slate-200">Pendientes</p>
-                <p className="mt-1 text-2xl font-bold">{pendingCount}</p>
-              </article>
-
-              <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
-                <p className="text-sm text-slate-200">Confirmadas</p>
-                <p className="mt-1 text-2xl font-bold">{confirmedCount}</p>
-              </article>
-
-              <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
-                <p className="text-sm text-slate-200">Prioridad alta</p>
-                <p className="mt-1 text-2xl font-bold">{highPriorityCount}</p>
-              </article>
             </section>
-          </section>
-        </header>
-
-        <section className="mt-6 grid gap-6 xl:grid-cols-[460px_1fr]">
-          <AdminAppointmentFormPanel
-            form={form}
-            specialties={specialties}
-            epsList={epsList}
-            appointmentClasses={appointmentClasses}
-            availableHours={availableHours}
-            loadingCatalogs={loadingCatalogs}
-            loadingHours={loadingHours}
-            saving={saving}
-            today={today}
-            onTextChange={handleTextChange}
-            onCheckboxChange={handleCheckboxChange}
-            onSubmit={handleCreateAppointment}
-          />
-
-          <QueuePanel
-            queueItems={queueItems}
-            loadingQueue={loadingQueue}
-            selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
-          />
-        </section>
-
-        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <header className="mb-6">
-            <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-              <article>
-                <h2 className="text-2xl font-semibold text-slate-900">
-                  Agenda general de citas
-                </h2>
-                <p className="mt-1 text-slate-600">
-                  Control administrativo, operativo y seguimiento del estado.
-                </p>
-              </article>
-            </section>
-
-            <AppointmentFilters
-              searchTerm={searchTerm}
-              dateFilter={dateFilter}
-              statusFilter={statusFilter}
-              onSearchChange={setSearchTerm}
-              onDateChange={setDateFilter}
-              onStatusChange={setStatusFilter}
-            />
           </header>
 
-          <AdminAppointmentList
-            filteredAppointments={filteredAppointments}
-            loading={loading}
-            onApprove={handleApprove}
-            onCancel={handleCancel}
-          />
+          {/* Formulario y cola priorizada */}
+          <section className="mt-5 grid items-start gap-5 xl:grid-cols-[520px_minmax(0,1fr)] 2xl:grid-cols-[560px_minmax(0,1fr)]">
+            <AdminAppointmentFormPanel
+              form={form}
+              specialties={specialties}
+              epsList={epsList}
+              appointmentClasses={appointmentClasses}
+              availableHours={availableHours}
+              loadingCatalogs={loadingCatalogs}
+              loadingHours={loadingHours}
+              saving={saving}
+              today={today}
+              onTextChange={handleTextChange}
+              onCheckboxChange={handleCheckboxChange}
+              onSubmit={handleCreateAppointment}
+            />
+
+            <QueuePanel
+              queueItems={queueItems}
+              loadingQueue={loadingQueue}
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+            />
+          </section>
+
+          {/* Agenda general */}
+          <section className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <header className="border-b border-slate-200 px-5 py-5 sm:px-6 lg:px-8">
+              <section className="flex flex-col gap-5">
+                <article>
+                  <section className="flex items-center gap-3">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                      <CalendarCheck2 size={22} />
+                    </span>
+
+                    <section>
+                      <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                        Agenda general de citas
+                      </h2>
+
+                      <p className="mt-1 text-sm leading-6 text-slate-600 sm:text-base">
+                        Control administrativo, operativo y seguimiento del
+                        estado de cada cita.
+                      </p>
+                    </section>
+                  </section>
+                </article>
+
+                <AppointmentFilters
+                  searchTerm={searchTerm}
+                  dateFilter={dateFilter}
+                  statusFilter={statusFilter}
+                  onSearchChange={setSearchTerm}
+                  onDateChange={setDateFilter}
+                  onStatusChange={setStatusFilter}
+                />
+              </section>
+            </header>
+
+            <section className="p-5 sm:p-6 lg:p-8">
+              <AdminAppointmentList
+                filteredAppointments={filteredAppointments}
+                loading={loading}
+                onApprove={handleApprove}
+                onCancel={handleCancel}
+              />
+            </section>
+          </section>
         </section>
       </section>
     </main>

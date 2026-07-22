@@ -1,8 +1,14 @@
 "use client";
 
-import { CalendarDays, FileBadge2, FileText } from "lucide-react";
-import { AppointmentItem } from "../types";
+import {
+  CalendarDays,
+  ChevronRight,
+  FileBadge2,
+  FileText,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
+
+import { AppointmentItem } from "../types";
 
 type TodayAppointmentsProps = {
   loadingAppointments: boolean;
@@ -10,14 +16,6 @@ type TodayAppointmentsProps = {
   downloadingId: number | null;
   onOpenPdf: (id: number) => Promise<void>;
 };
-
-function getReportBadgeClass(exists: boolean | undefined) {
-  if (exists) {
-    return "border border-cyan-200 bg-cyan-50 text-cyan-700";
-  }
-
-  return "border border-amber-200 bg-amber-50 text-amber-700";
-}
 
 export function TodayAppointments({
   loadingAppointments,
@@ -28,126 +26,152 @@ export function TodayAppointments({
   const router = useRouter();
 
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-7 shadow-sm">
-      <header className="mb-6 flex items-start gap-3">
-        <figure className="rounded-2xl bg-cyan-50 p-3 text-cyan-700">
-          <CalendarDays size={22} />
-        </figure>
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
+        <section className="flex items-start gap-3">
+          <figure className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700">
+            <CalendarDays size={20} />
+          </figure>
 
-        <section>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-            Citas confirmadas
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Pacientes listos para atención médica.
-          </p>
+          <section>
+            <h2 className="text-lg font-bold text-slate-950">
+              Agenda confirmada
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Citas disponibles para atención durante la jornada.
+            </p>
+          </section>
         </section>
+
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+          {loadingAppointments ? "..." : appointments.length}
+        </span>
       </header>
 
       {loadingAppointments ? (
-        <p className="text-slate-600">Cargando citas...</p>
+        <section className="p-6">
+          <p className="text-sm font-medium text-slate-500">
+            Cargando agenda...
+          </p>
+        </section>
       ) : appointments.length === 0 ? (
-        <article className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-          <p className="text-base font-semibold text-slate-700">
-            No hay citas confirmadas disponibles.
-          </p>
-          <p className="mt-2 text-sm text-slate-500">
-            Las citas aprobadas aparecerán automáticamente aquí.
-          </p>
-        </article>
+        <section className="p-6">
+          <article className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+            <p className="font-semibold text-slate-700">
+              No hay citas confirmadas
+            </p>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Las citas aprobadas aparecerán automáticamente.
+            </p>
+          </article>
+        </section>
       ) : (
-        <section className="space-y-5">
+        <section className="divide-y divide-slate-200">
           {appointments.map((item) => (
             <article
               key={item.id}
-              className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5"
+              className="p-5 transition hover:bg-slate-50 sm:p-6"
             >
-              <header className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between">
-                <section className="flex flex-wrap items-center gap-3">
-                  <h3 className="text-xl font-bold text-slate-900">
+              <header className="flex items-start justify-between gap-4">
+                <section className="min-w-0">
+                  <h3 className="truncate font-bold text-slate-950">
                     {item.patient?.nombre || "Paciente"}
                   </h3>
 
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${getReportBadgeClass(item.medicalReport?.exists)}`}
-                  >
-                    {item.medicalReport?.exists
-                      ? "Reporte guardado"
-                      : "Sin reporte"}
-                  </span>
+                  <section className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-cyan-800">
+                      {item.hora || "Sin hora"}
+                    </span>
+
+                    <span className="text-slate-300">•</span>
+
+                    <span className="text-sm text-slate-500">
+                      Cita #{item.id}
+                    </span>
+
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                        item.medicalReport?.exists
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-amber-200 bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {item.medicalReport?.exists
+                        ? "Reporte listo"
+                        : "Sin reporte"}
+                    </span>
+                  </section>
                 </section>
 
-                <p className="text-sm font-medium text-slate-500">
-                  Cita #{item.id}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    router.push(
+                      `/dashboard/doctor/report/${item.id}`,
+                    );
+                  }}
+                  aria-label={`Abrir reporte de ${item.patient?.nombre || "paciente"}`}
+                  className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700"
+                >
+                  <ChevronRight size={18} />
+                </button>
               </header>
 
-              <section className="mt-4 grid gap-4">
-                <article className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-4 md:grid-cols-2">
-                  <p className="text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">Fecha:</span>{" "}
-                    {item.fecha || "-"}
-                  </p>
-                  <p className="text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">Hora:</span>{" "}
-                    {item.hora || "-"}
-                  </p>
-                  <p className="text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">
-                      Documento:
-                    </span>{" "}
-                    {item.patient?.documento || "-"}
-                  </p>
-                  <p className="text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">EPS:</span>{" "}
-                    {item.patient?.eps || "-"}
-                  </p>
-                  <p className="text-sm text-slate-700 md:col-span-2">
-                    <span className="font-semibold text-slate-900">
-                      Correo:
-                    </span>{" "}
-                    {item.patient?.email || "-"}
-                  </p>
-                </article>
+              <section className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+                <p className="text-slate-600">
+                  <span className="font-semibold text-slate-800">
+                    Documento:
+                  </span>{" "}
+                  {item.patient?.documento || "-"}
+                </p>
 
-                <article className="rounded-3xl border border-slate-200 bg-white p-4">
-                  <p className="text-sm font-semibold text-slate-500">
-                    Motivo de consulta
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">
-                    {item.motivoConsulta || "Sin detalle"}
-                  </p>
-                </article>
-
-                <footer className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      router.push(`/dashboard/doctor/report/${item.id}`);
-                    }}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
-                  >
-                    <FileText size={16} />
-                    Ver reporte
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void onOpenPdf(item.id);
-                    }}
-                    disabled={
-                      downloadingId === item.id || !item.medicalReport?.exists
-                    }
-                    className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
-                  >
-                    <FileBadge2 size={16} />
-                    {downloadingId === item.id
-                      ? "Descargando PDF..."
-                      : "Descargar PDF"}
-                  </button>
-                </footer>
+                <p className="text-slate-600">
+                  <span className="font-semibold text-slate-800">
+                    EPS:
+                  </span>{" "}
+                  {item.patient?.eps || "-"}
+                </p>
               </section>
+
+              <article className="mt-4 rounded-xl bg-slate-50 px-4 py-3">
+                <p className="line-clamp-2 text-sm leading-6 text-slate-600">
+                  {item.motivoConsulta ||
+                    "Sin motivo de consulta registrado."}
+                </p>
+              </article>
+
+              <footer className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    router.push(
+                      `/dashboard/doctor/report/${item.id}`,
+                    );
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-3.5 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-800"
+                >
+                  <FileText size={15} />
+                  Abrir atención
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    void onOpenPdf(item.id);
+                  }}
+                  disabled={
+                    downloadingId === item.id ||
+                    !item.medicalReport?.exists
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FileBadge2 size={15} />
+                  {downloadingId === item.id
+                    ? "Descargando..."
+                    : "PDF"}
+                </button>
+              </footer>
             </article>
           ))}
         </section>

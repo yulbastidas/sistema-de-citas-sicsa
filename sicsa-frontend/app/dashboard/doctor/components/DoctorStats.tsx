@@ -2,9 +2,9 @@
 
 import {
   Activity,
-  CalendarDays,
+  CalendarCheck2,
   ClipboardList,
-  FileBadge2,
+  FileCheck2,
 } from "lucide-react";
 
 type DoctorStatsProps = {
@@ -16,6 +16,43 @@ type DoctorStatsProps = {
   savedReportsCount: number;
 };
 
+type StatItemProps = {
+  label: string;
+  value: string | number;
+  description: string;
+  icon: React.ReactNode;
+  iconClassName: string;
+};
+
+function StatItem({
+  label,
+  value,
+  description,
+  icon,
+  iconClassName,
+}: StatItemProps) {
+  return (
+    <article className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <figure
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${iconClassName}`}
+      >
+        {icon}
+      </figure>
+
+      <section className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {label}
+        </p>
+
+        <section className="mt-1 flex items-baseline gap-2">
+          <p className="text-2xl font-bold text-slate-950">{value}</p>
+          <p className="truncate text-xs text-slate-500">{description}</p>
+        </section>
+      </section>
+    </article>
+  );
+}
+
 export function DoctorStats({
   loadingAppointments,
   loadingQueue,
@@ -25,80 +62,38 @@ export function DoctorStats({
   savedReportsCount,
 }: DoctorStatsProps) {
   return (
-    <section className="grid gap-4 border-t border-slate-200 bg-slate-50 px-6 py-5 md:grid-cols-2 xl:grid-cols-4">
-      <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <header className="flex items-center justify-between">
-          <p className="text-sm font-medium text-slate-500">
-            Citas confirmadas
-          </p>
-          <span className="rounded-2xl bg-cyan-50 p-2 text-cyan-700">
-            <CalendarDays size={18} />
-          </span>
-        </header>
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <StatItem
+        label="Confirmadas"
+        value={loadingAppointments ? "..." : totalConfirmed}
+        description="citas del día"
+        icon={<CalendarCheck2 size={20} />}
+        iconClassName="bg-cyan-50 text-cyan-700"
+      />
 
-        <p className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
-          {loadingAppointments ? "..." : totalConfirmed}
-        </p>
+      <StatItem
+        label="En cola"
+        value={loadingQueue ? "..." : totalQueue}
+        description="pacientes"
+        icon={<ClipboardList size={20} />}
+        iconClassName="bg-violet-50 text-violet-700"
+      />
 
-        <p className="mt-2 text-sm text-slate-500">
-          Pacientes listos para atención médica.
-        </p>
-      </article>
+      <StatItem
+        label="Prioridad alta"
+        value={loadingQueue ? "..." : highPriorityCount}
+        description="casos urgentes"
+        icon={<Activity size={20} />}
+        iconClassName="bg-red-50 text-red-700"
+      />
 
-      <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <header className="flex items-center justify-between">
-          <p className="text-sm font-medium text-slate-500">
-            Pacientes en cola
-          </p>
-          <span className="rounded-2xl bg-violet-50 p-2 text-violet-700">
-            <ClipboardList size={18} />
-          </span>
-        </header>
-
-        <p className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
-          {loadingQueue ? "..." : totalQueue}
-        </p>
-
-        <p className="mt-2 text-sm text-slate-500">
-          Cola clínica priorizada del día.
-        </p>
-      </article>
-
-      <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <header className="flex items-center justify-between">
-          <p className="text-sm font-medium text-slate-500">Prioridad alta</p>
-          <span className="rounded-2xl bg-red-50 p-2 text-red-700">
-            <Activity size={18} />
-          </span>
-        </header>
-
-        <p className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
-          {loadingQueue ? "..." : highPriorityCount}
-        </p>
-
-        <p className="mt-2 text-sm text-slate-500">
-          Casos que requieren atención preferente.
-        </p>
-      </article>
-
-      <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <header className="flex items-center justify-between">
-          <p className="text-sm font-medium text-slate-500">
-            Reportes guardados
-          </p>
-          <span className="rounded-2xl bg-emerald-50 p-2 text-emerald-700">
-            <FileBadge2 size={18} />
-          </span>
-        </header>
-
-        <p className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
-          {loadingAppointments ? "..." : savedReportsCount}
-        </p>
-
-        <p className="mt-2 text-sm text-slate-500">
-          Reportes clínicos ya diligenciados.
-        </p>
-      </article>
+      <StatItem
+        label="Reportes"
+        value={loadingAppointments ? "..." : savedReportsCount}
+        description="completados"
+        icon={<FileCheck2 size={20} />}
+        iconClassName="bg-emerald-50 text-emerald-700"
+      />
     </section>
   );
 }

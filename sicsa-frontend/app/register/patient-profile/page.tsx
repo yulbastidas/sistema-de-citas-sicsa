@@ -18,7 +18,7 @@ export default function PatientProfilePage() {
   } = usePatientRegister();
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-slate-100 p-4 py-8 md:p-10">
       <PatientRegisterForm
         form={form}
         epsList={epsList}
