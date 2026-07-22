@@ -18,7 +18,12 @@ export class SpecialtiesService {
 
   findAll() {
     return this.specialtyRepository.find({
-      order: { nombre: 'ASC' },
+      where: {
+        activa: true,
+      },
+      order: {
+        nombre: 'ASC',
+      },
     });
   }
 
