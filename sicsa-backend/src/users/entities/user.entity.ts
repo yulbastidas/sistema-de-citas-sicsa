@@ -1,4 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+} from 'typeorm';
 
 @Entity()
 export class User {
@@ -16,4 +20,7 @@ export class User {
 
   @Column({ default: false })
   emailVerified!: boolean;
+
+  @Column({ default: false })
+  canViewReports!: boolean;
 }

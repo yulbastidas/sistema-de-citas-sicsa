@@ -10,6 +10,7 @@ import { Verification } from '../verifications/entities/verification.entity';
 import { User } from '../users/entities/user.entity';
 import { Patient } from '../patients/entities/patient.entity';
 import { EmailVerificationCode } from './entities/email-verification-code.entity';
+import { PasswordResetCode } from './entities/password-reset-code.entity';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -18,20 +19,33 @@ dotenv.config();
   imports: [
     UsersModule,
     PassportModule,
+
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'dev_secret_only',
+      secret:
+        process.env.JWT_SECRET ||
+        'dev_secret_only',
+
       signOptions: {
         expiresIn: '1h',
       },
     }),
+
     TypeOrmModule.forFeature([
       Verification,
       User,
       Patient,
       EmailVerificationCode,
+      PasswordResetCode,
     ]),
   ],
-  providers: [AuthService, JwtStrategy],
-  controllers: [AuthController],
+
+  providers: [
+    AuthService,
+    JwtStrategy,
+  ],
+
+  controllers: [
+    AuthController,
+  ],
 })
 export class AuthModule {}

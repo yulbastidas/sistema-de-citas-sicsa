@@ -1,38 +1,44 @@
 import {
+  BadRequestException,
   Injectable,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { RegisterDto } from './dto/register.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { Patient } from '../patients/entities/patient.entity';
 import { EmailVerificationCode } from './entities/email-verification-code.entity';
+import { PasswordResetCode } from './entities/password-reset-code.entity';
 import * as bcrypt from 'bcrypt';
+import { randomInt } from 'crypto';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private usersService: UsersService,
-    private jwtService: JwtService,
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
 
     @InjectRepository(User)
-    private userRepo: Repository<User>,
+    private readonly userRepo: Repository<User>,
 
     @InjectRepository(Patient)
-    private patientRepo: Repository<Patient>,
+    private readonly patientRepo: Repository<Patient>,
 
     @InjectRepository(EmailVerificationCode)
-    private emailCodeRepo: Repository<EmailVerificationCode>,
+    private readonly emailCodeRepo: Repository<EmailVerificationCode>,
+
+    @InjectRepository(PasswordResetCode)
+    private readonly passwordResetCodeRepo: Repository<PasswordResetCode>,
   ) {}
 
   private normalizeRole(role: string | number): string {
     if (role === 1 || role === '1') return 'admin';
     if (role === 2 || role === '2') return 'patient';
     if (role === 3 || role === '3') return 'doctor';
+
     return String(role);
   }
 
@@ -51,36 +57,92 @@ export class AuthService {
   }
 
   private normalizeText(value: string | undefined | null): string {
-    if (!value || typeof value !== 'string') return '';
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
+
     return value.trim();
   }
 
   private generateCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return randomInt(100000, 1000000).toString();
   }
 
-  private async sendCodeToN8n(email: string, code: string): Promise<void> {
-    const webhookUrl = process.env.N8N_VERIFICATION_CODE_WEBHOOK_URL;
+  private async sendCodeToN8n(
+    email: string,
+    code: string,
+  ): Promise<void> {
+    const webhookUrl =
+      process.env.N8N_VERIFICATION_CODE_WEBHOOK_URL;
 
     if (!webhookUrl) {
-      throw new BadRequestException('No está configurada la URL de n8n');
+      throw new BadRequestException(
+        'No está configurada la URL de verificación de n8n',
+      );
     }
 
     const response = await fetch(webhookUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, code }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        code,
+      }),
     });
 
     if (!response.ok) {
-      throw new BadRequestException('Error enviando correo con n8n');
+      throw new BadRequestException(
+        'Error enviando correo con n8n',
+      );
     }
   }
 
-  private async createEmailVerificationCode(user: User): Promise<string> {
+  private async sendPasswordResetCodeToN8n(
+    email: string,
+    code: string,
+  ): Promise<void> {
+    const webhookUrl =
+      process.env.N8N_PASSWORD_RESET_WEBHOOK_URL;
+
+    if (!webhookUrl) {
+      throw new BadRequestException(
+        'No está configurada la URL de recuperación de contraseña',
+      );
+    }
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        code,
+        purpose: 'password-reset',
+        expiresInMinutes: 10,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new BadRequestException(
+        'No fue posible enviar el código de recuperación',
+      );
+    }
+  }
+
+  private async createEmailVerificationCode(
+    user: User,
+  ): Promise<string> {
     await this.emailCodeRepo.update(
-      { email: user.email, used: false },
-      { used: true },
+      {
+        email: user.email,
+        used: false,
+      },
+      {
+        used: true,
+      },
     );
 
     const code = this.generateCode();
@@ -101,27 +163,104 @@ export class AuthService {
     return code;
   }
 
+  private async createPasswordResetCode(
+    user: User,
+  ): Promise<string> {
+    await this.passwordResetCodeRepo.update(
+      {
+        email: user.email,
+        used: false,
+      },
+      {
+        used: true,
+      },
+    );
+
+    const code = this.generateCode();
+    const codeHash = await bcrypt.hash(code, 10);
+
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+    const resetCode = this.passwordResetCodeRepo.create({
+      userId: user.id,
+      email: user.email,
+      codeHash,
+      used: false,
+      expiresAt,
+    });
+
+    await this.passwordResetCodeRepo.save(resetCode);
+
+    return code;
+  }
+
+  private async findValidPasswordResetCode(
+    email: string,
+    code: string,
+  ): Promise<PasswordResetCode> {
+    const resetCodes = await this.passwordResetCodeRepo.find({
+      where: {
+        email,
+        used: false,
+        expiresAt: MoreThan(new Date()),
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+      take: 5,
+    });
+
+    for (const resetCode of resetCodes) {
+      const codeMatches = await bcrypt.compare(
+        code,
+        resetCode.codeHash,
+      );
+
+      if (codeMatches) {
+        return resetCode;
+      }
+    }
+
+    throw new BadRequestException(
+      'El código es inválido o ha expirado',
+    );
+  }
+
   async register(data: RegisterDto) {
     const email = this.normalizeEmail(data.email);
-    const numeroDocumento = this.normalizeText(data.numeroDocumento);
+    const numeroDocumento = this.normalizeText(
+      data.numeroDocumento,
+    );
 
     const existingUser = await this.userRepo.findOne({
-      where: { email },
+      where: {
+        email,
+      },
     });
 
     if (existingUser) {
-      throw new BadRequestException('El correo ya está registrado');
+      throw new BadRequestException(
+        'El correo ya está registrado',
+      );
     }
 
     const existingPatient = await this.patientRepo.findOne({
-      where: { numeroDocumento },
+      where: {
+        numeroDocumento,
+      },
     });
 
     if (existingPatient) {
-      throw new BadRequestException('El documento ya está registrado');
+      throw new BadRequestException(
+        'El documento ya está registrado',
+      );
     }
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const hashedPassword = await bcrypt.hash(
+      data.password,
+      10,
+    );
 
     const user = this.userRepo.create({
       email,
@@ -152,7 +291,9 @@ export class AuthService {
 
     await this.patientRepo.save(patient);
 
-    const code = await this.createEmailVerificationCode(savedUser);
+    const code =
+      await this.createEmailVerificationCode(savedUser);
+
     await this.sendCodeToN8n(savedUser.email, code);
 
     return {
@@ -167,18 +308,26 @@ export class AuthService {
     const email = this.normalizeEmail(emailRaw);
 
     const user = await this.userRepo.findOne({
-      where: { email },
+      where: {
+        email,
+      },
     });
 
     if (!user) {
-      throw new BadRequestException('Usuario no encontrado');
+      throw new BadRequestException(
+        'Usuario no encontrado',
+      );
     }
 
     if (user.emailVerified) {
-      throw new BadRequestException('El correo ya fue verificado');
+      throw new BadRequestException(
+        'El correo ya fue verificado',
+      );
     }
 
-    const code = await this.createEmailVerificationCode(user);
+    const code =
+      await this.createEmailVerificationCode(user);
+
     await this.sendCodeToN8n(user.email, code);
 
     return {
@@ -187,7 +336,10 @@ export class AuthService {
     };
   }
 
-  async verifyEmailCode(emailRaw: string, codeRaw: string) {
+  async verifyEmailCode(
+    emailRaw: string,
+    codeRaw: string,
+  ) {
     const email = this.normalizeEmail(emailRaw);
     const code = this.normalizeText(codeRaw);
 
@@ -196,30 +348,39 @@ export class AuthService {
     }
 
     const user = await this.userRepo.findOne({
-      where: { email },
+      where: {
+        email,
+      },
     });
 
     if (!user) {
-      throw new BadRequestException('Usuario no encontrado');
+      throw new BadRequestException(
+        'Usuario no encontrado',
+      );
     }
 
-    const verificationCode = await this.emailCodeRepo.findOne({
-      where: {
-        email,
-        code,
-        used: false,
-      },
-      order: {
-        id: 'DESC',
-      },
-    });
+    const verificationCode =
+      await this.emailCodeRepo.findOne({
+        where: {
+          email,
+          code,
+          used: false,
+        },
+        order: {
+          id: 'DESC',
+        },
+      });
 
     if (!verificationCode) {
       throw new BadRequestException('Código inválido');
     }
 
-    if (verificationCode.expiresAt.getTime() < Date.now()) {
-      throw new BadRequestException('El código ha expirado');
+    if (
+      verificationCode.expiresAt.getTime() < Date.now()
+    ) {
+      throw new BadRequestException(
+        'El código ha expirado',
+      );
     }
 
     verificationCode.used = true;
@@ -234,32 +395,207 @@ export class AuthService {
     };
   }
 
+  async forgotPassword(emailRaw: string) {
+    const email = this.normalizeEmail(emailRaw);
+
+    const genericResponse = {
+      message:
+        'Si el correo está registrado, recibirás un código para recuperar tu contraseña.',
+    };
+
+    const user = await this.userRepo.findOne({
+      where: {
+        email,
+      },
+    });
+
+    /*
+     * Por seguridad no se informa si el correo existe o no.
+     * Esto evita que alguien pueda consultar qué usuarios
+     * están registrados en el sistema.
+     */
+    if (!user) {
+      return genericResponse;
+    }
+
+    const code =
+      await this.createPasswordResetCode(user);
+
+    await this.sendPasswordResetCodeToN8n(
+      user.email,
+      code,
+    );
+
+    return genericResponse;
+  }
+
+  async verifyResetCode(
+    emailRaw: string,
+    codeRaw: string,
+  ) {
+    const email = this.normalizeEmail(emailRaw);
+    const code = this.normalizeText(codeRaw);
+
+    if (!/^\d{6}$/.test(code)) {
+      throw new BadRequestException(
+        'El código debe contener seis números',
+      );
+    }
+
+    const user = await this.userRepo.findOne({
+      where: {
+        email,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException(
+        'El código es inválido o ha expirado',
+      );
+    }
+
+    await this.findValidPasswordResetCode(
+      email,
+      code,
+    );
+
+    return {
+      message: 'Código verificado correctamente',
+      valid: true,
+    };
+  }
+
+  async resetPassword(
+    emailRaw: string,
+    codeRaw: string,
+    newPassword: string,
+    confirmPassword: string,
+  ) {
+    const email = this.normalizeEmail(emailRaw);
+    const code = this.normalizeText(codeRaw);
+
+    if (!/^\d{6}$/.test(code)) {
+      throw new BadRequestException(
+        'El código debe contener seis números',
+      );
+    }
+
+    if (!newPassword || typeof newPassword !== 'string') {
+      throw new BadRequestException(
+        'La nueva contraseña es obligatoria',
+      );
+    }
+
+    if (newPassword !== confirmPassword) {
+      throw new BadRequestException(
+        'Las contraseñas no coinciden',
+      );
+    }
+
+    if (newPassword.length < 8) {
+      throw new BadRequestException(
+        'La contraseña debe tener al menos ocho caracteres',
+      );
+    }
+
+    const user = await this.userRepo.findOne({
+      where: {
+        email,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException(
+        'El código es inválido o ha expirado',
+      );
+    }
+
+    const resetCode =
+      await this.findValidPasswordResetCode(
+        email,
+        code,
+      );
+
+    const isSamePassword = await bcrypt.compare(
+      newPassword,
+      user.password,
+    );
+
+    if (isSamePassword) {
+      throw new BadRequestException(
+        'La nueva contraseña debe ser diferente a la actual',
+      );
+    }
+
+    user.password = await bcrypt.hash(
+      newPassword,
+      10,
+    );
+
+    await this.userRepo.save(user);
+
+    resetCode.used = true;
+    await this.passwordResetCodeRepo.save(resetCode);
+
+    /*
+     * Invalida cualquier otro código de recuperación
+     * pendiente para el mismo correo.
+     */
+    await this.passwordResetCodeRepo.update(
+      {
+        email,
+        used: false,
+      },
+      {
+        used: true,
+      },
+    );
+
+    return {
+      message:
+        'Contraseña actualizada correctamente. Ya puedes iniciar sesión.',
+      passwordUpdated: true,
+    };
+  }
+
   async login(emailRaw: string, password: string) {
     const email = this.normalizeEmail(emailRaw);
 
     if (!password || typeof password !== 'string') {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException(
+        'Credenciales inválidas',
+      );
     }
 
-    const user = await this.usersService.findByEmail(email);
+    const user =
+      await this.usersService.findByEmail(email);
 
     if (!user) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException(
+        'Credenciales inválidas',
+      );
     }
 
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    const passwordMatch = await bcrypt.compare(
+      password,
+      user.password,
+    );
 
     if (!passwordMatch) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException(
+        'Credenciales inválidas',
+      );
     }
 
-    const normalizedRole = this.normalizeRole(user.role);
-
+    const normalizedRole = this.normalizeRole(
+      user.role,
+    );
     const payload = {
       sub: user.id,
       email: user.email,
       role: normalizedRole,
       emailVerified: user.emailVerified,
+      canViewReports: user.canViewReports === true,
     };
 
     return {
@@ -270,6 +606,7 @@ export class AuthService {
         email: user.email,
         role: normalizedRole,
         emailVerified: user.emailVerified,
+        canViewReports: user.canViewReports === true,
       },
     };
   }

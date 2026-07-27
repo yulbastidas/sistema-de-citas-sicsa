@@ -1,78 +1,215 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-export async function registerPatient(data: {
+export type LoginResponse = {
+  message: string;
+  access_token: string;
+  user: {
+    id: number;
+    email: string;
+    role: "patient" | "doctor" | "admin";
+    emailVerified: boolean;
+  };
+};
+
+type ApiMessageResponse = {
+  message: string;
+};
+
+type RegisterResponse = {
+  message: string;
+  userId: number;
   email: string;
-  password: string;
-  role: "patient";
-  tipoDocumento?: string;
-  numeroDocumento?: string;
-  primerNombre?: string;
-  segundoNombre?: string;
-  primerApellido?: string;
-  segundoApellido?: string;
-  telefono?: string;
-  eps?: string;
-  epsId?: number;
-  genero?: string;
-  fechaNacimiento?: string;
-  departamento?: string;
-  municipio?: string;
-}) {
-  const response = await fetch(`${API_URL}/auth/register`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email: data.email,
-      password: data.password,
-      tipoDocumento: data.tipoDocumento,
-      numeroDocumento: data.numeroDocumento,
-      primerNombre: data.primerNombre,
-      segundoNombre: data.segundoNombre,
-      primerApellido: data.primerApellido,
-      segundoApellido: data.segundoApellido,
-      telefono: data.telefono,
-      eps: data.eps,
-      epsId: data.epsId,
-      genero: data.genero,
-      fechaNacimiento: data.fechaNacimiento,
-      departamento: data.departamento,
-      municipio: data.municipio,
-    }),
-  });
+  emailVerified: boolean;
+};
 
-  const result = await response.json();
+type VerifyEmailResponse = {
+  message: string;
+  emailVerified: boolean;
+};
+
+type VerifyResetCodeResponse = {
+  message: string;
+  valid: boolean;
+};
+
+type ResetPasswordResponse = {
+  message: string;
+  passwordUpdated: boolean;
+};
+
+async function parseApiResponse<T>(
+  response: Response,
+): Promise<T> {
+  const data = await response.json().catch(() => null);
 
   if (!response.ok) {
+    const backendMessage = Array.isArray(data?.message)
+      ? data.message.join(", ")
+      : data?.message;
+
     throw new Error(
-      Array.isArray(result.message)
-        ? result.message.join(", ")
-        : result.message || "Error al registrar paciente",
+      backendMessage ||
+        "Ocurrió un error al procesar la solicitud",
     );
   }
 
-  return result;
+  return data as T;
 }
 
-export async function loginUser(email: string, password: string) {
+/* =========================================================
+   INICIAR SESIÓN
+========================================================= */
+
+export async function loginUser(
+  email: string,
+  password: string,
+): Promise<LoginResponse> {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email: email.trim().toLowerCase(),
+      password,
+    }),
   });
 
-  const result = await response.json();
+  return parseApiResponse<LoginResponse>(response);
+}
 
-  if (!response.ok) {
-    throw new Error(
-      Array.isArray(result.message)
-        ? result.message.join(", ")
-        : result.message || "Error al iniciar sesión",
-    );
-  }
+/* =========================================================
+   REGISTRO DEL PACIENTE
+========================================================= */
 
-  return result;
+export async function registerPatient(
+  patientData: unknown,
+): Promise<RegisterResponse> {
+  const response = await fetch(`${API_URL}/auth/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(patientData),
+  });
+
+  return parseApiResponse<RegisterResponse>(response);
+}
+
+/* =========================================================
+   VERIFICACIÓN DEL CORREO
+========================================================= */
+
+export async function sendVerificationCode(
+  email: string,
+): Promise<ApiMessageResponse> {
+  const response = await fetch(
+    `${API_URL}/auth/send-verification-code`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+      }),
+    },
+  );
+
+  return parseApiResponse<ApiMessageResponse>(response);
+}
+
+export async function verifyEmailCode(
+  email: string,
+  code: string,
+): Promise<VerifyEmailResponse> {
+  const response = await fetch(
+    `${API_URL}/auth/verify-email-code`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        code: code.trim(),
+      }),
+    },
+  );
+
+  return parseApiResponse<VerifyEmailResponse>(response);
+}
+
+/* =========================================================
+   RECUPERACIÓN DE CONTRASEÑA
+========================================================= */
+
+export async function forgotPassword(
+  email: string,
+): Promise<ApiMessageResponse> {
+  const response = await fetch(
+    `${API_URL}/auth/forgot-password`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+      }),
+    },
+  );
+
+  return parseApiResponse<ApiMessageResponse>(response);
+}
+
+export async function verifyResetCode(
+  email: string,
+  code: string,
+): Promise<VerifyResetCodeResponse> {
+  const response = await fetch(
+    `${API_URL}/auth/verify-reset-code`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        code: code.trim(),
+      }),
+    },
+  );
+
+  return parseApiResponse<VerifyResetCodeResponse>(
+    response,
+  );
+}
+
+export async function resetPassword(
+  email: string,
+  code: string,
+  newPassword: string,
+  confirmPassword: string,
+): Promise<ResetPasswordResponse> {
+  const response = await fetch(
+    `${API_URL}/auth/reset-password`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        code: code.trim(),
+        newPassword,
+        confirmPassword,
+      }),
+    },
+  );
+
+  return parseApiResponse<ResetPasswordResponse>(
+    response,
+  );
 }

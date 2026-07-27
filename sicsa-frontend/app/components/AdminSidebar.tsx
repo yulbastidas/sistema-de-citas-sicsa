@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BarChart3,
   CalendarDays,
   ClipboardList,
   LogOut,
@@ -9,11 +10,27 @@ import {
   Sparkles,
   UsersRound,
 } from "lucide-react";
-import { logout } from "@/service/session";
+import { getUser, logout } from "@/service/session";
+
+type SessionUser = {
+  id?: number;
+  sub?: number;
+  email?: string;
+  role?: string | number;
+  emailVerified?: boolean;
+  canViewReports?: boolean;
+};
 
 export default function AdminSidebar() {
   const router = useRouter();
   const pathname = usePathname();
+
+  /*
+   * Obtiene el usuario guardado al iniciar sesión.
+   * Solo el usuario con canViewReports=true podrá ver Reportes.
+   */
+  const user = getUser() as SessionUser | null;
+  const canViewReports = user?.canViewReports === true;
 
   const items = [
     {
@@ -31,6 +48,20 @@ export default function AdminSidebar() {
       href: "/dashboard/admin/patients",
       icon: UsersRound,
     },
+
+    /*
+     * Esta opción solamente se agrega al menú cuando
+     * el usuario autenticado tiene permiso para reportes.
+     */
+    ...(canViewReports
+      ? [
+        {
+          label: "Reportes",
+          href: "/dashboard/admin/reports",
+          icon: BarChart3,
+        },
+      ]
+      : []),
   ];
 
   const handleLogout = () => {
@@ -44,7 +75,9 @@ export default function AdminSidebar() {
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-blue-100">
           SICSA
         </p>
+
         <h1 className="mt-3 text-3xl font-bold">Administración</h1>
+
         <p className="mt-2 text-sm text-slate-200">
           Gestión hospitalaria, operativa y seguimiento clínico.
         </p>
@@ -58,20 +91,20 @@ export default function AdminSidebar() {
           return (
             <button
               key={item.href}
+              type="button"
               onClick={() => router.push(item.href)}
-              className={`flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left transition ${
-                active
+              className={`flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left transition ${active
                   ? "border border-blue-200 bg-blue-50 text-blue-900 shadow-sm"
                   : "border border-transparent bg-white text-slate-700 hover:border-slate-200 hover:bg-slate-50"
-              }`}
+                }`}
             >
               <span
-                className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                  active ? "bg-blue-100" : "bg-slate-100"
-                }`}
+                className={`flex h-10 w-10 items-center justify-center rounded-xl ${active ? "bg-blue-100" : "bg-slate-100"
+                  }`}
               >
                 <Icon size={18} />
               </span>
+
               <span className="font-semibold">{item.label}</span>
             </button>
           );
@@ -83,10 +116,12 @@ export default function AdminSidebar() {
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm">
             <ClipboardList size={18} className="text-slate-700" />
           </span>
+
           <article>
             <h2 className="text-sm font-semibold text-slate-900">
               Acceso rápido
             </h2>
+
             <p className="text-xs text-slate-500">Resumen del panel</p>
           </article>
         </header>
@@ -102,10 +137,12 @@ export default function AdminSidebar() {
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm">
             <Sparkles size={18} className="text-blue-700" />
           </span>
+
           <article>
             <h2 className="text-sm font-semibold text-blue-900">
               Panel interno
             </h2>
+
             <p className="text-xs text-blue-700">Uso administrativo</p>
           </article>
         </header>
@@ -117,6 +154,7 @@ export default function AdminSidebar() {
       </section>
 
       <button
+        type="button"
         onClick={handleLogout}
         className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 font-semibold text-red-700 transition hover:bg-red-100"
       >

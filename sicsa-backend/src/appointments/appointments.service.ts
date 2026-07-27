@@ -88,7 +88,7 @@ export class AppointmentsService {
     }
 
     const duration = this.scheduleService.getAppointmentDuration(
-      data.appointmentClassId,
+      data.specialtyId,
     );
 
     this.scheduleService.validateBusinessSchedule(
@@ -96,6 +96,7 @@ export class AppointmentsService {
       data.hora,
       duration,
     );
+
     this.scheduleService.validateRadiologyBase(data);
 
     const slotAvailable = await this.scheduleService.isSlotAvailable(
@@ -104,9 +105,10 @@ export class AppointmentsService {
       duration,
     );
 
-    const appointmentStatus = slotAvailable ? 'confirmada' : 'lista_espera';
+    const appointmentStatus = slotAvailable? 'confirmada': 'lista_espera';
 
     const assignedDoctor = await this.findDoctorBySpecialty(data.specialtyId);
+
     const prioridadData = await this.priorityService.getPrioridad(data);
 
     const appointmentData: Partial<Appointment> = {
@@ -131,7 +133,6 @@ export class AppointmentsService {
       epsId: patient.epsId,
       departamento: patient.departamento,
       municipio: patient.municipio,
-
       appointmentClassId: data.appointmentClassId,
       observaciones: data.observaciones,
       ordenMedicaUrl: data.ordenMedicaUrl,
@@ -139,9 +140,11 @@ export class AppointmentsService {
 
     const appointment = this.appointmentRepo.create(appointmentData);
     const saved = await this.appointmentRepo.save(appointment);
+
     const result = await this.mapperService.attachPatientData(saved);
 
     this.appointmentsGateway.emitAppointmentCreated(result);
+
     this.appointmentsGateway.emitQueueUpdated({
       fecha: saved.fecha,
       message:
@@ -169,7 +172,7 @@ export class AppointmentsService {
     }
 
     const duration = this.scheduleService.getAppointmentDuration(
-      data.appointmentClassId,
+      data.specialtyId,
     );
 
     this.scheduleService.validateBusinessSchedule(
@@ -177,6 +180,7 @@ export class AppointmentsService {
       data.hora,
       duration,
     );
+
     this.scheduleService.validateRadiologyBase(data);
 
     const slotAvailable = await this.scheduleService.isSlotAvailable(
@@ -185,9 +189,10 @@ export class AppointmentsService {
       duration,
     );
 
-    const appointmentStatus = slotAvailable ? 'confirmada' : 'lista_espera';
+    const appointmentStatus = slotAvailable? 'confirmada': 'lista_espera';
 
     const assignedDoctor = await this.findDoctorBySpecialty(data.specialtyId);
+
     const prioridadData = await this.priorityService.getPrioridad(data);
 
     const appointmentData: Partial<Appointment> = {
@@ -219,9 +224,11 @@ export class AppointmentsService {
 
     const appointment = this.appointmentRepo.create(appointmentData);
     const saved = await this.appointmentRepo.save(appointment);
+
     const result = await this.mapperService.attachPatientData(saved);
 
     this.appointmentsGateway.emitAppointmentCreated(result);
+
     this.appointmentsGateway.emitQueueUpdated({
       fecha: saved.fecha,
       message:
@@ -356,9 +363,8 @@ export class AppointmentsService {
 
     const releasedFecha = appointment.fecha;
     const releasedHora = appointment.hora;
-    const releasedDuration = this.scheduleService.getAppointmentDuration(
-      appointment.appointmentClassId,
-    );
+
+    const releasedDuration = this.scheduleService.getAppointmentDuration(appointment.specialtyId);
 
     appointment.estado = 'cancelada';
 
@@ -366,6 +372,7 @@ export class AppointmentsService {
     const result = await this.mapperService.attachPatientData(saved);
 
     this.appointmentsGateway.emitAppointmentCancelled(result);
+
     this.appointmentsGateway.emitQueueUpdated({
       fecha: saved.fecha,
       message: 'Cola actualizada',
@@ -380,11 +387,8 @@ export class AppointmentsService {
     return result;
   }
 
-  async getAvailable(
-    fecha: string,
-    appointmentClassId?: number,
-  ): Promise<string[]> {
-    return this.scheduleService.getAvailableHours(fecha, appointmentClassId);
+  async getAvailable(fecha: string, specialtyId?: number): Promise<string[]> {
+    return this.scheduleService.getAvailableHours(fecha, specialtyId);
   }
 
   async getQueue(
@@ -453,6 +457,7 @@ export class AppointmentsService {
 
   async getTomorrowRemindersForN8n(): Promise<ReminderAppointment[]> {
     const appointments = await this.getTomorrowReminders();
+
     return this.notificationService.buildReminderPayload(appointments);
   }
 
@@ -516,7 +521,10 @@ export class AppointmentsService {
 
   private async resolveDoctorId(doctorOrUserId: number): Promise<number> {
     const doctorByUserId = await this.doctorRepo.findOne({
-      where: { userId: doctorOrUserId, activo: true },
+      where: {
+        userId: doctorOrUserId,
+        activo: true,
+      },
     });
 
     if (doctorByUserId) {
@@ -524,7 +532,10 @@ export class AppointmentsService {
     }
 
     const doctorById = await this.doctorRepo.findOne({
-      where: { id: doctorOrUserId, activo: true },
+      where: {
+        id: doctorOrUserId,
+        activo: true,
+      },
     });
 
     if (doctorById) {
@@ -561,6 +572,7 @@ export class AppointmentsService {
 
   private getTomorrowDate(): string {
     const tomorrow = new Date();
+
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const year = tomorrow.getFullYear();

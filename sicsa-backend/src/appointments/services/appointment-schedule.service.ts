@@ -15,22 +15,17 @@ export class AppointmentScheduleService {
     private appointmentRepo: Repository<Appointment>,
   ) {}
 
-  getAppointmentDuration(appointmentClassId?: number | null): number {
-    switch (appointmentClassId) {
-      case 1:
+  getAppointmentDuration(specialtyId?: number | null): number {
+    const specialtyIdNumber = Number(specialtyId);
+
+    switch (specialtyIdNumber) {
+      case 9: // Higienista oral
+      case 13: // Médico general
+      case 15: // Odontología
         return 20;
-      case 2:
-        return 30;
-      case 3:
-        return 30;
-      case 4:
-        return 20;
-      case 5:
-        return 20;
-      case 6:
-        return 40;
+
       default:
-        return 20;
+        return 30;
     }
   }
 
@@ -119,10 +114,11 @@ export class AppointmentScheduleService {
 
   async getAvailableHours(
     fecha: string,
-    appointmentClassId?: number,
+    specialtyId?: number,
   ): Promise<string[]> {
-    const duration = this.getAppointmentDuration(appointmentClassId);
-    const hours = this.generateAvailableHoursByDate(fecha);
+    const duration = this.getAppointmentDuration(specialtyId);
+
+    const hours = this.generateAvailableHoursByDate(fecha, duration);
 
     const appointments = await this.appointmentRepo.find({
       where: {
@@ -134,6 +130,7 @@ export class AppointmentScheduleService {
     return hours.filter((hour) => {
       try {
         this.validateBusinessSchedule(fecha, hour, duration);
+
         return !this.hasScheduleConflict(hour, duration, appointments);
       } catch {
         return false;
@@ -141,7 +138,10 @@ export class AppointmentScheduleService {
     });
   }
 
-  generateAvailableHoursByDate(fecha: string): string[] {
+  generateAvailableHoursByDate(
+    fecha: string,
+    durationMinutes: number,
+  ): string[] {
     const day = this.getDayOfWeek(fecha);
 
     if (day === 0 || day === 1) {
@@ -149,15 +149,15 @@ export class AppointmentScheduleService {
     }
 
     if (day === 2 || day === 3) {
-      return this.generateHours('08:00', '17:40', 20);
+      return this.generateHours('08:00', '17:40', durationMinutes);
     }
 
     if (day === 4 || day === 5) {
-      return this.generateHours('07:00', '17:40', 20);
+      return this.generateHours('07:00', '17:40', durationMinutes);
     }
 
     if (day === 6) {
-      return this.generateHours('07:00', '12:40', 20);
+      return this.generateHours('07:00', '12:40', durationMinutes);
     }
 
     return [];
@@ -190,22 +190,29 @@ export class AppointmentScheduleService {
 
     return appointments.some((appointment) => {
       const appointmentStart = this.timeToMinutes(appointment.hora);
+
       const appointmentDuration = this.getAppointmentDuration(
-        appointment.appointmentClassId,
+        appointment.specialtyId,
       );
+
       const appointmentEnd = appointmentStart + appointmentDuration;
 
-      return requestedStart < appointmentEnd && requestedEnd > appointmentStart;
+      return (
+        requestedStart < appointmentEnd &&
+        requestedEnd > appointmentStart
+      );
     });
   }
 
   getDayOfWeek(fecha: string): number {
     const [year, month, day] = fecha.split('-').map(Number);
+
     return new Date(year, month - 1, day).getDay();
   }
 
   timeToMinutes(time: string): number {
     const [hours, minutes] = time.split(':').map(Number);
+
     return hours * 60 + minutes;
   }
 
@@ -213,6 +220,9 @@ export class AppointmentScheduleService {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
 
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(
+      2,
+      '0',
+    )}`;
   }
 }

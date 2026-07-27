@@ -2,21 +2,48 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { HeartPulse, LogIn } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { loginUser } from "@/service/auth";
-import { logout, saveSession } from "@/service/session";
+import {
+  Eye,
+  EyeOff,
+  HeartPulse,
+  Loader2,
+  LogIn,
+} from "lucide-react";
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-type AllowedRole = "patient" | "doctor" | "admin";
+import { loginUser } from "@/service/auth";
+import {
+  logout,
+  saveSession,
+} from "@/service/session";
+
+type AllowedRole =
+  | "patient"
+  | "doctor"
+  | "admin";
+
 const ROLE_LABELS: Record<AllowedRole, string> = {
   patient: "Paciente",
   doctor: "Médico",
   admin: "Administrador",
 };
 
-function isAllowedRole(value: string | null): value is AllowedRole {
-  return value === "patient" || value === "doctor" || value === "admin";
+function isAllowedRole(
+  value: string | null,
+): value is AllowedRole {
+  return (
+    value === "patient" ||
+    value === "doctor" ||
+    value === "admin"
+  );
 }
 
 export default function LoginClient() {
@@ -26,7 +53,9 @@ export default function LoginClient() {
   const rawRole = searchParams.get("role");
 
   const role = useMemo<AllowedRole>(() => {
-    return isAllowedRole(rawRole) ? rawRole : "patient";
+    return isAllowedRole(rawRole)
+      ? rawRole
+      : "patient";
   }, [rawRole]);
 
   const roleLabel = ROLE_LABELS[role];
@@ -37,6 +66,8 @@ export default function LoginClient() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] =
+    useState(false);
 
   useEffect(() => {
     if (!rawRole || !isAllowedRole(rawRole)) {
@@ -44,22 +75,32 @@ export default function LoginClient() {
     }
   }, [rawRole, router]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const { name, value } = event.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
     }));
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
 
     if (!isAllowedRole(rawRole)) {
       router.replace("/login?role=patient");
       return;
     }
 
-    if (!form.email || !form.password) {
+    const email = form.email
+      .trim()
+      .toLowerCase();
+
+    if (!email || !form.password) {
       alert("Completa correo y contraseña");
       return;
     }
@@ -68,22 +109,34 @@ export default function LoginClient() {
       setLoading(true);
       logout();
 
-      const result = await loginUser(form.email, form.password);
+      const result = await loginUser(
+        email,
+        form.password,
+      );
 
       if (!result?.access_token) {
-        alert("El backend no devolvió un token válido");
+        alert(
+          "El backend no devolvió un token válido",
+        );
         return;
       }
 
-      const savedUser = saveSession(result.access_token);
+      const savedUser = saveSession(
+        result.access_token,
+      );
 
       if (!savedUser) {
-        alert("Login exitoso, pero no se pudo guardar la sesión");
+        alert(
+          "Login exitoso, pero no se pudo guardar la sesión",
+        );
         return;
       }
 
       if (savedUser.role !== role) {
-        alert("El rol seleccionado no coincide con el usuario");
+        alert(
+          "El rol seleccionado no coincide con el usuario",
+        );
+
         logout();
         router.replace("/login?role=patient");
         return;
@@ -91,19 +144,27 @@ export default function LoginClient() {
 
       if (savedUser.role === "patient") {
         router.replace("/dashboard/patient");
-      } else if (savedUser.role === "doctor") {
+        return;
+      }
+
+      if (savedUser.role === "doctor") {
         router.replace("/dashboard/doctor");
-      } else if (savedUser.role === "admin") {
+        return;
+      }
+
+      if (savedUser.role === "admin") {
         router.replace("/dashboard/admin");
-      } else {
-        router.replace("/login?role=patient");
+        return;
       }
+
+      logout();
+      router.replace("/login?role=patient");
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert("Error al iniciar sesión");
-      }
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Error al iniciar sesión",
+      );
     } finally {
       setLoading(false);
     }
@@ -126,18 +187,24 @@ export default function LoginClient() {
               Inicia sesión como {roleLabel}
             </p>
 
-            <form className="space-y-6" onSubmit={handleLogin}>
+            <form
+              className="space-y-6"
+              onSubmit={handleLogin}
+            >
               <section>
                 <label className="mb-2 block text-lg font-semibold text-slate-800">
-                  Correo Electrónico
+                  Correo electrónico
                 </label>
+
                 <input
                   name="email"
                   type="email"
                   placeholder="tu@email.com"
+                  autoComplete="email"
                   className="input"
                   value={form.email}
                   onChange={handleChange}
+                  disabled={loading}
                 />
               </section>
 
@@ -145,14 +212,53 @@ export default function LoginClient() {
                 <label className="mb-2 block text-lg font-semibold text-slate-800">
                   Contraseña
                 </label>
-                <input
-                  name="password"
-                  type="password"
-                  placeholder="********"
-                  className="input"
-                  value={form.password}
-                  onChange={handleChange}
-                />
+
+                <section className="relative">
+                  <input
+                    name="password"
+                    type={
+                      showPassword
+                        ? "text"
+                        : "password"
+                    }
+                    placeholder="********"
+                    autoComplete="current-password"
+                    className="input pr-12"
+                    value={form.password}
+                    onChange={handleChange}
+                    disabled={loading}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowPassword(
+                        (previous) => !previous,
+                      )
+                    }
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-700"
+                    aria-label={
+                      showPassword
+                        ? "Ocultar contraseña"
+                        : "Mostrar contraseña"
+                    }
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} />
+                    ) : (
+                      <Eye size={20} />
+                    )}
+                  </button>
+                </section>
+              </section>
+
+              <section className="flex justify-end">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm font-semibold text-blue-600 transition hover:text-blue-800 hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
               </section>
 
               <button
@@ -160,8 +266,18 @@ export default function LoginClient() {
                 disabled={loading}
                 className="flex w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 px-6 py-4 text-lg font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                <LogIn size={22} />
-                {loading ? "Ingresando..." : "Iniciar Sesión"}
+                {loading ? (
+                  <Loader2
+                    size={22}
+                    className="animate-spin"
+                  />
+                ) : (
+                  <LogIn size={22} />
+                )}
+
+                {loading
+                  ? "Ingresando..."
+                  : "Iniciar sesión"}
               </button>
             </form>
 
@@ -177,7 +293,6 @@ export default function LoginClient() {
                   </Link>
                 </p>
               )}
-
             </section>
           </section>
         </section>
@@ -188,7 +303,7 @@ export default function LoginClient() {
             alt="Hospital"
             fill
             priority
-            sizes="35vw"
+            sizes="50vw"
             className="object-cover"
           />
 
@@ -196,7 +311,10 @@ export default function LoginClient() {
 
           <section className="absolute inset-0 flex flex-col items-center justify-center px-10 text-center text-white">
             <section className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-lg">
-              <HeartPulse className="text-blue-600" size={48} />
+              <HeartPulse
+                className="text-blue-600"
+                size={48}
+              />
             </section>
 
             <h2 className="text-5xl font-extrabold leading-tight drop-shadow-lg">

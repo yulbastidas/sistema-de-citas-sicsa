@@ -102,16 +102,16 @@ export class AppointmentsController {
   @Get('available')
   getAvailable(
     @Query('fecha') fecha: string,
-    @Query('appointmentClassId') appointmentClassId?: string,
+    @Query('specialtyId') specialtyId?: string,
   ) {
-    const parsedAppointmentClassId = parseOptionalNumber(
-      appointmentClassId,
-      'appointmentClassId',
+    const parsedSpecialtyId = parseOptionalNumber(
+      specialtyId,
+      'specialtyId',
     );
 
     return this.appointmentsService.getAvailable(
       fecha,
-      parsedAppointmentClassId,
+      parsedSpecialtyId,
     );
   }
 

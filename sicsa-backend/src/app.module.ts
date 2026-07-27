@@ -11,6 +11,7 @@ import { MedicalReportsModule } from './medical-reports/medical-reports.module';
 import { EpsModule } from './eps/eps.module';
 import { AppointmentClassModule } from './appointment-class/appointment-class.module';
 import * as dotenv from 'dotenv';
+import { ReportsModule } from './reports/reports.module';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ dotenv.config();
     MedicalReportsModule,
     EpsModule,
     AppointmentClassModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
