@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -133,6 +134,20 @@ export class AppointmentsController {
   getTomorrowReminders() {
     return this.appointmentsService.getTomorrowReminders();
   }
+
+    @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('doctor', 'admin')
+  @Patch(':id/no-show')
+  markNoShow(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.appointmentsService.markNoShow(
+      id,
+      req.user,
+    );
+  }
+
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('doctor', 'admin')

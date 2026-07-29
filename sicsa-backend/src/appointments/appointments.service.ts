@@ -84,12 +84,15 @@ export class AppointmentsService {
     });
 
     if (!patient) {
-      throw new NotFoundException('Perfil de paciente no encontrado');
+      throw new NotFoundException(
+        'Perfil de paciente no encontrado',
+      );
     }
 
-    const duration = this.scheduleService.getAppointmentDuration(
-      data.specialtyId,
-    );
+    const duration =
+      this.scheduleService.getAppointmentDuration(
+        data.specialtyId,
+      );
 
     this.scheduleService.validateBusinessSchedule(
       data.fecha,
@@ -99,17 +102,24 @@ export class AppointmentsService {
 
     this.scheduleService.validateRadiologyBase(data);
 
-    const slotAvailable = await this.scheduleService.isSlotAvailable(
-      data.fecha,
-      data.hora,
-      duration,
-    );
+    const slotAvailable =
+      await this.scheduleService.isSlotAvailable(
+        data.fecha,
+        data.hora,
+        duration,
+      );
 
-    const appointmentStatus = slotAvailable? 'confirmada': 'lista_espera';
+    const appointmentStatus = slotAvailable
+      ? 'confirmada'
+      : 'lista_espera';
 
-    const assignedDoctor = await this.findDoctorBySpecialty(data.specialtyId);
+    const assignedDoctor =
+      await this.findDoctorBySpecialty(
+        data.specialtyId,
+      );
 
-    const prioridadData = await this.priorityService.getPrioridad(data);
+    const prioridadData =
+      await this.priorityService.getPrioridad(data);
 
     const appointmentData: Partial<Appointment> = {
       patientId: user.sub,
@@ -123,27 +133,43 @@ export class AppointmentsService {
       discapacidad: data.discapacidad ?? false,
       dolorIntenso: data.dolorIntenso ?? false,
       sangrado: data.sangrado ?? false,
-      dificultadRespiratoria: data.dificultadRespiratoria ?? false,
+      dificultadRespiratoria:
+        data.dificultadRespiratoria ?? false,
       fiebre: data.fiebre ?? false,
       estado: appointmentStatus,
       prioridad: prioridadData.prioridad,
-      scorePrioridad: prioridadData.scorePrioridad,
-      explicacionPrioridad: prioridadData.explicacionPrioridad,
+      scorePrioridad:
+        prioridadData.scorePrioridad,
+      explicacionPrioridad:
+        prioridadData.explicacionPrioridad,
       eps: patient.eps,
       epsId: patient.epsId,
       departamento: patient.departamento,
       municipio: patient.municipio,
-      appointmentClassId: data.appointmentClassId,
+      appointmentClassId:
+        data.appointmentClassId,
       observaciones: data.observaciones,
       ordenMedicaUrl: data.ordenMedicaUrl,
     };
 
-    const appointment = this.appointmentRepo.create(appointmentData);
-    const saved = await this.appointmentRepo.save(appointment);
+    const appointment =
+      this.appointmentRepo.create(
+        appointmentData,
+      );
 
-    const result = await this.mapperService.attachPatientData(saved);
+    const saved =
+      await this.appointmentRepo.save(
+        appointment,
+      );
 
-    this.appointmentsGateway.emitAppointmentCreated(result);
+    const result =
+      await this.mapperService.attachPatientData(
+        saved,
+      );
+
+    this.appointmentsGateway.emitAppointmentCreated(
+      result,
+    );
 
     this.appointmentsGateway.emitQueueUpdated({
       fecha: saved.fecha,
@@ -154,7 +180,9 @@ export class AppointmentsService {
     });
 
     if (saved.estado === 'confirmada') {
-      await this.notificationService.sendAppointmentCreatedToN8n(result);
+      await this.notificationService.sendAppointmentCreatedToN8n(
+        result,
+      );
     }
 
     return result;
@@ -164,16 +192,21 @@ export class AppointmentsService {
     data: CreateAdminAppointmentDto,
   ): Promise<AppointmentWithPatient> {
     const patient = await this.patientRepo.findOne({
-      where: { numeroDocumento: data.documento },
+      where: {
+        numeroDocumento: data.documento,
+      },
     });
 
     if (!patient) {
-      throw new NotFoundException('Paciente no encontrado');
+      throw new NotFoundException(
+        'Paciente no encontrado',
+      );
     }
 
-    const duration = this.scheduleService.getAppointmentDuration(
-      data.specialtyId,
-    );
+    const duration =
+      this.scheduleService.getAppointmentDuration(
+        data.specialtyId,
+      );
 
     this.scheduleService.validateBusinessSchedule(
       data.fecha,
@@ -183,17 +216,24 @@ export class AppointmentsService {
 
     this.scheduleService.validateRadiologyBase(data);
 
-    const slotAvailable = await this.scheduleService.isSlotAvailable(
-      data.fecha,
-      data.hora,
-      duration,
-    );
+    const slotAvailable =
+      await this.scheduleService.isSlotAvailable(
+        data.fecha,
+        data.hora,
+        duration,
+      );
 
-    const appointmentStatus = slotAvailable? 'confirmada': 'lista_espera';
+    const appointmentStatus = slotAvailable
+      ? 'confirmada'
+      : 'lista_espera';
 
-    const assignedDoctor = await this.findDoctorBySpecialty(data.specialtyId);
+    const assignedDoctor =
+      await this.findDoctorBySpecialty(
+        data.specialtyId,
+      );
 
-    const prioridadData = await this.priorityService.getPrioridad(data);
+    const prioridadData =
+      await this.priorityService.getPrioridad(data);
 
     const appointmentData: Partial<Appointment> = {
       patientId: patient.userId,
@@ -207,27 +247,46 @@ export class AppointmentsService {
       discapacidad: data.discapacidad ?? false,
       dolorIntenso: data.dolorIntenso ?? false,
       sangrado: data.sangrado ?? false,
-      dificultadRespiratoria: data.dificultadRespiratoria ?? false,
+      dificultadRespiratoria:
+        data.dificultadRespiratoria ?? false,
       fiebre: data.fiebre ?? false,
       estado: appointmentStatus,
       prioridad: prioridadData.prioridad,
-      scorePrioridad: prioridadData.scorePrioridad,
-      explicacionPrioridad: prioridadData.explicacionPrioridad,
+      scorePrioridad:
+        prioridadData.scorePrioridad,
+      explicacionPrioridad:
+        prioridadData.explicacionPrioridad,
       eps: data.eps ?? patient.eps,
       epsId: data.epsId ?? patient.epsId,
-      departamento: data.departamento ?? patient.departamento,
-      municipio: data.municipio ?? patient.municipio,
-      appointmentClassId: data.appointmentClassId,
+      departamento:
+        data.departamento ??
+        patient.departamento,
+      municipio:
+        data.municipio ?? patient.municipio,
+      appointmentClassId:
+        data.appointmentClassId,
       observaciones: data.observaciones,
       ordenMedicaUrl: data.ordenMedicaUrl,
     };
 
-    const appointment = this.appointmentRepo.create(appointmentData);
-    const saved = await this.appointmentRepo.save(appointment);
+    const appointment =
+      this.appointmentRepo.create(
+        appointmentData,
+      );
 
-    const result = await this.mapperService.attachPatientData(saved);
+    const saved =
+      await this.appointmentRepo.save(
+        appointment,
+      );
 
-    this.appointmentsGateway.emitAppointmentCreated(result);
+    const result =
+      await this.mapperService.attachPatientData(
+        saved,
+      );
+
+    this.appointmentsGateway.emitAppointmentCreated(
+      result,
+    );
 
     this.appointmentsGateway.emitQueueUpdated({
       fecha: saved.fecha,
@@ -238,57 +297,79 @@ export class AppointmentsService {
     });
 
     if (saved.estado === 'confirmada') {
-      await this.notificationService.sendAppointmentCreatedToN8n(result);
+      await this.notificationService.sendAppointmentCreatedToN8n(
+        result,
+      );
     }
 
     return result;
   }
 
-  async findAll(): Promise<AppointmentWithPatient[]> {
-    const appointments = await this.appointmentRepo.find({
-      order: {
-        fecha: 'ASC',
-        hora: 'ASC',
-      },
-    });
+  async findAll(): Promise<
+    AppointmentWithPatient[]
+  > {
+    const appointments =
+      await this.appointmentRepo.find({
+        order: {
+          fecha: 'ASC',
+          hora: 'ASC',
+        },
+      });
 
     return Promise.all(
       appointments.map((appointment) =>
-        this.mapperService.attachPatientData(appointment),
+        this.mapperService.attachPatientData(
+          appointment,
+        ),
       ),
     );
   }
 
-  async getByUser(userId: number): Promise<AppointmentWithPatient[]> {
-    const appointments = await this.appointmentRepo.find({
-      where: { patientId: userId },
-      order: {
-        fecha: 'DESC',
-        hora: 'DESC',
-      },
-    });
+  async getByUser(
+    userId: number,
+  ): Promise<AppointmentWithPatient[]> {
+    const appointments =
+      await this.appointmentRepo.find({
+        where: {
+          patientId: userId,
+        },
+        order: {
+          fecha: 'DESC',
+          hora: 'DESC',
+        },
+      });
 
     return Promise.all(
       appointments.map((appointment) =>
-        this.mapperService.attachPatientData(appointment),
+        this.mapperService.attachPatientData(
+          appointment,
+        ),
       ),
     );
   }
 
-  async findByDoctor(doctorId: number): Promise<AppointmentWithPatient[]> {
-    const realDoctorId = await this.resolveDoctorId(doctorId);
+  async findByDoctor(
+    doctorId: number,
+  ): Promise<AppointmentWithPatient[]> {
+    const realDoctorId =
+      await this.resolveDoctorId(doctorId);
 
-    const appointments = await this.appointmentRepo.find({
-      where: { doctorId: realDoctorId },
-      order: {
-        fecha: 'ASC',
-        hora: 'ASC',
-      },
-    });
+    const appointments =
+      await this.appointmentRepo.find({
+        where: {
+          doctorId: realDoctorId,
+        },
+        order: {
+          fecha: 'ASC',
+          hora: 'ASC',
+        },
+      });
 
     return Promise.all(
       appointments.map((appointment) =>
-        this.mapperService.attachPatientData(appointment),
+        this.mapperService.attachPatientData(
+          appointment,
+        ),
       ),
     );
   }
@@ -296,46 +377,72 @@ export class AppointmentsService {
   async findHistoryByDoctor(
     doctorId: number,
   ): Promise<AppointmentWithPatient[]> {
-    const realDoctorId = await this.resolveDoctorId(doctorId);
+    const realDoctorId =
+      await this.resolveDoctorId(doctorId);
 
-    const appointments = await this.appointmentRepo.find({
-      where: { doctorId: realDoctorId },
-      order: {
-        fecha: 'DESC',
-        hora: 'DESC',
-      },
-    });
+    const appointments =
+      await this.appointmentRepo.find({
+        where: {
+          doctorId: realDoctorId,
+        },
+        order: {
+          fecha: 'DESC',
+          hora: 'DESC',
+        },
+      });
 
-    const enrichedAppointments = await Promise.all(
-      appointments.map((appointment) =>
-        this.mapperService.attachPatientData(appointment),
-      ),
-    );
+    const enrichedAppointments =
+      await Promise.all(
+        appointments.map((appointment) =>
+          this.mapperService.attachPatientData(
+            appointment,
+          ),
+        ),
+      );
 
     return enrichedAppointments.filter(
       (appointment) =>
-        appointment.estado?.toLowerCase() === 'atendida' ||
+        appointment.estado
+          ?.toLowerCase()
+          .trim() === 'atendida' ||
         appointment.medicalReport?.exists,
     );
   }
 
-  async cancel(id: number, user: JwtUser): Promise<AppointmentWithPatient> {
-    const appointment = await this.appointmentRepo.findOne({
-      where: { id },
-    });
+  async cancel(
+    id: number,
+    user: JwtUser,
+  ): Promise<AppointmentWithPatient> {
+    const appointment =
+      await this.appointmentRepo.findOne({
+        where: { id },
+      });
 
     if (!appointment) {
-      throw new NotFoundException('Cita no encontrada');
+      throw new NotFoundException(
+        'Cita no encontrada',
+      );
     }
 
-    if (user.role !== 'admin' && appointment.patientId !== user.sub) {
-      throw new BadRequestException('No puedes cancelar esta cita');
+    if (
+      user.role !== 'admin' &&
+      appointment.patientId !== user.sub
+    ) {
+      throw new BadRequestException(
+        'No puedes cancelar esta cita',
+      );
     }
 
-    const currentStatus = (appointment.estado || '').trim().toLowerCase();
+    const currentStatus = (
+      appointment.estado || ''
+    )
+      .trim()
+      .toLowerCase();
 
     if (currentStatus === 'cancelada') {
-      throw new BadRequestException('La cita ya se encuentra cancelada');
+      throw new BadRequestException(
+        'La cita ya se encuentra cancelada',
+      );
     }
 
     if (currentStatus === 'atendida') {
@@ -344,34 +451,56 @@ export class AppointmentsService {
       );
     }
 
-    if (currentStatus === 'no_asistida' || currentStatus === 'no asistida') {
+    if (
+      currentStatus === 'no_asistida' ||
+      currentStatus === 'no asistida'
+    ) {
       throw new BadRequestException(
         'No puedes cancelar una cita marcada como no asistida',
       );
     }
 
-    const appointmentDateTime = this.getAppointmentDateTime(
-      appointment.fecha,
-      appointment.hora,
-    );
+    const appointmentDateTime =
+      this.getAppointmentDateTime(
+        appointment.fecha,
+        appointment.hora,
+      );
 
-    if (appointmentDateTime.getTime() <= Date.now()) {
+    if (
+      appointmentDateTime.getTime() <=
+      Date.now()
+    ) {
       throw new BadRequestException(
         'No puedes cancelar una cita cuya fecha y hora ya pasaron',
       );
     }
 
-    const releasedFecha = appointment.fecha;
-    const releasedHora = appointment.hora;
+    const releasedFecha =
+      appointment.fecha;
 
-    const releasedDuration = this.scheduleService.getAppointmentDuration(appointment.specialtyId);
+    const releasedHora =
+      appointment.hora;
+
+    const releasedDuration =
+      this.scheduleService.getAppointmentDuration(
+        appointment.specialtyId,
+      );
 
     appointment.estado = 'cancelada';
 
-    const saved = await this.appointmentRepo.save(appointment);
-    const result = await this.mapperService.attachPatientData(saved);
+    const saved =
+      await this.appointmentRepo.save(
+        appointment,
+      );
 
-    this.appointmentsGateway.emitAppointmentCancelled(result);
+    const result =
+      await this.mapperService.attachPatientData(
+        saved,
+      );
+
+    this.appointmentsGateway.emitAppointmentCancelled(
+      result,
+    );
 
     this.appointmentsGateway.emitQueueUpdated({
       fecha: saved.fecha,
@@ -387,8 +516,134 @@ export class AppointmentsService {
     return result;
   }
 
-  async getAvailable(fecha: string, specialtyId?: number): Promise<string[]> {
-    return this.scheduleService.getAvailableHours(fecha, specialtyId);
+  /**
+   * Marca una cita confirmada como inasistencia.
+   *
+   * Solo un médico asignado a la cita o un administrador
+   * pueden realizar esta acción.
+   */
+  async markNoShow(
+    id: number,
+    user: JwtUser,
+  ): Promise<AppointmentWithPatient> {
+    const appointment =
+      await this.appointmentRepo.findOne({
+        where: { id },
+      });
+
+    if (!appointment) {
+      throw new NotFoundException(
+        'Cita no encontrada',
+      );
+    }
+
+    /*
+     * Cuando la acción la realiza un médico,
+     * verificamos que la cita le pertenezca.
+     */
+    if (user.role === 'doctor') {
+      const realDoctorId =
+        await this.resolveDoctorId(user.sub);
+
+      if (
+        appointment.doctorId !==
+        realDoctorId
+      ) {
+        throw new BadRequestException(
+          'No puedes marcar la inasistencia de una cita asignada a otro médico',
+        );
+      }
+    }
+
+    const currentStatus = (
+      appointment.estado || ''
+    )
+      .trim()
+      .toLowerCase();
+
+    if (
+      currentStatus === 'no asistida' ||
+      currentStatus === 'no_asistida' ||
+      currentStatus === 'no-asistida' ||
+      currentStatus === 'inasistencia' ||
+      currentStatus === 'no asistio' ||
+      currentStatus === 'no asistió'
+    ) {
+      throw new BadRequestException(
+        'La cita ya está marcada como inasistencia',
+      );
+    }
+
+    if (
+      currentStatus === 'atendida' ||
+      currentStatus === 'atendido' ||
+      currentStatus === 'completada' ||
+      currentStatus === 'completado'
+    ) {
+      throw new BadRequestException(
+        'No puedes marcar como inasistencia una cita que ya fue atendida',
+      );
+    }
+
+    if (
+      currentStatus === 'cancelada' ||
+      currentStatus === 'cancelado'
+    ) {
+      throw new BadRequestException(
+        'No puedes marcar como inasistencia una cita cancelada',
+      );
+    }
+
+    if (currentStatus !== 'confirmada') {
+      throw new BadRequestException(
+        'Solo las citas confirmadas pueden marcarse como inasistencia',
+      );
+    }
+
+    const appointmentDateTime =
+      this.getAppointmentDateTime(
+        appointment.fecha,
+        appointment.hora,
+      );
+
+    if (
+      appointmentDateTime.getTime() >
+      Date.now()
+    ) {
+      throw new BadRequestException(
+        'No puedes marcar una inasistencia antes de la fecha y hora de la cita',
+      );
+    }
+
+    appointment.estado = 'no asistida';
+
+    const saved =
+      await this.appointmentRepo.save(
+        appointment,
+      );
+
+    const result =
+      await this.mapperService.attachPatientData(
+        saved,
+      );
+
+    this.appointmentsGateway.emitQueueUpdated({
+      fecha: saved.fecha,
+      message:
+        'Cita marcada como inasistencia',
+    });
+
+    return result;
+  }
+
+  async getAvailable(
+    fecha: string,
+    specialtyId?: number,
+  ): Promise<string[]> {
+    return this.scheduleService.getAvailableHours(
+      fecha,
+      specialtyId,
+    );
   }
 
   async getQueue(
@@ -396,12 +651,37 @@ export class AppointmentsService {
     doctorId?: number,
   ): Promise<AppointmentWithPatient[]> {
     if (doctorId) {
-      const realDoctorId = await this.resolveDoctorId(doctorId);
+      const realDoctorId =
+        await this.resolveDoctorId(
+          doctorId,
+        );
 
-      const appointments = await this.appointmentRepo.find({
+      const appointments =
+        await this.appointmentRepo.find({
+          where: {
+            fecha,
+            doctorId: realDoctorId,
+            estado: 'confirmada',
+          },
+          order: {
+            scorePrioridad: 'DESC',
+            hora: 'ASC',
+          },
+        });
+
+      return Promise.all(
+        appointments.map((appointment) =>
+          this.mapperService.attachPatientData(
+            appointment,
+          ),
+        ),
+      );
+    }
+
+    const appointments =
+      await this.appointmentRepo.find({
         where: {
           fecha,
-          doctorId: realDoctorId,
           estado: 'confirmada',
         },
         order: {
@@ -410,68 +690,69 @@ export class AppointmentsService {
         },
       });
 
-      return Promise.all(
-        appointments.map((appointment) =>
-          this.mapperService.attachPatientData(appointment),
+    return Promise.all(
+      appointments.map((appointment) =>
+        this.mapperService.attachPatientData(
+          appointment,
         ),
+      ),
+    );
+  }
+
+  async getTomorrowReminders(): Promise<
+    AppointmentWithPatient[]
+  > {
+    const fecha = this.getTomorrowDate();
+
+    const appointments =
+      await this.appointmentRepo.find({
+        where: {
+          fecha,
+          estado: 'confirmada',
+        },
+        order: {
+          hora: 'ASC',
+        },
+      });
+
+    return Promise.all(
+      appointments.map((appointment) =>
+        this.mapperService.attachPatientData(
+          appointment,
+        ),
+      ),
+    );
+  }
+
+  async getTomorrowRemindersForN8n(): Promise<
+    ReminderAppointment[]
+  > {
+    const appointments =
+      await this.getTomorrowReminders();
+
+    return this.notificationService.buildReminderPayload(
+      appointments,
+    );
+  }
+
+  async generateMedicalReportPdf(
+    id: number,
+  ): Promise<Buffer> {
+    const appointment =
+      await this.appointmentRepo.findOne({
+        where: { id },
+      });
+
+    if (!appointment) {
+      throw new NotFoundException(
+        'Cita no encontrada',
       );
     }
 
-    const appointments = await this.appointmentRepo.find({
-      where: {
-        fecha,
-        estado: 'confirmada',
-      },
-      order: {
-        scorePrioridad: 'DESC',
-        hora: 'ASC',
-      },
-    });
-
-    return Promise.all(
-      appointments.map((appointment) =>
-        this.mapperService.attachPatientData(appointment),
-      ),
-    );
-  }
-
-  async getTomorrowReminders(): Promise<AppointmentWithPatient[]> {
-    const fecha = this.getTomorrowDate();
-
-    const appointments = await this.appointmentRepo.find({
-      where: {
-        fecha,
-        estado: 'confirmada',
-      },
-      order: {
-        hora: 'ASC',
-      },
-    });
-
-    return Promise.all(
-      appointments.map((appointment) =>
-        this.mapperService.attachPatientData(appointment),
-      ),
-    );
-  }
-
-  async getTomorrowRemindersForN8n(): Promise<ReminderAppointment[]> {
-    const appointments = await this.getTomorrowReminders();
-
-    return this.notificationService.buildReminderPayload(appointments);
-  }
-
-  async generateMedicalReportPdf(id: number): Promise<Buffer> {
-    const appointment = await this.appointmentRepo.findOne({
-      where: { id },
-    });
-
-    if (!appointment) {
-      throw new NotFoundException('Cita no encontrada');
-    }
-
     const medicalReport =
-      await this.medicalReportsService.findByAppointmentId(id);
+      await this.medicalReportsService.findByAppointmentId(
+        id,
+      );
 
     if (!medicalReport) {
       throw new BadRequestException(
@@ -479,36 +760,50 @@ export class AppointmentsService {
       );
     }
 
-    const patient = await this.patientRepo.findOne({
-      where: { userId: appointment.patientId },
-    });
+    const patient =
+      await this.patientRepo.findOne({
+        where: {
+          userId: appointment.patientId,
+        },
+      });
 
     const doctor = appointment.doctorId
       ? await this.doctorRepo.findOne({
-          where: { id: appointment.doctorId },
+          where: {
+            id: appointment.doctorId,
+          },
+          relations: {
+            especialidad: true,
+          },
         })
       : null;
 
-    const pdfData = this.mapperService.buildMedicalReportData(
-      appointment,
-      patient,
-      doctor,
-      medicalReport,
-    );
+    const pdfData =
+      this.mapperService.buildMedicalReportData(
+        appointment,
+        patient,
+        doctor,
+        medicalReport,
+      );
 
-    return await this.appointmentPdfService.generateMedicalReport(pdfData);
+    return await this.appointmentPdfService.generateMedicalReport(
+      pdfData,
+    );
   }
 
-  private async findDoctorBySpecialty(specialtyId: number): Promise<Doctor> {
-    const doctor = await this.doctorRepo.findOne({
-      where: {
-        especialidadId: specialtyId,
-        activo: true,
-      },
-      order: {
-        id: 'ASC',
-      },
-    });
+  private async findDoctorBySpecialty(
+    specialtyId: number,
+  ): Promise<Doctor> {
+    const doctor =
+      await this.doctorRepo.findOne({
+        where: {
+          especialidadId: specialtyId,
+          activo: true,
+        },
+        order: {
+          id: 'ASC',
+        },
+      });
 
     if (!doctor) {
       throw new NotFoundException(
@@ -519,49 +814,76 @@ export class AppointmentsService {
     return doctor;
   }
 
-  private async resolveDoctorId(doctorOrUserId: number): Promise<number> {
-    const doctorByUserId = await this.doctorRepo.findOne({
-      where: {
-        userId: doctorOrUserId,
-        activo: true,
-      },
-    });
+  private async resolveDoctorId(
+    doctorOrUserId: number,
+  ): Promise<number> {
+    const doctorByUserId =
+      await this.doctorRepo.findOne({
+        where: {
+          userId: doctorOrUserId,
+          activo: true,
+        },
+      });
 
     if (doctorByUserId) {
       return doctorByUserId.id;
     }
 
-    const doctorById = await this.doctorRepo.findOne({
-      where: {
-        id: doctorOrUserId,
-        activo: true,
-      },
-    });
+    const doctorById =
+      await this.doctorRepo.findOne({
+        where: {
+          id: doctorOrUserId,
+          activo: true,
+        },
+      });
 
     if (doctorById) {
       return doctorById.id;
     }
 
-    throw new NotFoundException('Doctor no encontrado');
+    throw new NotFoundException(
+      'Doctor no encontrado',
+    );
   }
 
-  private getAppointmentDateTime(fecha: string, hora: string): Date {
-    const normalizedFecha = fecha?.trim();
-    let normalizedHora = hora?.trim();
+  private getAppointmentDateTime(
+    fecha: string,
+    hora: string,
+  ): Date {
+    const normalizedFecha =
+      fecha?.trim();
 
-    if (!normalizedFecha || !normalizedHora) {
-      throw new BadRequestException('La cita no tiene una fecha u hora válida');
+    let normalizedHora =
+      hora?.trim();
+
+    if (
+      !normalizedFecha ||
+      !normalizedHora
+    ) {
+      throw new BadRequestException(
+        'La cita no tiene una fecha u hora válida',
+      );
     }
 
-    if (/^\d{2}:\d{2}$/.test(normalizedHora)) {
-      normalizedHora = `${normalizedHora}:00`;
+    if (
+      /^\d{2}:\d{2}$/.test(
+        normalizedHora,
+      )
+    ) {
+      normalizedHora =
+        `${normalizedHora}:00`;
     }
 
-    const appointmentDateTime = new Date(
-      `${normalizedFecha}T${normalizedHora}-05:00`,
-    );
+    const appointmentDateTime =
+      new Date(
+        `${normalizedFecha}T${normalizedHora}-05:00`,
+      );
 
-    if (Number.isNaN(appointmentDateTime.getTime())) {
+    if (
+      Number.isNaN(
+        appointmentDateTime.getTime(),
+      )
+    ) {
       throw new BadRequestException(
         'La fecha u hora de la cita no tiene un formato válido',
       );
@@ -573,11 +895,20 @@ export class AppointmentsService {
   private getTomorrowDate(): string {
     const tomorrow = new Date();
 
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setDate(
+      tomorrow.getDate() + 1,
+    );
 
-    const year = tomorrow.getFullYear();
-    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
-    const day = String(tomorrow.getDate()).padStart(2, '0');
+    const year =
+      tomorrow.getFullYear();
+
+    const month = String(
+      tomorrow.getMonth() + 1,
+    ).padStart(2, '0');
+
+    const day = String(
+      tomorrow.getDate(),
+    ).padStart(2, '0');
 
     return `${year}-${month}-${day}`;
   }

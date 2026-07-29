@@ -57,11 +57,9 @@ export class AppointmentMapperService {
     const patientRecord = patient as unknown as Record<string, unknown> | null;
     const doctorName = doctor?.nombre ?? 'No asignado';
 
-    const specialtyName = doctor?.especialidadId
-      ? `Especialidad ID ${String(doctor.especialidadId)}`
-      : appointment.specialtyId
-        ? `Especialidad ID ${String(appointment.specialtyId)}`
-        : 'Medicina general';
+    const specialtyName =
+      doctor?.especialidad?.nombre ??
+      'Medicina general';
 
     return {
       cita: {
@@ -74,24 +72,29 @@ export class AppointmentMapperService {
         motivoConsulta: appointment.motivoConsulta ?? 'No registrado',
         explicacionPrioridad: appointment.explicacionPrioridad ?? '',
       },
+
       paciente: {
         nombre: patient
           ? `${patient.primerNombre} ${patient.primerApellido}`
           : 'Paciente no encontrado',
+
         documento: patient?.numeroDocumento ?? 'No registrado',
+
         telefono:
           patientRecord && typeof patientRecord['telefono'] === 'string'
             ? patientRecord['telefono']
             : 'No registrado',
+
         email:
           patientRecord && typeof patientRecord['email'] === 'string'
             ? patientRecord['email']
             : 'No registrado',
+
         eps:
           patientRecord && typeof patientRecord['eps'] === 'string'
             ? patientRecord['eps']
             : 'No registrada',
-        // --- LÓGICA DE EDAD CORREGIDA ---
+
         edad:
           appointment.edad ??
           this.calculateAgeFromBirthDate(
@@ -101,26 +104,108 @@ export class AppointmentMapperService {
               : null,
           ),
       },
+
       doctor: {
         nombre: doctorName,
         especialidad: specialtyName,
       },
+
       historiaClinica: {
+        motivoConsulta:
+          medicalReport?.motivoConsulta ??
+          appointment.motivoConsulta ??
+          'No registrado.',
+
         enfermedadActual:
           medicalReport?.enfermedadActual ??
           'Pendiente de diligenciamiento médico.',
+
         antecedentes:
-          medicalReport?.antecedentes ?? 'Sin antecedentes registrados.',
-        signosVitales: medicalReport?.signosVitales ?? 'No registrados.',
-        examenFisico: medicalReport?.examenFisico ?? 'No registrado.',
-        diagnostico: medicalReport?.diagnostico ?? 'Pendiente.',
-        tratamiento: medicalReport?.tratamiento ?? 'Pendiente.',
-        observaciones: medicalReport?.observaciones ?? 'Sin observaciones.',
+          medicalReport?.antecedentes ??
+          'Sin antecedentes generales registrados.',
+
+        antecedentesPersonales:
+          medicalReport?.antecedentesPersonales ??
+          'Sin antecedentes personales registrados.',
+
+        antecedentesFamiliares:
+          medicalReport?.antecedentesFamiliares ??
+          'Sin antecedentes familiares registrados.',
+
+        antecedentesQuirurgicos:
+          medicalReport?.antecedentesQuirurgicos ??
+          'Sin antecedentes quirúrgicos registrados.',
+
+        antecedentesAlergicos:
+          medicalReport?.antecedentesAlergicos ??
+          'Sin antecedentes alérgicos registrados.',
+
+        antecedentesFarmacologicos:
+          medicalReport?.antecedentesFarmacologicos ??
+          'Sin antecedentes farmacológicos registrados.',
+
+        signosVitales:
+          medicalReport?.signosVitales ??
+          'Sin observaciones adicionales.',
+
+        presionArterial:
+          medicalReport?.presionArterial ?? '',
+
+        frecuenciaCardiaca:
+          medicalReport?.frecuenciaCardiaca ?? '',
+
+        frecuenciaRespiratoria:
+          medicalReport?.frecuenciaRespiratoria ?? '',
+
+        temperatura:
+          medicalReport?.temperatura ?? '',
+
+        saturacionOxigeno:
+          medicalReport?.saturacionOxigeno ?? '',
+
+        peso:
+          medicalReport?.peso ?? '',
+
+        talla:
+          medicalReport?.talla ?? '',
+
+        imc:
+          medicalReport?.imc ?? '',
+
+        examenFisico:
+          medicalReport?.examenFisico ??
+          'No registrado.',
+
+        diagnostico:
+          medicalReport?.diagnostico ??
+          'Pendiente.',
+
+        codigoCie10:
+          medicalReport?.codigoCie10 ?? '',
+
+        tratamiento:
+          medicalReport?.tratamiento ??
+          'Pendiente.',
+
+        recomendaciones:
+          medicalReport?.recomendaciones ??
+          'Sin recomendaciones registradas.',
+
+        remision:
+          medicalReport?.remision ??
+          'No requiere remisión.',
+
+        observaciones:
+          medicalReport?.observaciones ??
+          'Sin observaciones.',
+
+        firmaDoctor:
+          medicalReport?.firmaDoctor ??
+          doctorName,
       },
     };
   }
 
-  // --- MÉTODO AUXILIAR PARA CALCULAR EDAD ---
   private calculateAgeFromBirthDate(
     fechaNacimiento: string | null,
   ): number | string {

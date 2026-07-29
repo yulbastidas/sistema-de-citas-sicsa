@@ -483,3 +483,28 @@ export async function getAppointmentClasses() {
 
   return result;
 }
+export async function markAppointmentNoShow(
+  token: string,
+  appointmentId: number,
+) {
+  const response = await fetch(
+    `${API_URL}/appointments/${appointmentId}/no-show`,
+    {
+      method: "PATCH",
+      headers: authHeaders(token),
+    },
+  );
+
+  const result = await parseResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      buildErrorMessage(
+        result,
+        "No fue posible marcar la inasistencia",
+      ),
+    );
+  }
+
+  return result;
+}

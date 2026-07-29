@@ -27,11 +27,48 @@ export default function DoctorMedicalReportPage() {
     router,
   } = useMedicalReport(appointmentId);
 
-  const completedFields = useMemo(() => {
-    return Object.values(form).filter((value) => value.trim().length > 0).length;
-  }, [form]);
+  const reportFields = useMemo(
+    () => [
+      form.motivoConsulta,
+      form.enfermedadActual,
 
-  const totalFields = Object.keys(form).length;
+      form.antecedentesPersonales,
+      form.antecedentesFamiliares,
+      form.antecedentesQuirurgicos,
+      form.antecedentesAlergicos,
+      form.antecedentesFarmacologicos,
+
+      form.presionArterial,
+      form.frecuenciaCardiaca,
+      form.frecuenciaRespiratoria,
+      form.temperatura,
+      form.saturacionOxigeno,
+      form.peso,
+      form.talla,
+      form.imc,
+
+      form.examenFisico,
+
+      form.diagnostico,
+      form.codigoCie10,
+
+      form.tratamiento,
+      form.recomendaciones,
+      form.remision,
+      form.observaciones,
+
+      form.firmaDoctor,
+    ],
+    [form],
+  );
+
+  const completedFields = useMemo(() => {
+    return reportFields.filter(
+      (value) => value.trim().length > 0,
+    ).length;
+  }, [reportFields]);
+
+  const totalFields = reportFields.length;
 
   if (checkingAuth || loadingData) {
     return (
@@ -67,7 +104,10 @@ export default function DoctorMedicalReportPage() {
         />
 
         <form onSubmit={handleSave} className="mt-6">
-          <MedicalReportForm form={form} onChange={handleChange} />
+          <MedicalReportForm
+            form={form}
+            onChange={handleChange}
+          />
 
           <ReportActions
             saving={saving}

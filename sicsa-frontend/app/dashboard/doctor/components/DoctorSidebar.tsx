@@ -47,14 +47,15 @@ export function DoctorSidebar({
               <h2 className="mt-1 text-xl font-bold text-slate-950">
                 {loadingAppointments
                   ? "Cargando paciente..."
-                  : nextAppointment?.patient?.nombre ||
-                    "No hay una cita pendiente"}
+                  : nextAppointment?.patient
+                    ?.nombre ||
+                  "No hay una cita pendiente para hoy"}
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
                 {nextAppointment
                   ? "Paciente confirmado y listo para iniciar la atención."
-                  : "No se encontraron citas confirmadas para la jornada."}
+                  : "Las citas vencidas pueden revisarse en la agenda y marcarse como inasistencia."}
               </p>
             </section>
           </header>
@@ -62,23 +63,39 @@ export function DoctorSidebar({
           {nextAppointment && (
             <section className="mt-5 flex flex-wrap gap-x-7 gap-y-3">
               <p className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <Clock3 size={16} className="text-cyan-700" />
+                <Clock3
+                  size={16}
+                  className="text-cyan-700"
+                />
+
                 <span className="font-semibold">
-                  {nextAppointment.hora || "Sin hora"}
+                  {nextAppointment.hora ||
+                    "Sin hora"}
                 </span>
               </p>
 
               <p className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <UserRound size={16} className="text-cyan-700" />
+                <UserRound
+                  size={16}
+                  className="text-cyan-700"
+                />
+
                 Documento:
+
                 <span className="font-semibold">
-                  {nextAppointment.patient?.documento || "-"}
+                  {nextAppointment.patient
+                    ?.documento || "-"}
                 </span>
               </p>
 
               <p className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <FileText size={16} className="text-cyan-700" />
-                {nextAppointment.medicalReport?.exists
+                <FileText
+                  size={16}
+                  className="text-cyan-700"
+                />
+
+                {nextAppointment.medicalReport
+                  ?.exists
                   ? "Reporte registrado"
                   : "Reporte pendiente"}
               </p>
@@ -90,10 +107,13 @@ export function DoctorSidebar({
           <section className="grid grid-cols-2 gap-3">
             <article>
               <p className="text-xs font-medium text-slate-500">
-                Citas del día
+                Pendientes
               </p>
+
               <p className="mt-1 text-2xl font-bold text-slate-950">
-                {loadingAppointments ? "..." : totalConfirmed}
+                {loadingAppointments
+                  ? "..."
+                  : totalConfirmed}
               </p>
             </article>
 
@@ -101,8 +121,11 @@ export function DoctorSidebar({
               <p className="text-xs font-medium text-slate-500">
                 Sin reporte
               </p>
+
               <p className="mt-1 text-2xl font-bold text-slate-950">
-                {loadingAppointments ? "..." : pendingReports}
+                {loadingAppointments
+                  ? "..."
+                  : pendingReports}
               </p>
             </article>
           </section>
@@ -111,7 +134,9 @@ export function DoctorSidebar({
             type="button"
             disabled={!nextAppointment}
             onClick={() => {
-              if (!nextAppointment) return;
+              if (!nextAppointment) {
+                return;
+              }
 
               router.push(
                 `/dashboard/doctor/report/${nextAppointment.id}`,

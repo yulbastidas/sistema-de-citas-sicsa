@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+
+import { Specialty } from '../../specialties/entities/specialty.entity';
 
 @Entity()
 export class Doctor {
@@ -13,6 +21,13 @@ export class Doctor {
 
   @Column()
   especialidadId!: number;
+
+  @ManyToOne(() => Specialty, {
+    nullable: false,
+    eager: false,
+  })
+  @JoinColumn({ name: 'especialidadId' })
+  especialidad!: Specialty;
 
   @Column({ nullable: true })
   registroMedico!: string;
