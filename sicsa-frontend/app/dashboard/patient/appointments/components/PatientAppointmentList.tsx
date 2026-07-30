@@ -1,7 +1,15 @@
 "use client";
 
 import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   ClockIcon,
   FileText,
@@ -9,6 +17,7 @@ import {
   MapPin,
   ShieldCheck,
   Stethoscope,
+  XCircle,
 } from "lucide-react";
 
 import type { AppointmentItem } from "../types";
@@ -20,10 +29,17 @@ type PatientAppointmentListProps = {
   onCancel: (id: number) => void;
 };
 
-function getStatusBadgeClass(status: string | undefined): string {
+const APPOINTMENTS_PER_PAGE = 5;
+
+function getStatusBadgeClass(
+  status: string | undefined,
+): string {
   const value = (status || "").toLowerCase();
 
-  if (value === "confirmada" || value === "aprobada") {
+  if (
+    value === "confirmada" ||
+    value === "aprobada"
+  ) {
     return "border border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
@@ -46,7 +62,9 @@ function getStatusBadgeClass(status: string | undefined): string {
   return "border border-slate-200 bg-slate-50 text-slate-700";
 }
 
-function getStatusLabel(status: string | undefined): string {
+function getStatusLabel(
+  status: string | undefined,
+): string {
   const value = (status || "").toLowerCase();
 
   if (value === "lista_espera") {
@@ -57,15 +75,22 @@ function getStatusLabel(status: string | undefined): string {
     return "Pendiente";
   }
 
-  return status.charAt(0).toUpperCase() + status.slice(1);
+  return (
+    status.charAt(0).toUpperCase() +
+    status.slice(1)
+  );
 }
 
-function formatAppointmentDate(dateValue: string): string {
+function formatAppointmentDate(
+  dateValue: string,
+): string {
   if (!dateValue) {
     return "Fecha no registrada";
   }
 
-  const date = new Date(`${dateValue}T00:00:00`);
+  const date = new Date(
+    `${dateValue}T00:00:00`,
+  );
 
   if (Number.isNaN(date.getTime())) {
     return dateValue;
@@ -84,28 +109,114 @@ export function PatientAppointmentList({
   loadingAppointments,
   onCancel,
 }: PatientAppointmentListProps) {
+  const [currentPage, setCurrentPage] =
+    useState(1);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(
+      appointments.length /
+      APPOINTMENTS_PER_PAGE,
+    ),
+  );
+
+  /*
+   * Cuando cambia la cantidad de citas,
+   * regresamos a la primera página.
+   */
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [appointments.length]);
+
+  /*
+   * Evita quedar ubicado en una página
+   * que ya no existe.
+   */
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedAppointments =
+    useMemo(() => {
+      const startIndex =
+        (currentPage - 1) *
+        APPOINTMENTS_PER_PAGE;
+
+      const endIndex =
+        startIndex +
+        APPOINTMENTS_PER_PAGE;
+
+      return appointments.slice(
+        startIndex,
+        endIndex,
+      );
+    }, [appointments, currentPage]);
+
+  const firstVisibleAppointment =
+    appointments.length === 0
+      ? 0
+      : (currentPage - 1) *
+      APPOINTMENTS_PER_PAGE +
+      1;
+
+  const lastVisibleAppointment = Math.min(
+    currentPage * APPOINTMENTS_PER_PAGE,
+    appointments.length,
+  );
+
+  const goToPreviousPage = () => {
+    setCurrentPage((previousPage) =>
+      Math.max(previousPage - 1, 1),
+    );
+  };
+
+  const goToNextPage = () => {
+    setCurrentPage((previousPage) =>
+      Math.min(
+        previousPage + 1,
+        totalPages,
+      ),
+    );
+  };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+
   return (
     <section className="mt-6 overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-xl">
       <header className="border-b border-slate-100 bg-gradient-to-r from-white via-sky-50/50 to-cyan-50/70 px-6 py-6 sm:px-8">
         <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <section className="flex items-start gap-4">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 shadow-md shadow-blue-100">
-              <HeartPulse className="text-white" size={23} />
+              <HeartPulse
+                className="text-white"
+                size={23}
+              />
             </span>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900">Mis citas</h2>
+              <h2 className="text-2xl font-bold text-slate-900">
+                Mis citas
+              </h2>
 
               <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-                Consulta el estado de tus solicitudes, revisa sus detalles y
-                cancela las citas que aún se encuentren activas.
+                Consulta el estado de tus
+                solicitudes, revisa sus detalles
+                y cancela las citas que aún se
+                encuentren activas.
               </p>
             </section>
           </section>
 
           <section className="flex w-fit items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
-              <CalendarDays className="text-blue-600" size={18} />
+              <CalendarDays
+                className="text-blue-600"
+                size={18}
+              />
             </span>
 
             <section>
@@ -126,7 +237,10 @@ export function PatientAppointmentList({
           <article className="flex min-h-[220px] items-center justify-center rounded-[1.75rem] border border-slate-200 bg-slate-50/70">
             <section className="text-center">
               <span className="mx-auto flex h-14 w-14 animate-pulse items-center justify-center rounded-2xl bg-blue-100">
-                <CalendarDays className="text-blue-600" size={25} />
+                <CalendarDays
+                  className="text-blue-600"
+                  size={25}
+                />
               </span>
 
               <p className="mt-4 font-semibold text-slate-800">
@@ -134,7 +248,8 @@ export function PatientAppointmentList({
               </p>
 
               <p className="mt-1 text-sm text-slate-500">
-                Estamos consultando tus solicitudes registradas.
+                Estamos consultando tus
+                solicitudes registradas.
               </p>
             </section>
           </article>
@@ -146,7 +261,10 @@ export function PatientAppointmentList({
 
             <section className="relative mx-auto max-w-xl text-center">
               <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 shadow-lg shadow-blue-100">
-                <CalendarDays className="text-white" size={28} />
+                <CalendarDays
+                  className="text-white"
+                  size={28}
+                />
               </span>
 
               <h3 className="mt-5 text-xl font-bold text-slate-900">
@@ -154,8 +272,10 @@ export function PatientAppointmentList({
               </h3>
 
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
-                Cuando solicites una cita, podrás consultar aquí su fecha,
-                horario, estado, motivo y demás información.
+                Cuando solicites una cita,
+                podrás consultar aquí su fecha,
+                horario, estado, motivo y demás
+                información.
               </p>
 
               <section className="mx-auto mt-6 grid max-w-lg gap-3 sm:grid-cols-3">
@@ -195,177 +315,331 @@ export function PatientAppointmentList({
             </section>
           </article>
         ) : (
-          <section className="grid gap-5">
-            {appointments.map((item) => {
-              const status = (item.estado || "").toLowerCase();
-              const isWaitlist = status === "lista_espera";
+          <>
+            <section className="grid gap-5">
+              {paginatedAppointments.map(
+                (item) => {
+                  const status = (
+                    item.estado || ""
+                  ).toLowerCase();
 
-              return (
-                <article
-                  key={item.id}
-                  className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg"
-                >
-                  <section className="h-1.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-400" />
+                  const isWaitlist =
+                    status ===
+                    "lista_espera";
 
-                  <section className="p-5 sm:p-6">
-                    <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <section className="flex min-w-0 items-start gap-4">
-                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50">
-                          <Stethoscope className="text-blue-600" size={22} />
-                        </span>
+                  return (
+                    <article
+                      key={item.id}
+                      className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg"
+                    >
+                      <section className="h-1.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-400" />
 
-                        <section className="min-w-0">
-                          <section className="flex flex-wrap items-center gap-3">
-                            <h3 className="text-xl font-bold text-slate-900">
-                              Cita #{item.id}
-                            </h3>
-
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusBadgeClass(
-                                item.estado,
-                              )}`}
-                            >
-                              {getStatusLabel(item.estado)}
+                      <section className="p-5 sm:p-6">
+                        <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <section className="flex min-w-0 items-start gap-4">
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50">
+                              <Stethoscope
+                                className="text-blue-600"
+                                size={22}
+                              />
                             </span>
+
+                            <section className="min-w-0">
+                              <section className="flex flex-wrap items-center gap-3">
+                                <h3 className="text-xl font-bold text-slate-900">
+                                  Cita #
+                                  {item.id}
+                                </h3>
+
+                                <span
+                                  className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusBadgeClass(
+                                    item.estado,
+                                  )}`}
+                                >
+                                  {getStatusLabel(
+                                    item.estado,
+                                  )}
+                                </span>
+                              </section>
+
+                              <p className="mt-1 text-sm capitalize text-slate-500">
+                                {formatAppointmentDate(
+                                  item.fecha,
+                                )}
+                              </p>
+                            </section>
                           </section>
 
-                          <p className="mt-1 text-sm capitalize text-slate-500">
-                            {formatAppointmentDate(item.fecha)}
-                          </p>
-                        </section>
-                      </section>
+                          {isAppointmentCancellable(
+                            item,
+                          ) && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onCancel(
+                                    item.id,
+                                  )
+                                }
+                                className="flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100"
+                              >
+                                <XCircle
+                                  size={17}
+                                />
+                                Cancelar cita
+                              </button>
+                            )}
+                        </header>
 
-                      {isAppointmentCancellable(item) && (
-                        <button onClick={() => onCancel(item.id)}>
-                          Cancelar cita
-                        </button>
-                      )}
-                    </header>
+                        <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <section className="flex items-center gap-2">
+                              <CalendarDays
+                                className="text-blue-600"
+                                size={17}
+                              />
 
-                    <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                        <section className="flex items-center gap-2">
-                          <CalendarDays className="text-blue-600" size={17} />
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Fecha
+                              </p>
+                            </section>
 
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Fecha
-                          </p>
-                        </section>
+                            <p className="mt-2 text-sm font-bold capitalize text-slate-900">
+                              {formatAppointmentDate(
+                                item.fecha,
+                              )}
+                            </p>
+                          </article>
 
-                        <p className="mt-2 text-sm font-bold capitalize text-slate-900">
-                          {formatAppointmentDate(item.fecha)}
-                        </p>
-                      </article>
+                          <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <section className="flex items-center gap-2">
+                              <Clock3
+                                className="text-cyan-600"
+                                size={17}
+                              />
 
-                      <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                        <section className="flex items-center gap-2">
-                          <Clock3 className="text-cyan-600" size={17} />
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Hora
+                              </p>
+                            </section>
 
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Hora
-                          </p>
-                        </section>
+                            <p className="mt-2 text-sm font-bold text-slate-900">
+                              {isWaitlist
+                                ? "Por asignar"
+                                : item.hora ||
+                                "-"}
+                            </p>
+                          </article>
 
-                        <p className="mt-2 text-sm font-bold text-slate-900">
-                          {isWaitlist ? "Por asignar" : item.hora || "-"}
-                        </p>
-                      </article>
+                          <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <section className="flex items-center gap-2">
+                              <MapPin
+                                className="text-emerald-600"
+                                size={17}
+                              />
 
-                      <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                        <section className="flex items-center gap-2">
-                          <MapPin className="text-emerald-600" size={17} />
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Ubicación
+                              </p>
+                            </section>
 
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Ubicación
-                          </p>
-                        </section>
-
-                        <p className="mt-2 text-sm font-bold text-slate-900">
-                          {item.municipio || "No registrado"}
-                        </p>
-
-                        <p className="mt-1 text-xs text-slate-500">
-                          {item.departamento || "Departamento no registrado"}
-                        </p>
-                      </article>
-
-                      <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                        <section className="flex items-center gap-2">
-                          <ShieldCheck
-                            className="text-violet-600"
-                            size={17}
-                          />
-
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            EPS
-                          </p>
-                        </section>
-
-                        <p className="mt-2 text-sm font-bold text-slate-900">
-                          {item.eps || "No registrada"}
-                        </p>
-                      </article>
-                    </section>
-
-                    {isWaitlist && (
-                      <section className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 p-4">
-                        <section className="flex items-start gap-3">
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100">
-                            <ClockIcon
-                              className="text-violet-700"
-                              size={18}
-                            />
-                          </span>
-
-                          <section>
-                            <p className="text-sm font-bold text-violet-800">
-                              Estás en lista de espera
+                            <p className="mt-2 text-sm font-bold text-slate-900">
+                              {item.municipio ||
+                                "No registrado"}
                             </p>
 
-                            <p className="mt-1 text-sm leading-6 text-violet-700">
-                              Cuando se libere un horario para esta fecha, el
-                              sistema podrá asignarlo automáticamente según tu
-                              prioridad.
+                            <p className="mt-1 text-xs text-slate-500">
+                              {item.departamento ||
+                                "Departamento no registrado"}
                             </p>
+                          </article>
+
+                          <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <section className="flex items-center gap-2">
+                              <ShieldCheck
+                                className="text-violet-600"
+                                size={17}
+                              />
+
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                EPS
+                              </p>
+                            </section>
+
+                            <p className="mt-2 text-sm font-bold text-slate-900">
+                              {item.eps ||
+                                "No registrada"}
+                            </p>
+                          </article>
+                        </section>
+
+                        {isWaitlist && (
+                          <section className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                            <section className="flex items-start gap-3">
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100">
+                                <ClockIcon
+                                  className="text-violet-700"
+                                  size={18}
+                                />
+                              </span>
+
+                              <section>
+                                <p className="text-sm font-bold text-violet-800">
+                                  Estás en
+                                  lista de
+                                  espera
+                                </p>
+
+                                <p className="mt-1 text-sm leading-6 text-violet-700">
+                                  Cuando se
+                                  libere un
+                                  horario para
+                                  esta fecha,
+                                  el sistema
+                                  podrá
+                                  asignarlo
+                                  automáticamente
+                                  según tu
+                                  prioridad.
+                                </p>
+                              </section>
+                            </section>
                           </section>
+                        )}
+
+                        <section className="mt-5 grid gap-4 lg:grid-cols-2">
+                          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <section className="flex items-center gap-2">
+                              <Stethoscope
+                                className="text-blue-600"
+                                size={17}
+                              />
+
+                              <p className="text-sm font-bold text-slate-900">
+                                Motivo de
+                                consulta
+                              </p>
+                            </section>
+
+                            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">
+                              {item.motivoConsulta ||
+                                "Sin detalle registrado"}
+                            </p>
+                          </article>
+
+                          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <section className="flex items-center gap-2">
+                              <FileText
+                                className="text-cyan-600"
+                                size={17}
+                              />
+
+                              <p className="text-sm font-bold text-slate-900">
+                                Observaciones
+                              </p>
+                            </section>
+
+                            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">
+                              {item.observaciones ||
+                                "Sin observaciones adicionales"}
+                            </p>
+                          </article>
                         </section>
                       </section>
-                    )}
+                    </article>
+                  );
+                },
+              )}
+            </section>
 
-                    <section className="mt-5 grid gap-4 lg:grid-cols-2">
-                      <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <section className="flex items-center gap-2">
-                          <Stethoscope className="text-blue-600" size={17} />
+            {/* Paginación de las citas del paciente */}
+            <footer className="mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <section>
+                <p className="text-sm font-semibold text-slate-700">
+                  Mostrando{" "}
+                  {firstVisibleAppointment} a{" "}
+                  {lastVisibleAppointment} de{" "}
+                  {appointments.length} citas
+                </p>
 
-                          <p className="text-sm font-bold text-slate-900">
-                            Motivo de consulta
-                          </p>
-                        </section>
+                <p className="mt-1 text-xs text-slate-500">
+                  Página {currentPage} de{" "}
+                  {totalPages}
+                </p>
+              </section>
 
-                        <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">
-                          {item.motivoConsulta || "Sin detalle registrado"}
-                        </p>
-                      </article>
+              <nav
+                aria-label="Paginación de mis citas"
+                className="flex flex-wrap items-center gap-2"
+              >
+                <button
+                  type="button"
+                  onClick={
+                    goToPreviousPage
+                  }
+                  disabled={
+                    currentPage === 1
+                  }
+                  className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-300 disabled:hover:bg-white disabled:hover:text-slate-700"
+                >
+                  <ChevronLeft
+                    size={17}
+                  />
 
-                      <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <section className="flex items-center gap-2">
-                          <FileText className="text-cyan-600" size={17} />
+                  <span className="hidden sm:inline">
+                    Anterior
+                  </span>
+                </button>
 
-                          <p className="text-sm font-bold text-slate-900">
-                            Observaciones
-                          </p>
-                        </section>
+                {Array.from(
+                  {
+                    length:
+                      totalPages,
+                  },
+                  (_, index) =>
+                    index + 1,
+                ).map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() =>
+                      goToPage(page)
+                    }
+                    aria-current={
+                      currentPage ===
+                        page
+                        ? "page"
+                        : undefined
+                    }
+                    className={`flex h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-sm font-bold transition ${currentPage ===
+                        page
+                        ? "border-blue-700 bg-blue-700 text-white shadow-sm"
+                        : "border-slate-300 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                      }`}
+                  >
+                    {page}
+                  </button>
+                ))}
 
-                        <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">
-                          {item.observaciones || "Sin observaciones adicionales"}
-                        </p>
-                      </article>
-                    </section>
-                  </section>
-                </article>
-              );
-            })}
-          </section>
+                <button
+                  type="button"
+                  onClick={goToNextPage}
+                  disabled={
+                    currentPage ===
+                    totalPages
+                  }
+                  className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-300 disabled:hover:bg-white disabled:hover:text-slate-700"
+                >
+                  <span className="hidden sm:inline">
+                    Siguiente
+                  </span>
+
+                  <ChevronRight
+                    size={17}
+                  />
+                </button>
+              </nav>
+            </footer>
+          </>
         )}
       </section>
     </section>
