@@ -6,13 +6,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   DataSource,
-  Like,
   Not,
   Repository,
 } from 'typeorm';
 
 import { Patient } from './entities/patient.entity';
 import { User } from '../users/entities/user.entity';
+import { PageRequest, pageResult } from '../common/pagination';
 
 type UpdateMyProfileData = {
   telefono?: string;
@@ -125,110 +125,23 @@ export class PatientsService {
     return this.patientRepository.save(patient);
   }
 
-  findAll(search?: string) {
-    if (!search?.trim()) {
-      return this.patientRepository.find({
-        order: {
-          id: 'DESC',
-        },
-      });
+  async findAll(search: string | undefined, pagination: PageRequest) {
+    const query = this.patientRepository.createQueryBuilder('patient');
+    const value = search?.trim();
+    if (value) {
+      query.andWhere(
+        `(patient.numeroDocumento LIKE :search OR patient.email LIKE :search
+          OR patient.telefono LIKE :search OR patient.primerNombre LIKE :search
+          OR patient.primerApellido LIKE :search OR patient.eps LIKE :search)`,
+        { search: `%${value}%` },
+      );
     }
-
-    const searchValue = search.trim();
-
-    return this.patientRepository.find({
-      where: [
-        {
-          numeroDocumento: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          email: Like(`%${searchValue}%`),
-        },
-        {
-          primerNombre: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          segundoNombre: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          primerApellido: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          segundoApellido: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          telefono: Like(`%${searchValue}%`),
-        },
-        {
-          eps: Like(`%${searchValue}%`),
-        },
-        {
-          genero: Like(`%${searchValue}%`),
-        },
-        {
-          fechaNacimiento: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          departamento: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          municipio: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          direccion: Like(`%${searchValue}%`),
-        },
-        {
-          tipoSangre: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          factorRh: Like(`%${searchValue}%`),
-        },
-        {
-          alergias: Like(`%${searchValue}%`),
-        },
-        {
-          enfermedadesCronicas: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          contactoEmergenciaNombre: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          contactoEmergenciaTelefono: Like(
-            `%${searchValue}%`,
-          ),
-        },
-        {
-          contactoEmergenciaParentesco: Like(
-            `%${searchValue}%`,
-          ),
-        },
-      ],
-      order: {
-        id: 'DESC',
-      },
-    });
+    const [data, total] = await query
+      .orderBy('patient.id', 'DESC')
+      .skip((pagination.page - 1) * pagination.limit)
+      .take(pagination.limit)
+      .getManyAndCount();
+    return pageResult(data, total, pagination);
   }
 
   async findByUserId(

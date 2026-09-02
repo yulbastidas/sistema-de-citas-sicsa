@@ -32,7 +32,7 @@ function StatItem({
   iconClassName,
 }: StatItemProps) {
   return (
-    <article className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <article className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md">
       <figure
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${iconClassName}`}
       >
@@ -45,7 +45,7 @@ function StatItem({
         </p>
 
         <section className="mt-1 flex items-baseline gap-2">
-          <p className="text-2xl font-bold text-slate-950">{value}</p>
+          <p className="text-2xl font-extrabold text-slate-950">{value}</p>
           <p className="truncate text-xs text-slate-500">{description}</p>
         </section>
       </section>

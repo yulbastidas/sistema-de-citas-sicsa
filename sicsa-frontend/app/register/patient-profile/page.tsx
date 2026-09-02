@@ -13,6 +13,8 @@ export default function PatientProfilePage() {
     loadingEps,
     loadingDepartments,
     loadingCities,
+    errors,
+    registrationChannel,
     handleChange,
     handleSubmit,
   } = usePatientRegister();
@@ -28,6 +30,8 @@ export default function PatientProfilePage() {
         loadingEps={loadingEps}
         loadingDepartments={loadingDepartments}
         loadingCities={loadingCities}
+        errors={errors}
+        registrationChannel={registrationChannel}
         onChange={handleChange}
         onSubmit={handleSubmit}
       />

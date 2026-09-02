@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 import { Appointment } from '../entities/appointment.entity';
 import { Patient } from '../../patients/entities/patient.entity';
@@ -15,6 +15,9 @@ export class AppointmentMapperService {
   constructor(
     @InjectRepository(Patient)
     private patientRepo: Repository<Patient>,
+
+    @InjectRepository(MedicalReport)
+    private medicalReportRepo: Repository<MedicalReport>,
 
     private medicalReportsService: MedicalReportsService,
   ) {}
@@ -46,6 +49,42 @@ export class AppointmentMapperService {
         id: report?.id ?? null,
       },
     };
+  }
+
+  async attachPatientDataBatch(
+    appointments: Appointment[],
+  ): Promise<AppointmentWithPatient[]> {
+    if (appointments.length === 0) return [];
+    const patientIds = [...new Set(appointments.map((item) => item.patientId))];
+    const appointmentIds = appointments.map((item) => item.id);
+    const [patients, reports] = await Promise.all([
+      this.patientRepo.find({ where: { userId: In(patientIds) } }),
+      this.medicalReportRepo.find({
+        where: { appointmentId: In(appointmentIds) },
+        select: { id: true, appointmentId: true },
+      }),
+    ]);
+    const patientByUser = new Map(patients.map((item) => [item.userId, item]));
+    const reportByAppointment = new Map(
+      reports.map((item) => [item.appointmentId, item]),
+    );
+    return appointments.map((appointment) => {
+      const patient = patientByUser.get(appointment.patientId);
+      const report = reportByAppointment.get(appointment.id);
+      return {
+        ...appointment,
+        patient: patient
+          ? {
+              documento: patient.numeroDocumento,
+              nombre: `${patient.primerNombre} ${patient.primerApellido}`,
+              telefono: patient.telefono,
+              email: patient.email,
+              eps: patient.eps,
+            }
+          : null,
+        medicalReport: { exists: !!report, id: report?.id ?? null },
+      };
+    });
   }
 
   buildMedicalReportData(

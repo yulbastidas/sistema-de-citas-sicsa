@@ -4,8 +4,8 @@ services:
     container_name: sicsa-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: 1230809075
-      MYSQL_DATABASE: sicsa
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD es obligatoria}
+      MYSQL_DATABASE: ${DB_DATABASE:-sicsa}
     ports:
       - "3307:3306"
     volumes:
@@ -23,27 +23,41 @@ services:
     ports:
       - "3000:3000"
     environment:
-      PORT: 3000
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${BACKEND_PORT:-3000}
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_USERNAME: root
-      DB_PASSWORD: 1230809075
-      DB_DATABASE: sicsa
-      JWT_SECRET: dev_secret_only
-      JWT_EXPIRES_IN: 1h
-      AI_SERVICE_URL: http://ai:8000
-      N8N_EMAIL_WEBHOOK_URL: http://n8n:5678/webhook/verificacion-aprobada
-      N8N_VERIFICATION_CODE_WEBHOOK_URL: http://n8n:5678/webhook/verificacion-codigo-email
-      N8N_APPOINTMENT_CREATED_WEBHOOK_URL: http://n8n:5678/webhook/cita-creada
-      N8N_WAITLIST_ASSIGNED_WEBHOOK_URL: http://n8n:5678/webhook/lista-espera-asignada
-      N8N_REMINDER_WEBHOOK_URL: http://n8n:5678/webhook/recordatorio-cita
-      N8N_PASSWORD_RESET_WEBHOOK_URL: http://n8n:5678/webhook/recuperar-contrasena
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD es obligatoria}
+      DB_DATABASE: ${DB_DATABASE:-sicsa}
+      DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-false}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET es obligatoria}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      AUTH_LOGIN_MAX_ATTEMPTS: ${AUTH_LOGIN_MAX_ATTEMPTS:-5}
+      AUTH_LOGIN_WINDOW_SECONDS: ${AUTH_LOGIN_WINDOW_SECONDS:-900}
+      AUTH_LOGIN_BLOCK_SECONDS: ${AUTH_LOGIN_BLOCK_SECONDS:-900}
+      AUTH_GENERAL_IP_LIMIT: ${AUTH_GENERAL_IP_LIMIT:-20}
+      AUTH_CODE_MAX_ATTEMPTS: ${AUTH_CODE_MAX_ATTEMPTS:-10}
+      AUTH_CODE_RESEND_COOLDOWN_SECONDS: ${AUTH_CODE_RESEND_COOLDOWN_SECONDS:-60}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS es obligatoria}
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai:8000}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-3000}
+      N8N_INTERNAL_TOKEN: ${N8N_INTERNAL_TOKEN:?N8N_INTERNAL_TOKEN es obligatoria}
+      N8N_EMAIL_WEBHOOK_URL: ${N8N_EMAIL_WEBHOOK_URL:?N8N_EMAIL_WEBHOOK_URL es obligatoria}
+      N8N_VERIFICATION_CODE_WEBHOOK_URL: ${N8N_VERIFICATION_CODE_WEBHOOK_URL:?N8N_VERIFICATION_CODE_WEBHOOK_URL es obligatoria}
+      N8N_APPOINTMENT_CREATED_WEBHOOK_URL: ${N8N_APPOINTMENT_CREATED_WEBHOOK_URL:?N8N_APPOINTMENT_CREATED_WEBHOOK_URL es obligatoria}
+      N8N_WAITLIST_ASSIGNED_WEBHOOK_URL: ${N8N_WAITLIST_ASSIGNED_WEBHOOK_URL:?N8N_WAITLIST_ASSIGNED_WEBHOOK_URL es obligatoria}
+      N8N_REMINDER_WEBHOOK_URL: ${N8N_REMINDER_WEBHOOK_URL:?N8N_REMINDER_WEBHOOK_URL es obligatoria}
+      N8N_PASSWORD_RESET_WEBHOOK_URL: ${N8N_PASSWORD_RESET_WEBHOOK_URL:?N8N_PASSWORD_RESET_WEBHOOK_URL es obligatoria}
+      N8N_SMS_WEBHOOK_URL: ${N8N_SMS_WEBHOOK_URL:-http://n8n:5678/webhook/sicsa-sms}
+      SMS_PROVIDER_MODE: ${SMS_PROVIDER_MODE:-fake}
+      SMS_TIMEOUT_MS: ${SMS_TIMEOUT_MS:-5000}
   frontend:
     build:
       context: ./sicsa-frontend
       args:
-        NEXT_PUBLIC_API_URL: http://74.161.42.39:3000
-        NEXT_PUBLIC_SOCKET_URL: http://74.161.42.39:3000
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL es obligatoria}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:?NEXT_PUBLIC_SOCKET_URL es obligatoria}
     container_name: sicsa-frontend
     restart: unless-stopped
     depends_on:
@@ -51,8 +65,8 @@ services:
     ports:
       - "3001:3001"
     environment:
-      NEXT_PUBLIC_API_URL: http://74.161.42.39:3000
-      NEXT_PUBLIC_SOCKET_URL: http://74.161.42.39:3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL es obligatoria}
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:?NEXT_PUBLIC_SOCKET_URL es obligatoria}
 
   ai:
     build:
@@ -71,7 +85,8 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
     environment:
-      - N8N_SECURE_COOKIE=false
+      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE:-false}
+      N8N_INTERNAL_TOKEN: ${N8N_INTERNAL_TOKEN:?N8N_INTERNAL_TOKEN es obligatoria}
 
 volumes:
   mysql_data:

@@ -58,8 +58,8 @@ export function DoctorQueue({
   const router = useRouter();
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
+    <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-white to-slate-50 px-5 py-4">
         <section className="flex items-start gap-3">
           <figure className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
             <ClipboardList size={20} />
@@ -110,7 +110,7 @@ export function DoctorQueue({
             return (
               <article
                 key={item.id}
-                className="relative p-5 transition hover:bg-slate-50 sm:p-6"
+                className="relative p-4 transition hover:bg-violet-50/30 sm:p-5"
               >
                 <span
                   className={`absolute bottom-5 left-0 top-5 w-1 rounded-r-full ${priorityStyles.marker}`}

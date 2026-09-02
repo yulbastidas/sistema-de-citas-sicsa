@@ -4,6 +4,7 @@
 node_modules/
 dist/
 build/
+*.tsbuildinfo
 
 # ======================
 # FRONTEND (Next.js)
@@ -14,10 +15,11 @@ out/
 # ======================
 # ENV VARIABLES (SEGURIDAD)
 # ======================
-.env
-.env.local
-.env.development
-.env.production
+.env*
+!.env.example
+!.env.prod.example
+!**/.env.example
+!**/.env.prod.example
 
 # ======================
 # LOGS
@@ -32,6 +34,34 @@ yarn-error.log*
 # ======================
 .n8n/
 n8n_data/
+
+# ======================
+# PYTHON / ARTEFACTOS GENERADOS
+# ======================
+__pycache__/
+*.py[cod]
+
+# ======================
+# BACKUPS / DUMPS / CERTIFICADOS
+# ======================
+backup/
+backups/
+*.sql
+*.dump
+*.bak
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+
+# ======================
+# TEMPORALES
+# ======================
+*.tmp
+*.temp
+*.swp
+*~
 
 # ======================
 # SISTEMA

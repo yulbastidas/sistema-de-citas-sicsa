@@ -12,6 +12,8 @@ import { EpsModule } from './eps/eps.module';
 import { AppointmentClassModule } from './appointment-class/appointment-class.module';
 import * as dotenv from 'dotenv';
 import { ReportsModule } from './reports/reports.module';
+import { getDatabaseSynchronize } from './config/environment';
+import { AuditModule } from './audit/audit.module';
 
 dotenv.config();
 
@@ -25,7 +27,7 @@ dotenv.config();
       password: process.env.DB_PASSWORD || '',
       database: process.env.DB_DATABASE || 'sicsa',
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: getDatabaseSynchronize(),
     }),
     UsersModule,
     PatientsModule,
@@ -38,6 +40,7 @@ dotenv.config();
     EpsModule,
     AppointmentClassModule,
     ReportsModule,
+    AuditModule,
   ],
 })
 export class AppModule {}

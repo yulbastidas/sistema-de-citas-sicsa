@@ -7,7 +7,6 @@ import {
   Clock3,
   ExternalLink,
   FileText,
-  ShieldCheck,
   Users,
   XCircle,
 } from "lucide-react";
@@ -19,6 +18,7 @@ import {
   rejectVerification,
 } from "@/service/verification";
 import AdminSidebar from "@/app/components/AdminSidebar";
+import { notifySicsa as alert, promptSicsa } from "@/app/components/SicsaFeedback";
 
 type SessionUser = {
   email?: string;
@@ -199,10 +199,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (checkingAuth) return;
+    const token = getToken();
+    if (!token) return;
 
     const socket = io(SOCKET_URL, {
       transports: ["websocket"],
       withCredentials: true,
+      auth: { token: `Bearer ${token}` },
     });
 
     socketRef.current = socket;
@@ -259,7 +262,13 @@ export default function AdminDashboard() {
 
     if (!token) return;
 
-    const motivoRechazo = prompt("Escribe el motivo del rechazo:");
+    const motivoRechazo = await promptSicsa({
+      title: "Rechazar verificación",
+      message: "Indica el motivo que se asociará a esta solicitud.",
+      inputLabel: "Motivo del rechazo",
+      inputPlaceholder: "Escribe un motivo claro",
+      confirmLabel: "Sí, rechazar",
+    });
 
     if (!motivoRechazo) return;
 
@@ -308,23 +317,16 @@ export default function AdminDashboard() {
   }
 
   return (
-    <main className="flex min-h-screen bg-slate-100">
-      <AdminSidebar />
-
-      <section className="flex-1 px-8 py-10">
-        <header className="rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-blue-900 px-8 py-8 text-white shadow-xl">
+    <main className="min-h-screen bg-slate-100">
+      <section className="px-4 pb-5 sm:px-6 lg:px-8">
+        <section className="mx-auto w-full max-w-[1600px]">
+        <header className="relative left-1/2 w-[100dvw] -translate-x-1/2 overflow-hidden bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-900 text-white shadow-lg">
+          <AdminSidebar />
+          <section className="px-6 py-7 sm:px-8">
           <section className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
-            <article className="flex items-start gap-4">
-              <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10">
-                <ShieldCheck size={30} className="text-white" />
-              </span>
-
+            <article>
               <section>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-100">
-                  Panel administrativo
-                </p>
-
-                <h1 className="mt-2 text-4xl font-bold tracking-tight">
+                <h1 className="text-4xl font-bold tracking-tight">
                   Supervisión de verificaciones
                 </h1>
 
@@ -335,7 +337,8 @@ export default function AdminDashboard() {
               </section>
             </article>
 
-            <section className="grid gap-3 sm:grid-cols-3">
+            <section className="flex w-full flex-col gap-4 xl:max-w-2xl xl:items-end">
+              <section className="grid w-full gap-3 sm:grid-cols-3">
               <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
                 <p className="text-sm text-slate-200">Pendientes</p>
 
@@ -359,7 +362,9 @@ export default function AdminDashboard() {
                   {rejectedItems.length}
                 </p>
               </article>
+              </section>
             </section>
+          </section>
           </section>
         </header>
 
@@ -540,6 +545,7 @@ export default function AdminDashboard() {
               })}
             </section>
           )}
+        </section>
         </section>
       </section>
     </main>

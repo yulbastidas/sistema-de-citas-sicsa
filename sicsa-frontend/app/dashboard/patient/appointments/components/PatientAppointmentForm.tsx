@@ -21,14 +21,12 @@ import {
 import type {
   AppointmentClassItem,
   AppointmentForm,
-  EpsItem,
   SpecialtyItem,
 } from "../types";
 
 type PatientAppointmentFormProps = {
   form: AppointmentForm;
   specialties: SpecialtyItem[];
-  epsList: EpsItem[];
   appointmentClasses: AppointmentClassItem[];
   loadingCatalogs: boolean;
   canCreateAppointment: boolean;
@@ -454,7 +452,6 @@ const priorityStyles: Record<
 export function PatientAppointmentForm({
   form,
   specialties,
-  epsList,
   appointmentClasses,
   loadingCatalogs,
   canCreateAppointment,
@@ -609,8 +606,8 @@ export function PatientAppointmentForm({
     }`;
 
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-lg">
-      <header className="mb-6 flex items-center gap-3">
+    <section className="min-w-0 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/60 sm:p-6 lg:p-7">
+      <header className="mb-5 flex items-center gap-3">
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
           <ClipboardList className="text-blue-700" size={22} />
         </span>
@@ -643,7 +640,7 @@ export function PatientAppointmentForm({
         </section>
       )}
 
-      <nav className="mb-8 flex items-center justify-between">
+      <nav className="mb-6 flex items-start justify-between overflow-hidden px-1">
         {STEPS.map((currentStep, index) => {
           const Icon = currentStep.icon;
           const isActive = step === currentStep.id;
@@ -675,7 +672,7 @@ export function PatientAppointmentForm({
                 </span>
 
                 <span
-                  className={`text-xs font-semibold ${isActive || isDone
+                  className={`hidden text-xs font-semibold sm:block ${isActive || isDone
                       ? "text-blue-700"
                       : "text-slate-400"
                     }`}
@@ -707,6 +704,7 @@ export function PatientAppointmentForm({
             Especialidad y tipo de cita
           </h3>
 
+          <section className="grid gap-4 md:grid-cols-2">
           <article>
             <label className={labelClass}>Especialidad</label>
 
@@ -755,8 +753,9 @@ export function PatientAppointmentForm({
               ))}
             </select>
           </article>
+          </section>
 
-          <section className="flex items-start gap-3 rounded-3xl border border-blue-100 bg-blue-50 p-4">
+          <section className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4">
             <Sparkles
               className="mt-0.5 shrink-0 text-blue-700"
               size={18}
@@ -776,44 +775,21 @@ export function PatientAppointmentForm({
             Entidad de salud
           </h3>
 
-          <section className="grid gap-4 md:grid-cols-2">
-            <article>
-              <label className={labelClass}>EPS</label>
+          <article>
+            <label className={labelClass}>EPS registrada</label>
 
-              <select
-                name="epsId"
-                value={form.epsId}
-                onChange={onChange}
-                disabled={!canCreateAppointment || loadingCatalogs}
-                className={inputClass}
-              >
-                <option value="">
-                  {loadingCatalogs
-                    ? "Cargando EPS..."
-                    : "Selecciona EPS"}
-                </option>
-
-                {epsList.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.nombre || `EPS ${item.id}`}
-                  </option>
-                ))}
-              </select>
-            </article>
-
-            <article>
-              <label className={labelClass}>
-                EPS seleccionada
-              </label>
-
-              <input
-                value={form.eps}
-                readOnly
-                placeholder="EPS seleccionada"
-                className={readOnlyClass}
-              />
-            </article>
-          </section>
+            <input
+              value={form.eps}
+              readOnly
+              aria-readonly="true"
+              placeholder={
+                loadingCatalogs
+                  ? "Cargando EPS de tu perfil..."
+                  : "EPS no registrada"
+              }
+              className={readOnlyClass}
+            />
+          </article>
 
           <section className="flex items-start gap-3 rounded-3xl border border-blue-100 bg-blue-50 p-4">
             <ShieldCheck
@@ -822,8 +798,9 @@ export function PatientAppointmentForm({
             />
 
             <p className="text-sm leading-6 text-blue-800">
-              Verifica que la EPS seleccionada corresponda a tu
-              afiliación actual.
+              Esta EPS proviene de tu perfil registrado y se usará en la
+              cita. Si necesitas actualizarla, solicita el cambio de tus
+              datos personales.
             </p>
           </section>
         </section>
@@ -1115,7 +1092,7 @@ export function PatientAppointmentForm({
         </section>
       )}
 
-      <section className="mt-8 flex items-center justify-between gap-3">
+      <section className="mt-6 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
         <button
           type="button"
           onClick={goBack}

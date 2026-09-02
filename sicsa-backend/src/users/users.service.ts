@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Patient } from '../patients/entities/patient.entity';
 import { CreateUserDto } from './dto/create-user.dto';
+import { PageRequest, pageResult } from '../common/pagination';
 
 @Injectable()
 export class UsersService {
@@ -71,9 +72,17 @@ export class UsersService {
       await this.patientRepo.save(patient);
     }
 
+    const safeUser = {
+      id: savedUser.id,
+      email: savedUser.email,
+      role: savedUser.role,
+      emailVerified: savedUser.emailVerified,
+      canViewReports: savedUser.canViewReports,
+    };
+
     return {
       message: 'Usuario creado correctamente',
-      user: savedUser,
+      user: safeUser,
     };
   }
 
@@ -85,7 +94,16 @@ export class UsersService {
     });
   }
 
-  async findAll() {
-    return this.userRepo.find();
+  async findAll(pagination: PageRequest, filters: { role?: string; search?: string }) {
+    const query = this.userRepo.createQueryBuilder('user')
+      .select(['user.id', 'user.email', 'user.role', 'user.emailVerified', 'user.canViewReports']);
+    if (filters.role) query.andWhere('user.role = :role', { role: filters.role });
+    if (filters.search?.trim()) {
+      query.andWhere('user.email LIKE :search', { search: `%${filters.search.trim()}%` });
+    }
+    const [data, total] = await query.orderBy('user.id', 'DESC')
+      .skip((pagination.page - 1) * pagination.limit).take(pagination.limit)
+      .getManyAndCount();
+    return pageResult(data, total, pagination);
   }
 }

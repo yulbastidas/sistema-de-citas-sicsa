@@ -675,10 +675,9 @@ export class ReportsService {
       filters,
     );
 
-    const results = await query
-      .andWhere(
-        this.noShowCondition(),
-      )
+    query.andWhere(this.noShowCondition());
+    const total = await query.clone().getCount();
+    const dataQuery = query
       .select(
         'appointment.id',
         'appointmentId',
@@ -776,8 +775,11 @@ export class ReportsService {
       .addOrderBy(
         'appointment.hora',
         'DESC',
-      )
-      .getRawMany<{
+      );
+    if (filters.exportMode !== 'all') {
+      dataQuery.skip((filters.page - 1) * filters.limit).take(filters.limit);
+    }
+    const results = await dataQuery.getRawMany<{
         appointmentId: string;
         date: string;
         time: string;
@@ -795,7 +797,10 @@ export class ReportsService {
       }>();
 
     return {
-      total: results.length,
+      total,
+      page: filters.page,
+      limit: filters.limit,
+      totalPages: total === 0 ? 0 : Math.ceil(total / filters.limit),
       filters,
 
       data: results.map(
@@ -868,8 +873,8 @@ export class ReportsService {
       filters,
     );
 
-    const results = await query
-      .select(
+    const total = await query.clone().getCount();
+    const dataQuery = query.select(
         'appointment.id',
         'appointmentId',
       )
@@ -994,8 +999,11 @@ export class ReportsService {
       .addOrderBy(
         'appointment.hora',
         'DESC',
-      )
-      .getRawMany<{
+      );
+    if (filters.exportMode !== 'all') {
+      dataQuery.skip((filters.page - 1) * filters.limit).take(filters.limit);
+    }
+    const results = await dataQuery.getRawMany<{
         appointmentId: string;
         date: string;
         time: string;
@@ -1022,7 +1030,10 @@ export class ReportsService {
       }>();
 
     return {
-      total: results.length,
+      total,
+      page: filters.page,
+      limit: filters.limit,
+      totalPages: total === 0 ? 0 : Math.ceil(total / filters.limit),
       filters,
 
       data: results.map(

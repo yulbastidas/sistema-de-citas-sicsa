@@ -1,7 +1,9 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class LoginDto {
-  @IsEmail({}, { message: 'Correo electrónico no válido' })
+  @IsString({ message: 'El identificador debe ser texto' })
+  @IsNotEmpty({ message: 'El identificador es obligatorio' })
+  @MaxLength(150, { message: 'El identificador no es válido' })
   email!: string;
 
   @IsString({ message: 'La contraseña debe ser texto' })

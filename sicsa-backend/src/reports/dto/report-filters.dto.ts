@@ -5,9 +5,27 @@ import {
   IsOptional,
   IsString,
   Min,
+  Max,
+  IsIn,
 } from 'class-validator';
 
 export class ReportFiltersDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit: number = 20;
+
+  @IsOptional()
+  @IsIn(['all'])
+  exportMode?: 'all';
   @IsOptional()
   @IsDateString()
   startDate?: string;

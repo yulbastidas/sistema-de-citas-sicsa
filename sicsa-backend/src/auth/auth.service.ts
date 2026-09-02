@@ -14,6 +14,9 @@ import { EmailVerificationCode } from './entities/email-verification-code.entity
 import { PasswordResetCode } from './entities/password-reset-code.entity';
 import * as bcrypt from 'bcrypt';
 import { randomInt } from 'crypto';
+import { Eps } from '../eps/entities/eps.entity';
+import { normalizeColombianPhone } from '../patients/security/colombian-phone';
+import { MfaService } from './mfa.service';
 
 @Injectable()
 export class AuthService {
@@ -32,6 +35,10 @@ export class AuthService {
 
     @InjectRepository(PasswordResetCode)
     private readonly passwordResetCodeRepo: Repository<PasswordResetCode>,
+
+    @InjectRepository(Eps)
+    private readonly epsRepo: Repository<Eps>,
+    private readonly mfaService: MfaService,
   ) {}
 
   private normalizeRole(role: string | number): string {
@@ -68,12 +75,13 @@ export class AuthService {
     return randomInt(100000, 1000000).toString();
   }
 
-  private async sendCodeToN8n(
-    email: string,
-    code: string,
-  ): Promise<void> {
-    const webhookUrl =
-      process.env.N8N_VERIFICATION_CODE_WEBHOOK_URL;
+  private getN8nTimeoutMs(): number {
+    const configured = Number(process.env.N8N_TIMEOUT_MS || 5000);
+    return Number.isFinite(configured) && configured > 0 ? configured : 5000;
+  }
+
+  private async sendCodeToN8n(email: string, code: string): Promise<void> {
+    const webhookUrl = process.env.N8N_VERIFICATION_CODE_WEBHOOK_URL;
 
     if (!webhookUrl) {
       throw new BadRequestException(
@@ -85,17 +93,18 @@ export class AuthService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Idempotency-Key': `email-verification:${email}:${code}`,
       },
+      signal: AbortSignal.timeout(this.getN8nTimeoutMs()),
       body: JSON.stringify({
         email,
         code,
+        idempotencyKey: `email-verification:${email}:${code}`,
       }),
     });
 
     if (!response.ok) {
-      throw new BadRequestException(
-        'Error enviando correo con n8n',
-      );
+      throw new BadRequestException('Error enviando correo con n8n');
     }
   }
 
@@ -103,8 +112,7 @@ export class AuthService {
     email: string,
     code: string,
   ): Promise<void> {
-    const webhookUrl =
-      process.env.N8N_PASSWORD_RESET_WEBHOOK_URL;
+    const webhookUrl = process.env.N8N_PASSWORD_RESET_WEBHOOK_URL;
 
     if (!webhookUrl) {
       throw new BadRequestException(
@@ -116,12 +124,15 @@ export class AuthService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Idempotency-Key': `password-reset:${email}:${code}`,
       },
+      signal: AbortSignal.timeout(this.getN8nTimeoutMs()),
       body: JSON.stringify({
         email,
         code,
         purpose: 'password-reset',
         expiresInMinutes: 10,
+        idempotencyKey: `password-reset:${email}:${code}`,
       }),
     });
 
@@ -132,9 +143,7 @@ export class AuthService {
     }
   }
 
-  private async createEmailVerificationCode(
-    user: User,
-  ): Promise<string> {
+  private async createEmailVerificationCode(user: User): Promise<string> {
     await this.emailCodeRepo.update(
       {
         email: user.email,
@@ -163,9 +172,7 @@ export class AuthService {
     return code;
   }
 
-  private async createPasswordResetCode(
-    user: User,
-  ): Promise<string> {
+  private async createPasswordResetCode(user: User): Promise<string> {
     await this.passwordResetCodeRepo.update(
       {
         email: user.email,
@@ -212,26 +219,41 @@ export class AuthService {
     });
 
     for (const resetCode of resetCodes) {
-      const codeMatches = await bcrypt.compare(
-        code,
-        resetCode.codeHash,
-      );
+      const codeMatches = await bcrypt.compare(code, resetCode.codeHash);
 
       if (codeMatches) {
         return resetCode;
       }
     }
 
-    throw new BadRequestException(
-      'El código es inválido o ha expirado',
-    );
+    throw new BadRequestException('El código es inválido o ha expirado');
   }
 
   async register(data: RegisterDto) {
     const email = this.normalizeEmail(data.email);
-    const numeroDocumento = this.normalizeText(
-      data.numeroDocumento,
-    );
+    const numeroDocumento = this.normalizeText(data.numeroDocumento);
+
+    const eps = await this.epsRepo.findOne({
+      where: {
+        id: data.epsId,
+        activo: true,
+      },
+    });
+
+    if (!eps) {
+      throw new BadRequestException(
+        'La EPS seleccionada no existe o no está activa',
+      );
+    }
+
+    if (
+      eps.nombre.trim().toLocaleLowerCase('es-CO') !==
+      data.eps.trim().toLocaleLowerCase('es-CO')
+    ) {
+      throw new BadRequestException(
+        'El nombre de la EPS no corresponde a la EPS seleccionada',
+      );
+    }
 
     const existingUser = await this.userRepo.findOne({
       where: {
@@ -240,9 +262,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new BadRequestException(
-        'El correo ya está registrado',
-      );
+      throw new BadRequestException('El correo ya está registrado');
     }
 
     const existingPatient = await this.patientRepo.findOne({
@@ -252,15 +272,10 @@ export class AuthService {
     });
 
     if (existingPatient) {
-      throw new BadRequestException(
-        'El documento ya está registrado',
-      );
+      throw new BadRequestException('El documento ya está registrado');
     }
 
-    const hashedPassword = await bcrypt.hash(
-      data.password,
-      10,
-    );
+    const hashedPassword = await bcrypt.hash(data.password, 10);
 
     const user = this.userRepo.create({
       email,
@@ -281,8 +296,8 @@ export class AuthService {
       segundoApellido: this.normalizeText(data.segundoApellido),
       telefono: this.normalizeText(data.telefono),
       email,
-      eps: this.normalizeText(data.eps),
-      epsId: data.epsId,
+      eps: eps.nombre,
+      epsId: eps.id,
       genero: this.normalizeText(data.genero),
       fechaNacimiento: data.fechaNacimiento,
       departamento: this.normalizeText(data.departamento),
@@ -291,8 +306,7 @@ export class AuthService {
 
     await this.patientRepo.save(patient);
 
-    const code =
-      await this.createEmailVerificationCode(savedUser);
+    const code = await this.createEmailVerificationCode(savedUser);
 
     await this.sendCodeToN8n(savedUser.email, code);
 
@@ -314,19 +328,14 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new BadRequestException(
-        'Usuario no encontrado',
-      );
+      throw new BadRequestException('Usuario no encontrado');
     }
 
     if (user.emailVerified) {
-      throw new BadRequestException(
-        'El correo ya fue verificado',
-      );
+      throw new BadRequestException('El correo ya fue verificado');
     }
 
-    const code =
-      await this.createEmailVerificationCode(user);
+    const code = await this.createEmailVerificationCode(user);
 
     await this.sendCodeToN8n(user.email, code);
 
@@ -336,10 +345,7 @@ export class AuthService {
     };
   }
 
-  async verifyEmailCode(
-    emailRaw: string,
-    codeRaw: string,
-  ) {
+  async verifyEmailCode(emailRaw: string, codeRaw: string) {
     const email = this.normalizeEmail(emailRaw);
     const code = this.normalizeText(codeRaw);
 
@@ -354,33 +360,26 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new BadRequestException(
-        'Usuario no encontrado',
-      );
+      throw new BadRequestException('Usuario no encontrado');
     }
 
-    const verificationCode =
-      await this.emailCodeRepo.findOne({
-        where: {
-          email,
-          code,
-          used: false,
-        },
-        order: {
-          id: 'DESC',
-        },
-      });
+    const verificationCode = await this.emailCodeRepo.findOne({
+      where: {
+        email,
+        code,
+        used: false,
+      },
+      order: {
+        id: 'DESC',
+      },
+    });
 
     if (!verificationCode) {
       throw new BadRequestException('Código inválido');
     }
 
-    if (
-      verificationCode.expiresAt.getTime() < Date.now()
-    ) {
-      throw new BadRequestException(
-        'El código ha expirado',
-      );
+    if (verificationCode.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('El código ha expirado');
     }
 
     verificationCode.used = true;
@@ -414,32 +413,26 @@ export class AuthService {
      * Esto evita que alguien pueda consultar qué usuarios
      * están registrados en el sistema.
      */
-    if (!user) {
+    if (
+      !user ||
+      (this.normalizeRole(user.role) === 'patient' && !user.emailVerified)
+    ) {
       return genericResponse;
     }
 
-    const code =
-      await this.createPasswordResetCode(user);
+    const code = await this.createPasswordResetCode(user);
 
-    await this.sendPasswordResetCodeToN8n(
-      user.email,
-      code,
-    );
+    await this.sendPasswordResetCodeToN8n(user.email, code);
 
     return genericResponse;
   }
 
-  async verifyResetCode(
-    emailRaw: string,
-    codeRaw: string,
-  ) {
+  async verifyResetCode(emailRaw: string, codeRaw: string) {
     const email = this.normalizeEmail(emailRaw);
     const code = this.normalizeText(codeRaw);
 
     if (!/^\d{6}$/.test(code)) {
-      throw new BadRequestException(
-        'El código debe contener seis números',
-      );
+      throw new BadRequestException('El código debe contener seis números');
     }
 
     const user = await this.userRepo.findOne({
@@ -449,15 +442,10 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new BadRequestException(
-        'El código es inválido o ha expirado',
-      );
+      throw new BadRequestException('El código es inválido o ha expirado');
     }
 
-    await this.findValidPasswordResetCode(
-      email,
-      code,
-    );
+    await this.findValidPasswordResetCode(email, code);
 
     return {
       message: 'Código verificado correctamente',
@@ -475,21 +463,15 @@ export class AuthService {
     const code = this.normalizeText(codeRaw);
 
     if (!/^\d{6}$/.test(code)) {
-      throw new BadRequestException(
-        'El código debe contener seis números',
-      );
+      throw new BadRequestException('El código debe contener seis números');
     }
 
     if (!newPassword || typeof newPassword !== 'string') {
-      throw new BadRequestException(
-        'La nueva contraseña es obligatoria',
-      );
+      throw new BadRequestException('La nueva contraseña es obligatoria');
     }
 
     if (newPassword !== confirmPassword) {
-      throw new BadRequestException(
-        'Las contraseñas no coinciden',
-      );
+      throw new BadRequestException('Las contraseñas no coinciden');
     }
 
     if (newPassword.length < 8) {
@@ -505,21 +487,12 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new BadRequestException(
-        'El código es inválido o ha expirado',
-      );
+      throw new BadRequestException('El código es inválido o ha expirado');
     }
 
-    const resetCode =
-      await this.findValidPasswordResetCode(
-        email,
-        code,
-      );
+    const resetCode = await this.findValidPasswordResetCode(email, code);
 
-    const isSamePassword = await bcrypt.compare(
-      newPassword,
-      user.password,
-    );
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
 
     if (isSamePassword) {
       throw new BadRequestException(
@@ -527,10 +500,8 @@ export class AuthService {
       );
     }
 
-    user.password = await bcrypt.hash(
-      newPassword,
-      10,
-    );
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
 
     await this.userRepo.save(user);
 
@@ -558,44 +529,52 @@ export class AuthService {
     };
   }
 
-  async login(emailRaw: string, password: string) {
-    const email = this.normalizeEmail(emailRaw);
-
+  async login(identifierRaw: string, password: string) {
     if (!password || typeof password !== 'string') {
-      throw new UnauthorizedException(
-        'Credenciales inválidas',
-      );
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const user =
-      await this.usersService.findByEmail(email);
+    const identifier = identifierRaw?.trim().toLowerCase();
+    const user = await this.findLoginUser(identifier);
 
     if (!user) {
-      throw new UnauthorizedException(
-        'Credenciales inválidas',
-      );
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const passwordMatch = await bcrypt.compare(
-      password,
-      user.password,
-    );
+    const passwordMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordMatch) {
-      throw new UnauthorizedException(
-        'Credenciales inválidas',
-      );
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const normalizedRole = this.normalizeRole(
-      user.role,
-    );
+    const normalizedRole = this.normalizeRole(user.role);
+    if (normalizedRole === 'doctor' || normalizedRole === 'admin') {
+      return this.mfaService.begin(user);
+    }
+
+    return this.issueAccessToken(user);
+  }
+
+  async completeMfaLogin(challengeToken: string, method: 'totp' | 'recovery', code: string) {
+    const result = await this.mfaService.complete(challengeToken, method, code);
+    const role = this.normalizeRole(result.user.role);
+    if (role !== 'doctor' && role !== 'admin') throw new UnauthorizedException('Código de verificación inválido o expirado');
+    return { ...this.issueAccessToken(result.user), recoveryCodes: result.recoveryCodes };
+  }
+
+  async regenerateRecoveryCodes(userId: number, code: string) {
+    return { recoveryCodes: await this.mfaService.regenerate(userId, code) };
+  }
+
+  private issueAccessToken(user: User) {
+    const normalizedRole = this.normalizeRole(user.role);
     const payload = {
       sub: user.id,
       email: user.email,
       role: normalizedRole,
       emailVerified: user.emailVerified,
       canViewReports: user.canViewReports === true,
+      tokenVersion: user.tokenVersion ?? 0,
     };
 
     return {
@@ -609,5 +588,40 @@ export class AuthService {
         canViewReports: user.canViewReports === true,
       },
     };
+  }
+
+  private async findLoginUser(identifier: string | undefined) {
+    if (!identifier) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    if (identifier.includes('@')) {
+      try {
+        return await this.usersService.findByEmail(identifier);
+      } catch {
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
+    }
+
+    let verifiedPhoneE164: string;
+
+    try {
+      verifiedPhoneE164 = normalizeColombianPhone(identifier);
+    } catch {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    const patient = await this.patientRepo.findOne({
+      where: { verifiedPhoneE164 },
+      select: { userId: true, verifiedPhoneE164: true },
+    });
+
+    if (!patient) {
+      return null;
+    }
+
+    return this.userRepo.findOne({
+      where: { id: patient.userId, role: 'patient' },
+    });
   }
 }

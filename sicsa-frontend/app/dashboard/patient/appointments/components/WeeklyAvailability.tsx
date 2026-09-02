@@ -5,9 +5,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   Info,
-  Sparkles,
 } from "lucide-react";
 
 import { WaitlistCard } from "./WaitlistCard";
@@ -61,8 +59,6 @@ export function WeeklyAvailability({
   canCreateAppointment,
   showWaitlistButton,
   savingWaitlist,
-  activeAppointments,
-  appointments,
   today,
   onSelectDay,
   onSelectHour,
@@ -72,6 +68,7 @@ export function WeeklyAvailability({
 
   const [visibleMonth, setVisibleMonth] = useState(currentDate.getMonth());
   const [visibleYear, setVisibleYear] = useState(currentDate.getFullYear());
+  const [isChoosingDate, setIsChoosingDate] = useState(!form.fecha);
 
   const formatDateToYMD = (date: Date) => {
     const year = date.getFullYear();
@@ -177,16 +174,21 @@ export function WeeklyAvailability({
     }
   };
 
+  const handleSelectDay = (date: string) => {
+    onSelectDay(date);
+    setIsChoosingDate(false);
+  };
+
   return (
-    <section className="overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-xl">
-      <header className="border-b border-slate-100 bg-gradient-to-r from-sky-50 via-white to-cyan-50 px-6 py-6">
+    <section className="min-w-0 overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-xl shadow-slate-200/60">
+      <header className="border-b border-slate-100 bg-gradient-to-r from-sky-50 via-white to-cyan-50 px-5 py-4">
         <section className="flex items-start gap-4">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 shadow-md">
-            <Sparkles className="text-white" size={22} />
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50">
+            <CalendarDays className="text-blue-700" size={21} />
           </span>
 
           <section>
-            <h2 className="text-2xl font-bold text-slate-900">
+            <h2 className="text-xl font-bold text-slate-900">
               Calendario de citas
             </h2>
 
@@ -198,16 +200,20 @@ export function WeeklyAvailability({
         </section>
       </header>
 
-      <section className="p-6">
-        <section className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
-          <article className="rounded-[1.75rem] border border-slate-200 bg-slate-50/70 p-5">
-            <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <section className="p-4">
+        {!form.fecha || isChoosingDate ? (
+          <>
+          <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <header className="mb-4 space-y-4">
               <section className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm">
                   <CalendarDays className="text-blue-600" size={20} />
                 </span>
 
                 <section>
+                  <p className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-600">
+                    Paso 1 de 2
+                  </p>
                   <p className="font-bold text-slate-900">
                     Selecciona una fecha
                   </p>
@@ -217,7 +223,7 @@ export function WeeklyAvailability({
                 </section>
               </section>
 
-              <section className="flex flex-wrap items-center gap-2">
+              <section className="grid grid-cols-[40px_minmax(0,1fr)_88px_40px] items-center gap-2">
                 <button
                   type="button"
                   onClick={previousMonth}
@@ -231,7 +237,7 @@ export function WeeklyAvailability({
                   onChange={(event) =>
                     setVisibleMonth(Number(event.target.value))
                   }
-                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500"
+                  className="h-10 min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500"
                 >
                   {MONTHS.map((month, index) => (
                     <option key={month} value={index}>
@@ -245,7 +251,7 @@ export function WeeklyAvailability({
                   onChange={(event) =>
                     setVisibleYear(Number(event.target.value))
                   }
-                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500"
+                  className="h-10 min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500"
                 >
                   {years.map((year) => (
                     <option key={year} value={year}>
@@ -264,11 +270,11 @@ export function WeeklyAvailability({
               </section>
             </header>
 
-            <section className="grid grid-cols-7 gap-2">
+            <section className="grid grid-cols-7 gap-1.5">
               {WEEK_DAYS.map((day) => (
                 <p
                   key={day}
-                  className="rounded-xl bg-slate-200/80 py-2 text-center text-xs font-bold text-slate-600"
+                  className="py-1.5 text-center text-xs font-bold text-slate-500"
                 >
                   {day}
                 </p>
@@ -276,7 +282,7 @@ export function WeeklyAvailability({
 
               {calendarDays.map((day, index) => {
                 if (!day.dayNumber) {
-                  return <div key={index} className="h-12" />;
+                  return <div key={index} className="h-10" />;
                 }
 
                 const isSelected = form.fecha === day.date;
@@ -286,8 +292,8 @@ export function WeeklyAvailability({
                     key={day.date}
                     type="button"
                     disabled={day.disabled}
-                    onClick={() => onSelectDay(day.date)}
-                    className={`relative h-12 rounded-2xl border text-sm font-bold transition ${
+                    onClick={() => handleSelectDay(day.date)}
+                    className={`relative h-10 rounded-xl border text-xs font-bold transition ${
                       isSelected
                         ? "border-blue-600 bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-100"
                         : day.disabled
@@ -307,79 +313,33 @@ export function WeeklyAvailability({
               })}
             </section>
 
-            <section className="mt-5 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-600">
+            <section className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[11px]">
+              <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Disponible
               </span>
 
-              <span className="rounded-full bg-slate-200 px-3 py-1.5 font-medium text-slate-500">
+              <span className="inline-flex items-center gap-1.5 font-medium text-slate-500">
+                <span className="h-2 w-2 rounded-full bg-slate-300" />
                 No disponible
               </span>
 
-              <span className="rounded-full bg-blue-100 px-3 py-1.5 font-medium text-blue-700">
+              <span className="inline-flex items-center gap-1.5 font-medium text-blue-700">
+                <span className="h-2 w-2 rounded-full bg-blue-600" />
                 Fecha seleccionada
               </span>
             </section>
           </article>
 
-          <aside className="space-y-4">
-            <article className="rounded-[1.75rem] border border-blue-100 bg-gradient-to-br from-blue-50 to-cyan-50 p-5">
-              <section className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm">
-                  <Clock3 className="text-blue-600" size={20} />
-                </span>
-
-                <section>
-                  <p className="text-sm font-semibold text-slate-500">
-                    Fecha elegida
-                  </p>
-                  <p className="mt-1 text-sm font-bold capitalize text-slate-900">
-                    {selectedDateText || "Sin seleccionar"}
-                  </p>
-                </section>
-              </section>
-            </article>
-
-            <section className="grid gap-3 sm:grid-cols-3 2xl:grid-cols-1">
-              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-medium text-slate-500">
-                  Total de citas
-                </p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">
-                  {appointments.length}
-                </p>
-              </article>
-
-              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-medium text-slate-500">
-                  Citas activas
-                </p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">
-                  {activeAppointments.length}
-                </p>
-              </article>
-
-              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-medium text-slate-500">
-                  Horarios disponibles
-                </p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">
-                  {canCreateAppointment ? availableHours.length : 0}
-                </p>
-              </article>
-            </section>
-          </aside>
-        </section>
-
-        <section className="mt-6 rounded-[1.75rem] border border-slate-200 bg-slate-50/70 p-5">
-          {!canCreateAppointment ? (
+          <section className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
+            {!canCreateAppointment ? (
             <section className="flex items-start gap-3">
               <Info className="mt-0.5 text-amber-600" size={18} />
               <p className="text-sm leading-6 text-slate-600">
                 Tu verificación debe estar aprobada para solicitar citas.
               </p>
             </section>
-          ) : !form.fecha ? (
+            ) : (
             <section className="flex items-start gap-3">
               <Info className="mt-0.5 text-blue-600" size={18} />
               <p className="text-sm leading-6 text-slate-600">
@@ -387,9 +347,37 @@ export function WeeklyAvailability({
                 horarios disponibles.
               </p>
             </section>
-          ) : (
+            )}
+          </section>
+          </>
+        ) : (
+          <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            {!canCreateAppointment ? (
+              <section className="flex items-start gap-3">
+                <Info className="mt-0.5 text-amber-600" size={18} />
+                <p className="text-sm leading-6 text-slate-600">
+                  Tu verificación debe estar aprobada para solicitar citas.
+                </p>
+              </section>
+            ) : (
             <>
-              <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <header className="space-y-3">
+                <section className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-600">
+                    Paso 2 de 2
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsChoosingDate(true)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 text-xs font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-50"
+                  >
+                    <ChevronLeft size={15} />
+                    Cambiar fecha
+                  </button>
+                </section>
+
+                <section className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <section>
                   <p className="text-base font-bold capitalize text-slate-900">
                     {selectedDateText}
@@ -405,6 +393,7 @@ export function WeeklyAvailability({
                     Hora seleccionada: {form.hora}
                   </span>
                 )}
+                </section>
               </header>
 
               {loadingHours ? (
@@ -430,30 +419,33 @@ export function WeeklyAvailability({
                   )}
                 </>
               ) : (
-                <section className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
-                  {availableHours.map((hour) => {
-                    const isSelectedHour = form.hora === hour;
+                <section className="mt-4 max-h-64 overflow-y-auto pr-1 [scrollbar-color:#bfdbfe_transparent] [scrollbar-width:thin]">
+                  <section className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
+                    {availableHours.map((hour) => {
+                      const isSelectedHour = form.hora === hour;
 
-                    return (
-                      <button
-                        key={hour}
-                        type="button"
-                        onClick={() => onSelectHour(hour)}
-                        className={`rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
-                          isSelectedHour
-                            ? "border-blue-600 bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md"
-                            : "border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-                        }`}
-                      >
-                        {hour}
-                      </button>
-                    );
-                  })}
+                      return (
+                        <button
+                          key={hour}
+                          type="button"
+                          onClick={() => onSelectHour(hour)}
+                          className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                            isSelectedHour
+                              ? "border-blue-600 bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md"
+                              : "border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                          }`}
+                        >
+                          {hour}
+                        </button>
+                      );
+                    })}
+                  </section>
                 </section>
               )}
             </>
-          )}
-        </section>
+            )}
+          </article>
+        )}
       </section>
     </section>
   );

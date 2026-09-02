@@ -5,6 +5,7 @@ import {
   ParseIntPipe,
   Post,
   Req,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -13,6 +14,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { VerificationsService } from './verifications.service';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { AuditService } from '../audit/audit.service';
+import { parsePageRequest } from '../common/pagination';
 
 interface JwtUser {
   sub: number;
@@ -27,7 +30,10 @@ type RequestWithUser = Request & {
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('verifications')
 export class VerificationsController {
-  constructor(private readonly verificationsService: VerificationsService) {}
+  constructor(
+    private readonly verificationsService: VerificationsService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Post('request')
   requestVerification(
@@ -53,14 +59,34 @@ export class VerificationsController {
 
   @Roles('admin')
   @Get()
-  findAll() {
-    return this.verificationsService.findAll();
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.verificationsService.findAll(
+      parsePageRequest(page, limit),
+      { status, search },
+    );
   }
 
   @Roles('admin')
   @Post('approve')
-  approve(@Body('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
-    return this.verificationsService.approve(id, req.user);
+  async approve(
+    @Body('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ) {
+    const result = await this.verificationsService.approve(id, req.user);
+    await this.audit.record({
+      actorUserId: req.user.sub,
+      actorRole: req.user.role,
+      action: 'verification.approved',
+      resourceType: 'verification',
+      resourceId: id,
+      result: 'success',
+    });
+    return result;
   }
 
   @Roles('admin')
@@ -70,6 +96,18 @@ export class VerificationsController {
     @Body('motivoRechazo') motivoRechazo: string,
     @Req() req: RequestWithUser,
   ) {
-    return this.verificationsService.reject(id, motivoRechazo, req.user);
+    return this.verificationsService
+      .reject(id, motivoRechazo, req.user)
+      .then(async (result) => {
+        await this.audit.record({
+          actorUserId: req.user.sub,
+          actorRole: req.user.role,
+          action: 'verification.rejected',
+          resourceType: 'verification',
+          resourceId: id,
+          result: 'success',
+        });
+        return result;
+      });
   }
 }

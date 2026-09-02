@@ -20,3 +20,11 @@ body {
 .input {
   @apply w-full rounded-2xl border border-slate-400 bg-white px-5 py-4 text-base text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-200;
 }
+
+.input-with-leading-icon {
+  padding-left: 3.5rem !important;
+}
+
+.input-with-trailing-action {
+  padding-right: 3.5rem !important;
+}

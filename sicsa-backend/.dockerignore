@@ -1,5 +1,11 @@
 node_modules
+dist
+build
 .git
-.env
+.env*
 *.log
 coverage
+.nyc_output
+.temp
+.tmp
+*.tsbuildinfo

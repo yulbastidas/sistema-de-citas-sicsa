@@ -112,8 +112,8 @@ export function TodayAppointments({
   const now = getColombiaDateTime();
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
+    <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-white to-slate-50 px-5 py-4">
         <section className="flex items-start gap-3">
           <figure className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700">
             <CalendarDays size={20} />

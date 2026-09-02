@@ -4,6 +4,9 @@ services:
     container_name: n8n
     ports:
       - "5678:5678"
+    environment:
+      N8N_INTERNAL_TOKEN: ${N8N_INTERNAL_TOKEN:?N8N_INTERNAL_TOKEN es obligatoria}
+      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE:-false}
     volumes:
       - ./n8n_data:/home/node/.n8n
     restart: unless-stopped

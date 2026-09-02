@@ -1,12 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  CalendarDays,
-  History,
-} from "lucide-react";
-import Link from "next/link";
-
 import { useDoctorDashboard } from "./hooks/useDoctorDashboard";
 import { DoctorHeader } from "./components/DoctorHeader";
 import { DoctorStats } from "./components/DoctorStats";
@@ -86,34 +80,14 @@ export default function DoctorDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-slate-100">
       <DoctorHeader
         user={user}
         today={today}
         onLogout={handleLogout}
       />
 
-      <section className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
-        <nav className="mb-6 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm"
-          >
-            <CalendarDays size={17} />
-
-            Agenda del día
-          </button>
-
-          <Link
-            href="/dashboard/doctor/history"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800"
-          >
-            <History size={17} />
-
-            Historial clínico
-          </Link>
-        </nav>
-
+      <section className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8">
         <DoctorStats
           loadingAppointments={
             loadingAppointments
@@ -142,7 +116,7 @@ export default function DoctorDashboardPage() {
           }
         />
 
-        <section className="mt-6 grid items-start gap-6 xl:grid-cols-[1.12fr_0.88fr]">
+        <section className="mt-4 grid items-start gap-4 xl:grid-cols-[1.12fr_0.88fr]">
           <DoctorQueue
             loadingQueue={loadingQueue}
             queueItems={queueItems}

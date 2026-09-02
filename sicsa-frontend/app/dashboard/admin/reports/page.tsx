@@ -5,8 +5,8 @@ import {
     type ReactNode,
     useCallback,
     useEffect,
-    useMemo,
     useState,
+    useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -16,8 +16,9 @@ import {
     CalendarCheck2,
     CalendarDays,
     CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
     Clock3,
-    Download,
     FileDown,
     FileSpreadsheet,
     FileText,
@@ -64,6 +65,10 @@ const API_URL =
     process.env.NEXT_PUBLIC_API_URL ||
     "http://74.161.42.39:3000";
 
+const subscribeToClient = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
 type AppointmentRecord = {
     appointmentId: number;
     date: string;
@@ -107,6 +112,8 @@ const EMPTY_FILTERS: ReportFilters = {
     municipality: "",
 };
 
+const REPORT_ROWS_PER_PAGE = 10;
+
 const STATUS_COLORS: Record<string, string> = {
     confirmada: "#2563eb",
     confirmado: "#2563eb",
@@ -116,6 +123,7 @@ const STATUS_COLORS: Record<string, string> = {
     completado: "#16a34a",
     cancelada: "#dc2626",
     cancelado: "#dc2626",
+    lista_espera: "#7c3aed",
     pendiente: "#f59e0b",
     solicitada: "#8b5cf6",
     solicitado: "#8b5cf6",
@@ -383,6 +391,14 @@ function downloadBlob(
 }
 
 export default function ReportsPage() {
+    const isClient = useSyncExternalStore(
+        subscribeToClient,
+        getClientSnapshot,
+        getServerSnapshot,
+    );
+    const currentUser = isClient
+        ? (getUser() as SessionUser | null)
+        : null;
     const router = useRouter();
 
     const [checkingAuth, setCheckingAuth] =
@@ -413,12 +429,9 @@ export default function ReportsPage() {
     const [activeTable, setActiveTable] =
         useState<TableView>("appointments");
 
-    const [error, setError] = useState("");
+    const [tablePage, setTablePage] = useState(1);
 
-    const currentUser = useMemo(
-        () => getUser() as SessionUser | null,
-        [],
-    );
+    const [error, setError] = useState("");
 
     useEffect(() => {
         const token = getToken();
@@ -527,6 +540,7 @@ export default function ReportsPage() {
             return;
         }
 
+        setTablePage(1);
         setAppliedFilters({
             startDate: filters.startDate || undefined,
             endDate: filters.endDate || undefined,
@@ -539,6 +553,7 @@ export default function ReportsPage() {
     }
 
     function clearFilters() {
+        setTablePage(1);
         setFilters(EMPTY_FILTERS);
         setAppliedFilters({});
         setError("");
@@ -549,7 +564,7 @@ export default function ReportsPage() {
     }
 
     async function exportToExcel() {
-        if (!dashboard || appointments.length === 0) {
+        if (!dashboard) {
             setError(
                 "No hay citas disponibles para exportar.",
             );
@@ -560,23 +575,46 @@ export default function ReportsPage() {
             setExporting("excel");
             setError("");
 
+            const exportAppointments = (
+                await getAppointmentsReport({ ...appliedFilters, exportMode: "all" })
+            ).data ?? [];
+            if (exportAppointments.length === 0) throw new Error("No hay citas disponibles para exportar.");
+
             const XLSX = await import("xlsx");
 
             const summary = dashboard.summary;
 
             const summaryRows = [
-                ["SICSA - Reporte de citas"],
+                ["E.S.E. Hospital Clarita Santos"],
+                ["SICSA - Reporte de control de citas"],
+                [],
                 ["Fecha de generación", formatGenerationDate()],
                 [
                     "Generado por",
                     currentUser?.email || "Usuario autorizado",
                 ],
                 [],
-                ["Filtros aplicados"],
-                ...getFilterDescription(appliedFilters).map(
-                    (item) => [item],
-                ),
+                ["FILTROS APLICADOS"],
+                ["Periodo", getAppliedRange(appliedFilters)],
+                [
+                    "Estado",
+                    appliedFilters.status
+                        ? formatStatus(appliedFilters.status)
+                        : "Todos los estados",
+                ],
+                [
+                    "Prioridad",
+                    appliedFilters.priority
+                        ? formatStatus(appliedFilters.priority)
+                        : "Todas las prioridades",
+                ],
+                ["EPS", appliedFilters.eps || "Todas las EPS"],
+                [
+                    "Municipio",
+                    appliedFilters.municipality || "Todos los municipios",
+                ],
                 [],
+                ["RESUMEN DEL REPORTE"],
                 ["Indicador", "Valor"],
                 ["Total de citas", summary.totalAppointments],
                 ["Pacientes", summary.totalPatients],
@@ -595,7 +633,7 @@ export default function ReportsPage() {
                 ],
             ];
 
-            const appointmentRows = appointments.map(
+            const appointmentRows = exportAppointments.map(
                 (item) => ({
                     Fecha: formatDate(item.date),
                     Hora: formatTime(item.time),
@@ -656,17 +694,88 @@ export default function ReportsPage() {
             const summarySheet =
                 XLSX.utils.aoa_to_sheet(summaryRows);
 
-            const appointmentsSheet =
-                XLSX.utils.json_to_sheet(appointmentRows);
+            const createInstitutionalSheet = (
+                title: string,
+                rows: Record<string, unknown>[],
+            ) => {
+                const sheet = XLSX.utils.aoa_to_sheet([
+                    ["E.S.E. Hospital Clarita Santos"],
+                    [`SICSA - ${title}`],
+                    [
+                        "Generado",
+                        formatGenerationDate(),
+                    ],
+                    [],
+                ]);
 
-            const noShowsSheet =
-                XLSX.utils.json_to_sheet(noShowRows);
+                XLSX.utils.sheet_add_json(sheet, rows, {
+                    origin: "A5",
+                });
 
-            const statusSheet =
-                XLSX.utils.json_to_sheet(statusRows);
+                const columnCount = Math.max(
+                    Object.keys(rows[0] || {}).length,
+                    2,
+                );
+                const lastColumn = XLSX.utils.encode_col(
+                    columnCount - 1,
+                );
 
-            const specialtySheet =
-                XLSX.utils.json_to_sheet(specialtyRows);
+                sheet["!merges"] = [
+                    { s: { r: 0, c: 0 }, e: { r: 0, c: columnCount - 1 } },
+                    { s: { r: 1, c: 0 }, e: { r: 1, c: columnCount - 1 } },
+                ];
+                sheet["!rows"] = [
+                    { hpt: 24 },
+                    { hpt: 21 },
+                    { hpt: 18 },
+                    { hpt: 8 },
+                    { hpt: 24 },
+                ];
+
+                if (rows.length > 0) {
+                    sheet["!autofilter"] = {
+                        ref: `A5:${lastColumn}${rows.length + 5}`,
+                    };
+                }
+
+                return sheet;
+            };
+
+            const appointmentsSheet = createInstitutionalSheet(
+                "Todas las citas",
+                appointmentRows,
+            );
+
+            const noShowsSheet = createInstitutionalSheet(
+                "Inasistencias",
+                noShowRows,
+            );
+
+            const statusSheet = createInstitutionalSheet(
+                "Citas por estado",
+                statusRows,
+            );
+
+            const specialtySheet = createInstitutionalSheet(
+                "Citas por especialidad",
+                specialtyRows,
+            );
+
+            summarySheet["!merges"] = [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
+                { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } },
+                { s: { r: 6, c: 0 }, e: { r: 6, c: 1 } },
+                { s: { r: 13, c: 0 }, e: { r: 13, c: 1 } },
+            ];
+            summarySheet["!rows"] = [
+                { hpt: 26 },
+                { hpt: 22 },
+                { hpt: 8 },
+                { hpt: 19 },
+                { hpt: 19 },
+                { hpt: 8 },
+                { hpt: 22 },
+            ];
 
             summarySheet["!cols"] = [
                 { wch: 35 },
@@ -704,6 +813,16 @@ export default function ReportsPage() {
                 { wch: 22 },
                 { wch: 18 },
                 { wch: 16 },
+            ];
+
+            statusSheet["!cols"] = [
+                { wch: 28 },
+                { wch: 14 },
+            ];
+
+            specialtySheet["!cols"] = [
+                { wch: 38 },
+                { wch: 14 },
             ];
 
             XLSX.utils.book_append_sheet(
@@ -754,16 +873,14 @@ export default function ReportsPage() {
     }
 
     function exportToCsv() {
-        if (appointments.length === 0) {
-            setError(
-                "No hay citas disponibles para exportar.",
-            );
-            return;
-        }
-
-        try {
+        void (async () => { try {
             setExporting("csv");
             setError("");
+
+            const exportAppointments = (
+                await getAppointmentsReport({ ...appliedFilters, exportMode: "all" })
+            ).data ?? [];
+            if (exportAppointments.length === 0) throw new Error("No hay citas disponibles para exportar.");
 
             const headers = [
                 "Fecha",
@@ -784,7 +901,7 @@ export default function ReportsPage() {
                 "Observaciones",
             ];
 
-            const rows = appointments.map((item) => [
+            const rows = exportAppointments.map((item) => [
                 formatDate(item.date),
                 formatTime(item.time),
                 formatStatus(item.status),
@@ -831,11 +948,11 @@ export default function ReportsPage() {
             );
         } finally {
             setExporting("");
-        }
+        } })();
     }
 
     async function exportToPdf() {
-        if (!dashboard || appointments.length === 0) {
+        if (!dashboard) {
             setError(
                 "No hay citas disponibles para exportar.",
             );
@@ -845,6 +962,11 @@ export default function ReportsPage() {
         try {
             setExporting("pdf");
             setError("");
+
+            const exportAppointments = (
+                await getAppointmentsReport({ ...appliedFilters, exportMode: "all" })
+            ).data ?? [];
+            if (exportAppointments.length === 0) throw new Error("No hay citas disponibles para exportar.");
 
             const { jsPDF } = await import("jspdf");
             const autoTableModule = await import(
@@ -941,7 +1063,7 @@ export default function ReportsPage() {
                         "Municipio",
                     ],
                 ],
-                body: appointments.map((item) => [
+                body: exportAppointments.map((item) => [
                     formatDate(item.date),
                     formatTime(item.time),
                     item.patientName,
@@ -1051,45 +1173,63 @@ export default function ReportsPage() {
     const hasExportData =
         !loading && appointments.length > 0;
 
+    const activeTableTotal =
+        activeTable === "appointments"
+            ? appointments.length
+            : noShows.length;
+    const tableTotalPages = Math.max(
+        1,
+        Math.ceil(activeTableTotal / REPORT_ROWS_PER_PAGE),
+    );
+    const visibleTablePage = Math.min(tablePage, tableTotalPages);
+    const tableStartIndex =
+        (visibleTablePage - 1) * REPORT_ROWS_PER_PAGE;
+    const visibleAppointments = appointments.slice(
+        tableStartIndex,
+        tableStartIndex + REPORT_ROWS_PER_PAGE,
+    );
+    const visibleNoShows = noShows.slice(
+        tableStartIndex,
+        tableStartIndex + REPORT_ROWS_PER_PAGE,
+    );
+    const firstVisibleReportRow =
+        activeTableTotal === 0 ? 0 : tableStartIndex + 1;
+    const lastVisibleReportRow = Math.min(
+        tableStartIndex + REPORT_ROWS_PER_PAGE,
+        activeTableTotal,
+    );
+
     return (
-        <main className="flex min-h-screen bg-slate-100 print:bg-white">
-            <div className="print-hidden">
-                <AdminSidebar />
-            </div>
-
-            <section className="min-w-0 flex-1 px-5 py-7 lg:px-8 lg:py-10 print:p-0">
-                <header className="overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-blue-900 text-white shadow-xl print:rounded-none print:bg-white print:text-slate-900 print:shadow-none">
-                    <section className="flex flex-col gap-7 px-7 py-8 xl:flex-row xl:items-center xl:justify-between">
-                        <article className="flex items-start gap-4">
-                            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/10 print:hidden">
-                                <BarChart3 size={30} />
-                            </span>
-
+        <main className="min-h-screen bg-slate-100 print:bg-white">
+            <section className="px-4 pb-5 sm:px-6 lg:px-8 print:p-0">
+              <section className="mx-auto w-full max-w-[1600px]">
+                <header className="relative left-1/2 w-[100dvw] -translate-x-1/2 overflow-hidden bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-900 text-white shadow-lg print:left-auto print:w-auto print:translate-x-0 print:bg-white print:text-slate-900 print:shadow-none">
+                    <div className="print-hidden"><AdminSidebar /></div>
+                    <span className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-cyan-400/15 blur-3xl print:hidden" />
+                    <span className="pointer-events-none absolute -bottom-32 left-1/3 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl print:hidden" />
+                    <section className="relative flex flex-col gap-5 px-5 py-6 sm:px-7 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
+                        <article>
                             <section>
-                                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-100 print:text-slate-500">
-                                    Control y seguimiento
-                                </p>
-
-                                <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">
+                                <h1 className="text-3xl font-extrabold tracking-tight md:text-[2.6rem]">
                                     Reportes de citas
                                 </h1>
 
-                                <p className="mt-2 max-w-3xl text-slate-200 print:text-slate-600">
+                                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base print:text-slate-600">
                                     Indicadores, estadísticas y control de
                                     inasistencias del sistema SICSA.
                                 </p>
 
-                                <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                                    <span className="rounded-full bg-white/10 px-3 py-1.5 print:border print:border-slate-300 print:bg-white">
+                                <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                                    <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 backdrop-blur print:border-slate-300 print:bg-white">
                                         {getAppliedRange(appliedFilters)}
                                     </span>
 
-                                    <span className="rounded-full bg-white/10 px-3 py-1.5 print:border print:border-slate-300 print:bg-white">
+                                    <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 backdrop-blur print:border-slate-300 print:bg-white">
                                         {appliedFilters.eps ||
                                             "Todas las EPS"}
                                     </span>
 
-                                    <span className="rounded-full bg-white/10 px-3 py-1.5 print:border print:border-slate-300 print:bg-white">
+                                    <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 backdrop-blur print:border-slate-300 print:bg-white">
                                         {appliedFilters.municipality ||
                                             "Todos los municipios"}
                                     </span>
@@ -1097,36 +1237,37 @@ export default function ReportsPage() {
                             </section>
                         </article>
 
-                        <article className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur print:hidden">
-                            <ShieldCheck size={24} />
+                        <article className="flex max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 backdrop-blur print:hidden xl:max-w-sm">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-200">
+                              <ShieldCheck size={20} />
+                            </span>
 
                             <section>
-                                <p className="text-sm text-blue-100">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
                                     Acceso autorizado
                                 </p>
 
-                                <p className="font-semibold">
-                                    {currentUser?.email ||
-                                        "Módulo exclusivo"}
+                                <p className="mt-0.5 truncate text-sm font-semibold">
+                                    Módulo exclusivo
                                 </p>
                             </section>
                         </article>
                     </section>
 
-                    <section className="print-hidden border-t border-white/10 bg-white/5 px-7 py-5">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <section className="print-hidden relative border-t border-white/10 bg-white/[0.06] px-5 py-4 sm:px-7 lg:px-8">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                             <section>
                                 <p className="text-sm font-semibold">
                                     Exportar reporte filtrado
                                 </p>
 
-                                <p className="mt-1 text-xs text-blue-100">
+                                <p className="mt-0.5 text-xs text-cyan-200">
                                     Se exportarán los mismos datos que estás
                                     visualizando.
                                 </p>
                             </section>
 
-                            <div className="flex flex-wrap gap-2">
+                            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                                 <ExportButton
                                     label="Excel"
                                     icon={<FileSpreadsheet size={17} />}
@@ -1181,16 +1322,16 @@ export default function ReportsPage() {
 
                 <form
                     onSubmit={applyFilters}
-                    className="print-hidden mt-7 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+                    className="print-hidden mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
                 >
-                    <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <header className="flex flex-col gap-3 border-b border-slate-200 bg-gradient-to-r from-white to-slate-50 px-5 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
                         <section className="flex items-start gap-3">
-                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-                                <Filter size={21} />
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                                <Filter size={19} />
                             </span>
 
                             <section>
-                                <h2 className="text-xl font-semibold text-slate-900">
+                                <h2 className="text-lg font-bold text-slate-900">
                                     Filtros del reporte
                                 </h2>
 
@@ -1201,12 +1342,12 @@ export default function ReportsPage() {
                             </section>
                         </section>
 
-                        <span className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600">
+                        <span className="w-fit rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
                             {appointments.length} citas encontradas
                         </span>
                     </header>
 
-                    <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <section className="grid gap-4 px-5 py-5 sm:px-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
                         <FilterField label="Fecha inicial">
                             <input
                                 type="date"
@@ -1252,6 +1393,9 @@ export default function ReportsPage() {
                                 <option value="confirmada">
                                     Confirmadas
                                 </option>
+                                <option value="lista_espera">
+                                    Lista de espera
+                                </option>
                                 <option value="atendida">
                                     Atendidas
                                 </option>
@@ -1260,12 +1404,6 @@ export default function ReportsPage() {
                                 </option>
                                 <option value="no asistida">
                                     No asistidas
-                                </option>
-                                <option value="pendiente">
-                                    Pendientes
-                                </option>
-                                <option value="solicitada">
-                                    Solicitadas
                                 </option>
                             </select>
                         </FilterField>
@@ -1327,11 +1465,11 @@ export default function ReportsPage() {
                         </FilterField>
                     </section>
 
-                    <footer className="mt-6 flex flex-wrap gap-3">
+                    <footer className="flex flex-wrap items-center gap-2.5 border-t border-slate-200 bg-slate-50/70 px-5 py-4 sm:px-6">
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex items-center gap-2 rounded-2xl bg-blue-700 px-5 py-3 font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <Filter size={18} />
                             Aplicar filtros
@@ -1341,7 +1479,7 @@ export default function ReportsPage() {
                             type="button"
                             onClick={clearFilters}
                             disabled={loading}
-                            className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                            className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100 disabled:opacity-60"
                         >
                             <RefreshCcw size={18} />
                             Limpiar
@@ -1351,7 +1489,7 @@ export default function ReportsPage() {
                             type="button"
                             onClick={reloadReports}
                             disabled={loading}
-                            className="flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-3 font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
+                            className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
                         >
                             <RefreshCcw size={18} />
                             Actualizar
@@ -1388,7 +1526,7 @@ export default function ReportsPage() {
                     </section>
                 ) : (
                     <>
-                        <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                        <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                             <MetricCard
                                 title="Total de citas"
                                 value={summary?.totalAppointments ?? 0}
@@ -1430,7 +1568,7 @@ export default function ReportsPage() {
                             />
                         </section>
 
-                        <section className="mt-4 grid gap-4 sm:grid-cols-3">
+                        <section className="mt-3 grid gap-3 sm:grid-cols-3">
                             <CompactMetric
                                 label="Pacientes diferentes"
                                 value={summary?.totalPatients ?? 0}
@@ -1452,7 +1590,7 @@ export default function ReportsPage() {
                             />
                         </section>
 
-                        <section className="mt-8 grid gap-6 xl:grid-cols-2">
+                        <section className="mt-5 grid gap-4 xl:grid-cols-2">
                             <ChartCard
                                 title="Distribución por estado"
                                 description="Cantidad de citas según su estado."
@@ -1545,7 +1683,7 @@ export default function ReportsPage() {
                             </ChartCard>
                         </section>
 
-                        <section className="mt-6">
+                        <section className="mt-4">
                             <ChartCard
                                 title="Comportamiento mensual"
                                 description="Evolución de las citas registradas."
@@ -1588,7 +1726,7 @@ export default function ReportsPage() {
                             </ChartCard>
                         </section>
 
-                        <section className="mt-6">
+                        <section className="mt-4">
                             <ChartCard
                                 title="Inasistencias por especialidad"
                                 description="Servicios con mayor cantidad de pacientes ausentes."
@@ -1646,11 +1784,11 @@ export default function ReportsPage() {
                             </ChartCard>
                         </section>
 
-                        <section className="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                            <header className="border-b border-slate-200 p-6">
+                        <section className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                            <header className="border-b border-slate-200 bg-gradient-to-r from-white to-slate-50 px-5 py-4 sm:px-6">
                                 <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                     <section>
-                                        <h2 className="text-xl font-semibold text-slate-900">
+                                        <h2 className="text-lg font-bold text-slate-900">
                                             Detalle del reporte
                                         </h2>
 
@@ -1660,13 +1798,16 @@ export default function ReportsPage() {
                                         </p>
                                     </section>
 
-                                    <div className="print-hidden flex rounded-2xl bg-slate-100 p-1">
+                                    <div className="print-hidden flex max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-slate-100 p-1">
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                setActiveTable("appointments")
+                                                {
+                                                    setActiveTable("appointments");
+                                                    setTablePage(1);
+                                                }
                                             }
-                                            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTable === "appointments"
+                                            className={`whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-semibold transition ${activeTable === "appointments"
                                                     ? "bg-white text-blue-700 shadow-sm"
                                                     : "text-slate-600"
                                                 }`}
@@ -1677,9 +1818,12 @@ export default function ReportsPage() {
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                setActiveTable("no-shows")
+                                                {
+                                                    setActiveTable("no-shows");
+                                                    setTablePage(1);
+                                                }
                                             }
-                                            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTable === "no-shows"
+                                            className={`whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-semibold transition ${activeTable === "no-shows"
                                                     ? "bg-white text-orange-700 shadow-sm"
                                                     : "text-slate-600"
                                                 }`}
@@ -1690,11 +1834,68 @@ export default function ReportsPage() {
                                 </section>
                             </header>
 
-                            <section className="overflow-x-auto">
+                            <section className="print-hidden overflow-x-auto">
                                 {activeTable === "appointments" ? (
                                     <AppointmentsTable
-                                        appointments={appointments}
+                                        appointments={visibleAppointments}
                                     />
+                                ) : (
+                                    <NoShowsTable noShows={visibleNoShows} />
+                                )}
+                            </section>
+
+                            <section className="print-hidden border-t border-slate-200 bg-slate-50/70 px-4 py-3 sm:px-5">
+                                <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <section>
+                                        <p className="text-sm font-semibold text-slate-700">
+                                            Mostrando {firstVisibleReportRow} a {lastVisibleReportRow} de {activeTableTotal} {activeTable === "appointments" ? "citas" : "inasistencias"}
+                                        </p>
+                                        {tableTotalPages > 1 && (
+                                            <p className="mt-0.5 text-xs text-slate-500">
+                                                Página {visibleTablePage} de {tableTotalPages}
+                                            </p>
+                                        )}
+                                    </section>
+
+                                    {tableTotalPages > 1 && (
+                                        <nav aria-label="Paginación del detalle del reporte" className="flex flex-wrap items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setTablePage((page) => Math.max(page - 1, 1))}
+                                                disabled={visibleTablePage === 1}
+                                                className="flex h-9 items-center gap-1 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                            >
+                                                <ChevronLeft size={16} /> Anterior
+                                            </button>
+
+                                            {Array.from({ length: tableTotalPages }, (_, index) => index + 1).map((page) => (
+                                                <button
+                                                    key={page}
+                                                    type="button"
+                                                    onClick={() => setTablePage(page)}
+                                                    aria-current={visibleTablePage === page ? "page" : undefined}
+                                                    className={`flex h-9 min-w-9 items-center justify-center rounded-xl border px-2.5 text-sm font-bold transition ${visibleTablePage === page ? "border-blue-700 bg-blue-700 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}
+                                                >
+                                                    {page}
+                                                </button>
+                                            ))}
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setTablePage((page) => Math.min(page + 1, tableTotalPages))}
+                                                disabled={visibleTablePage === tableTotalPages}
+                                                className="flex h-9 items-center gap-1 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                            >
+                                                Siguiente <ChevronRight size={16} />
+                                            </button>
+                                        </nav>
+                                    )}
+                                </section>
+                            </section>
+
+                            <section className="hidden overflow-visible print:block">
+                                {activeTable === "appointments" ? (
+                                    <AppointmentsTable appointments={appointments} />
                                 ) : (
                                     <NoShowsTable noShows={noShows} />
                                 )}
@@ -1702,20 +1903,26 @@ export default function ReportsPage() {
                         </section>
                     </>
                 )}
+              </section>
             </section>
 
             <style jsx global>{`
         .input-report {
           width: 100%;
-          border-radius: 1rem;
+          min-height: 2.75rem;
+          border-radius: 0.75rem;
           border: 1px solid rgb(203 213 225);
-          padding: 0.75rem 1rem;
+          background: rgb(248 250 252);
+          padding: 0.625rem 0.875rem;
+          color: rgb(15 23 42);
+          font-size: 0.875rem;
           outline: none;
           transition: 0.2s;
         }
 
         .input-report:focus {
           border-color: rgb(37 99 235);
+          background: white;
           box-shadow: 0 0 0 3px rgb(219 234 254);
         }
 
@@ -1764,7 +1971,7 @@ function ExportButton({
             type="button"
             onClick={onClick}
             disabled={disabled}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+            className={`flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-px hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${className}`}
         >
             {loading ? (
                 <LoaderCircle
@@ -1792,12 +1999,12 @@ function FilterField({
     children,
 }: FilterFieldProps) {
     return (
-        <label className="space-y-2">
-            <span className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+        <label className="space-y-1.5">
+            <span className="flex min-h-5 items-center justify-between gap-2 text-xs font-bold uppercase tracking-wide text-slate-600">
                 {label}
 
                 {helper && (
-                    <small className="font-normal text-slate-400">
+                    <small className="normal-case tracking-normal font-normal text-slate-400">
                         {helper}
                     </small>
                 )}
@@ -1824,23 +2031,28 @@ function MetricCard({
     iconClass,
 }: MetricCardProps) {
     return (
-        <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-            <span
-                className={`flex h-11 w-11 items-center justify-center rounded-2xl ${iconClass}`}
-            >
-                {icon}
-            </span>
+        <article className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+            <span className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-blue-600 to-cyan-400 opacity-0 transition group-hover:opacity-100" />
+            <section className="flex items-start justify-between gap-3">
+              <section>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    {title}
+                </p>
 
-            <p className="mt-4 text-sm font-medium text-slate-500">
-                {title}
-            </p>
+                <p className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">
+                    {value}
+                </p>
+              </section>
 
-            <p className="mt-1 text-3xl font-bold text-slate-900">
-                {value}
-            </p>
+              <span
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
+              >
+                  {icon}
+              </span>
+            </section>
 
-            <p className="mt-2 text-xs text-slate-500">
-                {description}
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              {description}
             </p>
         </article>
     );
@@ -1856,9 +2068,9 @@ function CompactMetric({
     icon: ReactNode;
 }) {
     return (
-        <article className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <article className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:border-blue-200">
             <section className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
                     {icon}
                 </span>
 
@@ -1867,7 +2079,7 @@ function CompactMetric({
                 </p>
             </section>
 
-            <p className="text-2xl font-bold text-slate-900">
+            <p className="text-2xl font-extrabold text-slate-900">
                 {value}
             </p>
         </article>
@@ -1884,9 +2096,9 @@ function ChartCard({
     children: ReactNode;
 }) {
     return (
-        <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <header>
-                <h2 className="text-xl font-semibold text-slate-900">
+        <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <header className="border-b border-slate-100 bg-gradient-to-r from-white to-slate-50 px-5 py-4 sm:px-6">
+                <h2 className="text-lg font-bold text-slate-900">
                     {title}
                 </h2>
 
@@ -1895,7 +2107,7 @@ function ChartCard({
                 </p>
             </header>
 
-            <section className="mt-5">{children}</section>
+            <section className="px-3 py-4 sm:px-5">{children}</section>
         </article>
     );
 }
@@ -1934,7 +2146,7 @@ function AppointmentsTable({
 }) {
     return (
         <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-100/80">
                 <tr>
                     <TableHeader>Fecha</TableHeader>
                     <TableHeader>Paciente</TableHeader>
@@ -1952,7 +2164,7 @@ function AppointmentsTable({
                     appointments.map((item) => (
                         <tr
                             key={item.appointmentId}
-                            className="transition hover:bg-slate-50"
+                            className="transition-colors hover:bg-blue-50/40"
                         >
                             <TableCell>
                                 <p className="font-semibold text-slate-900">
@@ -2019,7 +2231,7 @@ function NoShowsTable({
 }) {
     return (
         <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-100/80">
                 <tr>
                     <TableHeader>Fecha</TableHeader>
                     <TableHeader>Paciente</TableHeader>
@@ -2136,7 +2348,7 @@ function TableHeader({
     children: ReactNode;
 }) {
     return (
-        <th className="whitespace-nowrap px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+        <th className="whitespace-nowrap px-5 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-600">
             {children}
         </th>
     );
@@ -2148,7 +2360,7 @@ function TableCell({
     children: ReactNode;
 }) {
     return (
-        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-600">
+        <td className="whitespace-nowrap px-5 py-3.5 text-sm text-slate-600">
             {children}
         </td>
     );

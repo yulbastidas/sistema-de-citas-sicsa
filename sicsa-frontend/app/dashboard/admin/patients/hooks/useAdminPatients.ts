@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { getToken, getUser } from "@/service/session";
+import { notifySicsa as alert } from "@/app/components/SicsaFeedback";
 import {
   getPatients,
   updatePatientByAdmin,
@@ -79,7 +80,7 @@ export function useAdminPatients() {
 
         const patientList = Array.isArray(result)
           ? result
-          : [];
+          : result?.data || [];
 
         setPatients(patientList);
       } catch (error) {

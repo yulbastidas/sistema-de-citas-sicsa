@@ -1,7 +1,6 @@
 "use client";
 
 import {
-    Building2,
     CheckCircle2,
     FileText,
     HeartPulse,
@@ -59,7 +58,7 @@ export function PatientEditPanel({
 }: PatientEditPanelProps) {
     return (
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <header className="border-b border-slate-200 bg-gradient-to-r from-white to-blue-50 px-5 py-5 sm:px-6">
+            <header className="border-b border-slate-200 bg-gradient-to-r from-white to-blue-50 px-5 py-4 sm:px-6">
                 <section className="flex items-center gap-3">
                     <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-200">
                         <FileText size={21} />
@@ -79,7 +78,7 @@ export function PatientEditPanel({
             </header>
 
             {!selectedPatient ? (
-                <article className="flex min-h-[680px] flex-col items-center justify-center p-8 text-center">
+                <article className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
                     <span className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 text-blue-500">
                         <UserRound size={36} />
                     </span>
@@ -95,7 +94,7 @@ export function PatientEditPanel({
                     </p>
                 </article>
             ) : (
-                <section className="p-5 sm:p-6">
+                <section className="p-4 sm:p-5 lg:p-6">
                     <article className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-white p-4">
                         <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <section className="flex min-w-0 items-center gap-3">
@@ -122,7 +121,7 @@ export function PatientEditPanel({
                         </section>
                     </article>
 
-                    <section className="mt-6">
+                    <section className="mt-5">
                         <PatientFormSection
                             title="Información personal"
                             description="Documento, nombres y apellidos registrados."
@@ -133,7 +132,7 @@ export function PatientEditPanel({
                         />
                     </section>
 
-                    <div className="my-6 h-px bg-slate-200" />
+                    <div className="my-5 h-px bg-slate-200" />
 
                     <PatientFormSection
                         title="Información de contacto"
@@ -144,7 +143,7 @@ export function PatientEditPanel({
                         onChange={onChange}
                     />
 
-                    <div className="my-6 h-px bg-slate-200" />
+                    <div className="my-5 h-px bg-slate-200" />
 
                     <PatientFormSection
                         title="Información de salud"
@@ -171,7 +170,7 @@ export function PatientEditPanel({
                         </section>
                     </article>
 
-                    <div className="my-6 h-px bg-slate-200" />
+                    <div className="my-5 h-px bg-slate-200" />
 
                     <PatientFormSection
                         title="Información de ubicación"
@@ -182,7 +181,7 @@ export function PatientEditPanel({
                         onChange={onChange}
                     />
 
-                    <div className="my-6 h-px bg-slate-200" />
+                    <div className="my-5 h-px bg-slate-200" />
 
                     <PatientFormSection
                         title="Contacto de emergencia"

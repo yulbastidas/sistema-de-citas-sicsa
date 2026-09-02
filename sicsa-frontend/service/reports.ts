@@ -14,6 +14,9 @@ export type ReportFilters = {
   priority?: string;
   eps?: string;
   municipality?: string;
+  page?: number;
+  limit?: number;
+  exportMode?: "all";
 };
 
 export type ReportSummary = {
@@ -143,6 +146,9 @@ function buildQueryParams(filters: ReportFilters): string {
       filters.municipality,
     );
   }
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.limit) params.set("limit", String(filters.limit));
+  if (filters.exportMode) params.set("exportMode", filters.exportMode);
 
   const queryString = params.toString();
 

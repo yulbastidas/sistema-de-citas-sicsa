@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install
+RUN npm ci
 
 COPY . .
 
@@ -17,13 +17,15 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install --omit=dev
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copia la aplicación compilada
-COPY --from=builder /app/dist ./dist
+COPY --from=builder --chown=node:node /app/dist ./dist
 
 # Copia el logo y demás recursos
-COPY --from=builder /app/assets ./assets
+COPY --from=builder --chown=node:node /app/assets ./assets
+
+USER node
 
 EXPOSE 3000
 

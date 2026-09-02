@@ -1,10 +1,9 @@
-import {
-  Column,
-  Entity,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
+@Index('UQ_patient_verified_phone_e164', ['verifiedPhoneE164'], {
+  unique: true,
+})
 export class Patient {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -32,6 +31,20 @@ export class Patient {
 
   @Column()
   telefono!: string;
+
+  @Column({
+    type: 'varchar',
+    length: 13,
+    nullable: true,
+    select: false,
+  })
+  verifiedPhoneE164!: string | null;
+
+  @Column({ type: 'datetime', nullable: true, select: false })
+  phoneVerifiedAt!: Date | null;
+
+  @Column({ type: 'datetime', nullable: true, select: false })
+  phoneChangedAt!: Date | null;
 
   @Column()
   email!: string;

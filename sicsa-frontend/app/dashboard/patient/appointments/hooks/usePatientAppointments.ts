@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 
 import { getToken, getUser } from "@/service/session";
+import { getMyPatient } from "@/service/patient";
 import { getMyVerification } from "@/service/verification";
 import { getSpecialties } from "@/service/specialty";
 import {
   createAppointment,
   getAppointmentClasses,
   getAvailableAppointments,
-  getEpsCatalog,
   getMyAppointments,
   cancelAppointment,
 } from "@/service/appointment";
@@ -20,7 +20,6 @@ import type {
   AppointmentClassItem,
   AppointmentForm,
   AppointmentItem,
-  EpsItem,
   SessionUser,
   SpecialtyItem,
   VerificationResponse,
@@ -28,6 +27,7 @@ import type {
 } from "../types";
 
 import { isAppointmentUpcoming } from "@/utils/appointment-date";
+import { confirmSicsa, notifySicsa as alert } from "@/app/components/SicsaFeedback";
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL || "http://74.161.42.39:3000";
@@ -89,8 +89,6 @@ export function usePatientAppointments() {
 
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [specialties, setSpecialties] = useState<SpecialtyItem[]>([]);
-  const [epsList, setEpsList] = useState<EpsItem[]>([]);
-
   const [appointmentClasses, setAppointmentClasses] = useState<
     AppointmentClassItem[]
   >([]);
@@ -246,7 +244,7 @@ export function usePatientAppointments() {
     setLoadingAppointments(true);
 
     try {
-      const result = await getMyAppointments(token);
+      const result = await getMyAppointments(token, 1, 100);
       const items = Array.isArray(result)
         ? result
         : result?.data || [];
@@ -271,6 +269,35 @@ export function usePatientAppointments() {
     }
   }, []);
 
+  const loadPatientProfile = useCallback(async () => {
+    const token = getToken();
+
+    if (!token) return;
+
+    try {
+      const result = await getMyPatient(token);
+      const patient = result?.data || result;
+
+      if (!mountedRef.current || !patient) return;
+
+      setForm((previous) => ({
+        ...previous,
+        eps: typeof patient.eps === "string" ? patient.eps : "",
+        epsId: patient.epsId ? String(patient.epsId) : "",
+        departamento: patient.departamento || previous.departamento,
+        municipio: patient.municipio || previous.municipio,
+      }));
+    } catch (error: unknown) {
+      if (!mountedRef.current) return;
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "No se pudo cargar la EPS de tu perfil",
+      );
+    }
+  }, []);
+
   const loadCatalogs = useCallback(async () => {
     const token = getToken();
 
@@ -279,24 +306,16 @@ export function usePatientAppointments() {
     try {
       setLoadingCatalogs(true);
 
-      const [specialtiesResult, epsResult, classesResult] =
-        await Promise.all([
-          getSpecialties(token),
-          getEpsCatalog(),
-          getAppointmentClasses(),
-        ]);
+      const [specialtiesResult, classesResult] = await Promise.all([
+        getSpecialties(token),
+        getAppointmentClasses(),
+      ]);
 
       if (mountedRef.current) {
         setSpecialties(
           Array.isArray(specialtiesResult)
             ? specialtiesResult
             : specialtiesResult?.data || [],
-        );
-
-        setEpsList(
-          Array.isArray(epsResult)
-            ? epsResult
-            : epsResult?.data || [],
         );
 
         setAppointmentClasses(
@@ -308,7 +327,6 @@ export function usePatientAppointments() {
     } catch (error: unknown) {
       if (mountedRef.current) {
         setSpecialties([]);
-        setEpsList([]);
         setAppointmentClasses([]);
       }
 
@@ -402,6 +420,8 @@ export function usePatientAppointments() {
         loadCatalogs(),
       ]);
 
+      await loadPatientProfile();
+
       if (mountedRef.current) {
         setCheckingAuth(false);
       }
@@ -415,10 +435,13 @@ export function usePatientAppointments() {
   // ── Socket ──
   useEffect(() => {
     if (checkingAuth) return;
+    const token = getToken();
+    if (!token) return;
 
     const socket = io(SOCKET_URL, {
       transports: ["websocket"],
       withCredentials: true,
+      auth: { token: `Bearer ${token}` },
     });
 
     socketRef.current = socket;
@@ -552,34 +575,6 @@ export function usePatientAppointments() {
     loadAvailableHours,
   ]);
 
-  // ── Auto-completar epsId desde nombre ──
-  useEffect(() => {
-    if (
-      !form.eps ||
-      form.epsId ||
-      epsList.length === 0
-    ) {
-      return;
-    }
-
-    const normalizedFormEps = form.eps
-      .trim()
-      .toLowerCase();
-
-    const selectedEps = epsList.find(
-      (item) =>
-        item.nombre?.trim().toLowerCase() ===
-        normalizedFormEps,
-    );
-
-    if (!selectedEps) return;
-
-    setForm((prev) => ({
-      ...prev,
-      epsId: String(selectedEps.id),
-    }));
-  }, [form.eps, form.epsId, epsList]);
-
   // ── Handlers ──
   const handleChange = (
     e: React.ChangeEvent<
@@ -589,20 +584,6 @@ export function usePatientAppointments() {
     >,
   ) => {
     const { name, value } = e.target;
-
-    if (name === "epsId") {
-      const selectedEps = epsList.find(
-        (item) => String(item.id) === value,
-      );
-
-      setForm((prev) => ({
-        ...prev,
-        epsId: value,
-        eps: selectedEps?.nombre || prev.eps,
-      }));
-
-      return;
-    }
 
     setForm((prev) => ({
       ...prev,
@@ -787,9 +768,11 @@ export function usePatientAppointments() {
 
     if (!token) return;
 
-    const confirmed = window.confirm(
-      "¿Deseas cancelar esta cita?",
-    );
+    const confirmed = await confirmSicsa({
+      title: "Cancelar cita",
+      message: "¿Estás seguro de que deseas cancelar esta cita?",
+      confirmLabel: "Sí, cancelar",
+    });
 
     if (!confirmed) return;
 
@@ -856,7 +839,6 @@ export function usePatientAppointments() {
     verificationStatus,
     appointments,
     specialties,
-    epsList,
     appointmentClasses,
     availableHours,
     loadingAppointments,

@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowLeft, Stethoscope } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarCheck2,
+  CalendarClock,
+  Clock3,
+  Stethoscope,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { usePatientAppointments } from "./hooks/usePatientAppointments";
 import { PatientAppointmentForm } from "./components/PatientAppointmentForm";
@@ -14,7 +20,6 @@ export default function PatientAppointmentsPage() {
     checkingAuth,
     appointments,
     specialties,
-    epsList,
     appointmentClasses,
     availableHours,
     loadingAppointments,
@@ -44,18 +49,19 @@ export default function PatientAppointmentsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-sky-50 via-cyan-50 to-emerald-50 px-6 py-8">
-      <header className="rounded-[2rem] bg-gradient-to-r from-slate-800 via-slate-700 to-slate-600 px-8 py-8 text-white shadow-xl">
-        <section className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+    <main className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-cyan-50">
+      <header className="bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-900 text-white shadow-lg">
+        <section className="mx-auto flex max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
           <article className="flex items-start gap-4">
-            <figure className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/20 backdrop-blur">
-              <Stethoscope className="text-white" size={30} />
+            <figure className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-cyan-100 shadow-inner">
+              <Stethoscope size={28} />
             </figure>
 
             <section>
               <button
+                type="button"
                 onClick={() => router.push("/dashboard/patient")}
-                className="mb-3 flex items-center gap-2 text-sm font-semibold text-cyan-50 transition hover:text-white"
+                className="mb-3 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/15"
               >
                 <ArrowLeft size={16} />
                 Volver al panel
@@ -64,7 +70,7 @@ export default function PatientAppointmentsPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100">
                 Agenda del paciente
               </p>
-              <h1 className="mt-2 text-4xl font-bold tracking-tight">
+              <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
                 Gestión de citas
               </h1>
               <p className="mt-2 max-w-3xl text-cyan-50">
@@ -74,22 +80,22 @@ export default function PatientAppointmentsPage() {
             </section>
           </article>
 
-          <section className="grid gap-3 sm:grid-cols-3">
-            <article className="rounded-3xl border border-white/15 bg-white/15 px-5 py-4 backdrop-blur">
-              <p className="text-sm text-cyan-100">Mis citas</p>
-              <p className="mt-1 text-2xl font-bold">{appointments.length}</p>
+          <section className="grid gap-3 sm:grid-cols-3 xl:min-w-[530px]">
+            <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur-sm">
+              <p className="flex items-center gap-2 text-sm text-cyan-100"><CalendarCheck2 size={16} /> Mis citas</p>
+              <p className="mt-2 text-2xl font-bold">{appointments.length}</p>
             </article>
 
-            <article className="rounded-3xl border border-white/15 bg-white/15 px-5 py-4 backdrop-blur">
-              <p className="text-sm text-cyan-100">Citas activas</p>
-              <p className="mt-1 text-2xl font-bold">
+            <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur-sm">
+              <p className="flex items-center gap-2 text-sm text-cyan-100"><CalendarClock size={16} /> Citas activas</p>
+              <p className="mt-2 text-2xl font-bold">
                 {activeAppointments.length}
               </p>
             </article>
 
-            <article className="rounded-3xl border border-white/15 bg-white/15 px-5 py-4 backdrop-blur">
-              <p className="text-sm text-cyan-100">Horarios visibles</p>
-              <p className="mt-1 text-2xl font-bold">
+            <article className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur-sm">
+              <p className="flex items-center gap-2 text-sm text-cyan-100"><Clock3 size={16} /> Horarios visibles</p>
+              <p className="mt-2 text-2xl font-bold">
                 {canCreateAppointment ? availableHours.length : 0}
               </p>
             </article>
@@ -97,11 +103,11 @@ export default function PatientAppointmentsPage() {
         </section>
       </header>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[470px_1fr]">
+      <section className="mx-auto max-w-[1600px] px-4 pb-8 pt-6 sm:px-6 lg:px-8">
+      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,2.15fr)_minmax(340px,1fr)]">
         <PatientAppointmentForm
           form={form}
           specialties={specialties}
-          epsList={epsList}
           appointmentClasses={appointmentClasses}
           loadingCatalogs={loadingCatalogs}
           canCreateAppointment={canCreateAppointment}
@@ -131,6 +137,7 @@ export default function PatientAppointmentsPage() {
         loadingAppointments={loadingAppointments}
         onCancel={handleCancelAppointment}
       />
+      </section>
     </main>
   );
 }

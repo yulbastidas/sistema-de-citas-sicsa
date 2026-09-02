@@ -12,6 +12,11 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY . .
 
+RUN addgroup --system sicsa && adduser --system --ingroup sicsa sicsa \
+    && chown -R sicsa:sicsa /app
+
+USER sicsa
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

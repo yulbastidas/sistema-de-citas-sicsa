@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { io, Socket } from "socket.io-client";
+import { confirmSicsa, notifySicsa as alert } from "@/app/components/SicsaFeedback";
 
 import {
   downloadAppointmentPdf,
@@ -139,6 +140,7 @@ export function useDoctorDashboard() {
           await getDoctorAppointments(
             token,
             savedUser.sub,
+            { status: "confirmada", limit: 100 },
           );
 
         const items = Array.isArray(result)
@@ -308,10 +310,13 @@ export function useDoctorDashboard() {
     if (checkingAuth) {
       return;
     }
+    const token = getToken();
+    if (!token) return;
 
     const socket = io(SOCKET_URL, {
       transports: ["websocket"],
       withCredentials: true,
+      auth: { token: `Bearer ${token}` },
     });
 
     socketRef.current = socket;
@@ -380,9 +385,11 @@ export function useDoctorDashboard() {
       appointment.patient?.nombre ||
       "este paciente";
 
-    const confirmed = window.confirm(
-      `¿Confirmas que ${patientName} no asistió a la cita?\n\nEsta acción cambiará el estado de la cita a "No asistida".`,
-    );
+    const confirmed = await confirmSicsa({
+      title: "Registrar inasistencia",
+      message: `¿Confirmas que ${patientName} no asistió? El estado de la cita cambiará a “No asistida”.`,
+      confirmLabel: "Sí, registrar",
+    });
 
     if (!confirmed) {
       return;

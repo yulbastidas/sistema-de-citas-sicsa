@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -15,6 +16,8 @@ import {
   WalletCards,
   XCircle,
 } from "lucide-react";
+
+import { isAppointmentCancellable } from "@/utils/appointment-date";
 
 import type { AppointmentItem } from "../types";
 
@@ -61,14 +64,42 @@ function getStatusBadgeClass(
   }
 
   if (value === "cancelada") {
-    return "border border-red-200 bg-red-50 text-red-700";
+    return "border border-rose-200 bg-rose-50 text-rose-700";
   }
 
   if (value === "atendida") {
-    return "border border-blue-200 bg-blue-50 text-blue-700";
+    return "border border-sky-200 bg-sky-50 text-sky-700";
+  }
+
+  if (value === "lista_espera") {
+    return "border border-violet-200 bg-violet-50 text-violet-700";
+  }
+
+  if (value === "no asistida" || value === "no_asistida") {
+    return "border border-slate-300 bg-slate-100 text-slate-700";
   }
 
   return "border border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function getStatusLabel(
+  status: string | undefined,
+): string {
+  const value = (status || "").toLowerCase();
+
+  if (value === "lista_espera") {
+    return "Lista de espera";
+  }
+
+  if (value === "no_asistida") {
+    return "No asistida";
+  }
+
+  if (!status) {
+    return "Pendiente";
+  }
+
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 export function AdminAppointmentList({
@@ -77,7 +108,10 @@ export function AdminAppointmentList({
   onApprove,
   onCancel,
 }: AdminAppointmentListProps) {
-  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    appointments: filteredAppointments,
+    page: 1,
+  });
 
   const totalPages = Math.max(
     1,
@@ -87,23 +121,10 @@ export function AdminAppointmentList({
     ),
   );
 
-  /*
-   * Cada vez que cambien los resultados filtrados,
-   * regresamos a la primera página.
-   */
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filteredAppointments]);
-
-  /*
-   * Evita quedar en una página inexistente si se
-   * elimina, cancela o modifica una cita.
-   */
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  const currentPage =
+    pagination.appointments === filteredAppointments
+      ? Math.min(pagination.page, totalPages)
+      : 1;
 
   const paginatedAppointments = useMemo(() => {
     const startIndex =
@@ -131,19 +152,24 @@ export function AdminAppointmentList({
   );
 
   const goToPreviousPage = () => {
-    setCurrentPage((previousPage) =>
-      Math.max(previousPage - 1, 1),
-    );
+    setPagination({
+      appointments: filteredAppointments,
+      page: Math.max(currentPage - 1, 1),
+    });
   };
 
   const goToNextPage = () => {
-    setCurrentPage((previousPage) =>
-      Math.min(previousPage + 1, totalPages),
-    );
+    setPagination({
+      appointments: filteredAppointments,
+      page: Math.min(currentPage + 1, totalPages),
+    });
   };
 
   const goToPage = (page: number) => {
-    setCurrentPage(page);
+    setPagination({
+      appointments: filteredAppointments,
+      page,
+    });
   };
 
   if (loading) {
@@ -183,19 +209,24 @@ export function AdminAppointmentList({
 
   return (
     <section>
-      <section className="space-y-4">
+      <section className="space-y-3">
         {paginatedAppointments.map((item) => {
           const status = (
             item.estado || ""
           ).toLowerCase();
+          const canCancel = isAppointmentCancellable({
+            fecha: item.fecha || "",
+            hora: item.hora || "",
+            estado: item.estado,
+          });
 
           return (
-            <article
+            <details
               key={item.id}
-              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-blue-200 hover:shadow-md"
+              className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:border-blue-200 hover:shadow-md open:border-blue-200 open:shadow-md"
             >
-              <header className="border-b border-slate-200 bg-slate-50 px-5 py-4">
-                <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <summary className="flex cursor-pointer list-none items-center gap-3 bg-slate-50/80 px-4 py-3.5 outline-none transition-colors duration-200 hover:bg-blue-50/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:px-5 [&::-webkit-details-marker]:hidden">
+                <section className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <section className="flex min-w-0 items-center gap-3">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
                       <UserRound size={22} />
@@ -203,7 +234,7 @@ export function AdminAppointmentList({
 
                     <section className="min-w-0">
                       <section className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-lg font-bold text-slate-900 sm:text-xl">
+                        <h3 className="truncate text-base font-bold text-slate-900 sm:text-lg">
                           {item.patient?.nombre ||
                             "Paciente"}
                         </h3>
@@ -213,7 +244,7 @@ export function AdminAppointmentList({
                             item.estado,
                           )}`}
                         >
-                          {item.estado || "-"}
+                          {getStatusLabel(item.estado)}
                         </span>
 
                         <span
@@ -232,13 +263,32 @@ export function AdminAppointmentList({
                     </section>
                   </section>
 
-                  <section className="flex flex-wrap gap-2">
+                  <section className="grid gap-2 text-sm sm:grid-cols-2 lg:min-w-[280px]">
+                    <span className="flex items-center gap-2 font-semibold text-slate-700">
+                      <CalendarDays size={16} className="shrink-0 text-blue-600" />
+                      {item.fecha || "-"}
+                    </span>
+                    <span className="flex items-center gap-2 font-semibold text-slate-700">
+                      <Clock3 size={16} className="shrink-0 text-cyan-600" />
+                      {item.hora || "-"}
+                    </span>
+                  </section>
+                </section>
+
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all duration-200 group-hover:border-blue-300 group-hover:bg-blue-50 group-hover:text-blue-700 group-open:rotate-180 group-open:border-blue-300 group-open:bg-blue-50 group-open:text-blue-700">
+                  <ChevronDown size={19} strokeWidth={2.4} />
+                </span>
+              </summary>
+
+              <section className="h-px bg-gradient-to-r from-blue-500 via-cyan-400 to-transparent" />
+
+              <section className="p-4 sm:p-5">
+                {(status === "pendiente" || canCancel) && (
+                  <section className="mb-4 flex flex-wrap justify-end gap-2">
                     {status === "pendiente" && (
                       <button
                         type="button"
-                        onClick={() =>
-                          onApprove(item.id)
-                        }
+                        onClick={() => onApprove(item.id)}
                         className="flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
                       >
                         <CheckCircle2 size={17} />
@@ -246,12 +296,10 @@ export function AdminAppointmentList({
                       </button>
                     )}
 
-                    {status !== "cancelada" && (
+                    {canCancel && (
                       <button
                         type="button"
-                        onClick={() =>
-                          onCancel(item.id)
-                        }
+                        onClick={() => onCancel(item.id)}
                         className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100"
                       >
                         <XCircle size={17} />
@@ -259,10 +307,8 @@ export function AdminAppointmentList({
                       </button>
                     )}
                   </section>
-                </section>
-              </header>
+                )}
 
-              <section className="p-5">
                 <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <article className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <CalendarDays
@@ -443,7 +489,7 @@ export function AdminAppointmentList({
                   </article>
                 </section>
               </section>
-            </article>
+            </details>
           );
         })}
       </section>

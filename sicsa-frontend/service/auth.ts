@@ -1,7 +1,7 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-export type LoginResponse = {
+export type AuthenticatedLoginResponse = {
   message: string;
   access_token: string;
   user: {
@@ -23,6 +23,24 @@ type RegisterResponse = {
   emailVerified: boolean;
 };
 
+export type MfaChallengeResponse = {
+  requiresTwoFactor: true;
+  enrollmentRequired: boolean;
+  challengeToken: string;
+  expiresInSeconds: number;
+  qrCodeDataUrl?: string;
+  manualKey?: string;
+};
+
+export type LoginResponse = AuthenticatedLoginResponse | MfaChallengeResponse;
+
+export type PhoneRegistrationResponse = {
+  registrationId: number;
+  challengeId: string;
+  maskedPhone: string;
+  expiresAt: string;
+};
+
 type VerifyEmailResponse = {
   message: string;
   emailVerified: boolean;
@@ -38,6 +56,23 @@ type ResetPasswordResponse = {
   passwordUpdated: boolean;
 };
 
+export type PhonePasswordRecoveryResponse = {
+  message: string;
+  challengeId: string;
+  maskedPhone: string;
+};
+
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly retryAfterSeconds?: number,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
 async function parseApiResponse<T>(
   response: Response,
 ): Promise<T> {
@@ -48,9 +83,12 @@ async function parseApiResponse<T>(
       ? data.message.join(", ")
       : data?.message;
 
-    throw new Error(
+    const retryAfter = Number(response.headers.get("Retry-After"));
+    throw new ApiRequestError(
       backendMessage ||
         "Ocurrió un error al procesar la solicitud",
+      response.status,
+      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
     );
   }
 
@@ -62,7 +100,7 @@ async function parseApiResponse<T>(
 ========================================================= */
 
 export async function loginUser(
-  email: string,
+  identifier: string,
   password: string,
 ): Promise<LoginResponse> {
   const response = await fetch(`${API_URL}/auth/login`, {
@@ -71,7 +109,7 @@ export async function loginUser(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      email: email.trim().toLowerCase(),
+      email: identifier.trim().toLowerCase(),
       password,
     }),
   });
@@ -95,6 +133,54 @@ export async function registerPatient(
   });
 
   return parseApiResponse<RegisterResponse>(response);
+}
+
+export async function completeMfaLogin(
+  challengeToken: string,
+  method: "totp" | "recovery",
+  code: string,
+): Promise<AuthenticatedLoginResponse & { recoveryCodes?: string[] }> {
+  const response = await fetch(`${API_URL}/auth/mfa/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ challengeToken, method, code }),
+  });
+  return parseApiResponse(response);
+}
+
+export async function registerPatientByPhone(
+  patientData: unknown,
+): Promise<PhoneRegistrationResponse> {
+  const response = await fetch(`${API_URL}/auth/register/phone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patientData),
+  });
+  return parseApiResponse<PhoneRegistrationResponse>(response);
+}
+
+export async function verifyPhoneRegistration(
+  registrationId: number,
+  challengeId: string,
+  code: string,
+): Promise<{ message: string; phoneVerified: boolean }> {
+  const response = await fetch(`${API_URL}/auth/register/phone/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ registrationId, challengeId, code }),
+  });
+  return parseApiResponse(response);
+}
+
+export async function resendPhoneRegistration(
+  registrationId: number,
+): Promise<PhoneRegistrationResponse> {
+  const response = await fetch(`${API_URL}/auth/register/phone/resend`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ registrationId }),
+  });
+  return parseApiResponse<PhoneRegistrationResponse>(response);
 }
 
 /* =========================================================
@@ -212,4 +298,47 @@ export async function resetPassword(
   return parseApiResponse<ResetPasswordResponse>(
     response,
   );
+}
+
+export async function forgotPasswordByPhone(
+  phone: string,
+): Promise<PhonePasswordRecoveryResponse> {
+  const response = await fetch(`${API_URL}/auth/forgot-password/phone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone: phone.trim() }),
+  });
+  return parseApiResponse<PhonePasswordRecoveryResponse>(response);
+}
+
+export async function verifyPhoneResetCode(
+  phone: string,
+  challengeId: string,
+  code: string,
+): Promise<{ message: string; valid: boolean; resetToken: string }> {
+  const response = await fetch(`${API_URL}/auth/verify-reset-code/phone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone: phone.trim(), challengeId, code }),
+  });
+  return parseApiResponse(response);
+}
+
+export async function resetPasswordByPhone(
+  phone: string,
+  resetToken: string,
+  newPassword: string,
+  confirmPassword: string,
+): Promise<ResetPasswordResponse> {
+  const response = await fetch(`${API_URL}/auth/reset-password/phone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      phone: phone.trim(),
+      resetToken,
+      newPassword,
+      confirmPassword,
+    }),
+  });
+  return parseApiResponse<ResetPasswordResponse>(response);
 }

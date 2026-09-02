@@ -15,6 +15,7 @@ export type CityItem = {
 };
 
 export type PatientRegisterFormData = {
+  email: string;
   tipoDocumento: string;
   numeroDocumento: string;
   primerNombre: string;
@@ -31,3 +32,18 @@ export type PatientRegisterFormData = {
   municipio: string;
   municipioId: string;
 };
+
+export type PatientRegisterErrors = Partial<
+  Record<
+    | "tipoDocumento"
+    | "email"
+    | "numeroDocumento"
+    | "primerNombre"
+    | "segundoNombre"
+    | "primerApellido"
+    | "segundoApellido"
+    | "telefono"
+    | "fechaNacimiento",
+    string
+  >
+>;

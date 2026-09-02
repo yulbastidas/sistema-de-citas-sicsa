@@ -2,7 +2,6 @@
 
 import {
   CalendarCheck2,
-  ClipboardList,
   Clock3,
   ShieldAlert,
 } from "lucide-react";
@@ -62,29 +61,20 @@ export default function AdminAppointmentsPage() {
   }
 
   return (
-    <main className="flex min-h-screen bg-slate-100">
-      <AdminSidebar />
-
-      <section className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-slate-100">
+      <section className="px-4 pb-5 sm:px-6 lg:px-8">
         <section className="mx-auto w-full max-w-[1600px]">
           {/* Encabezado principal */}
-          <header className="overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-blue-900 text-white shadow-xl">
+          <header className="relative left-1/2 w-[100dvw] -translate-x-1/2 overflow-hidden bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-900 text-white shadow-lg">
+            <AdminSidebar />
             <section className="relative px-6 py-7 sm:px-8 lg:px-10">
-              <span className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
-              <span className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+              <span className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+              <span className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-teal-400/10 blur-3xl" />
 
               <section className="relative flex flex-col gap-7 2xl:flex-row 2xl:items-center 2xl:justify-between">
-                <article className="flex max-w-4xl items-start gap-4 sm:gap-5">
-                  <figure className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 shadow-lg backdrop-blur sm:h-16 sm:w-16">
-                    <ClipboardList className="text-white" size={30} />
-                  </figure>
-
+                <article className="max-w-4xl">
                   <section>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-200 sm:text-sm">
-                      Panel administrativo
-                    </p>
-
-                    <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+                    <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
                       Gestión integral de citas
                     </h1>
 
@@ -151,7 +141,7 @@ export default function AdminAppointmentsPage() {
           </header>
 
           {/* Formulario y cola priorizada */}
-          <section className="mt-5 grid items-start gap-5 xl:grid-cols-[520px_minmax(0,1fr)] 2xl:grid-cols-[560px_minmax(0,1fr)]">
+          <section className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.9fr)]">
             <AdminAppointmentFormPanel
               form={form}
               specialties={specialties}
@@ -209,7 +199,7 @@ export default function AdminAppointmentsPage() {
               </section>
             </header>
 
-            <section className="p-5 sm:p-6 lg:p-8">
+            <section className="p-4 sm:p-5 lg:p-6">
               <AdminAppointmentList
                 filteredAppointments={filteredAppointments}
                 loading={loading}

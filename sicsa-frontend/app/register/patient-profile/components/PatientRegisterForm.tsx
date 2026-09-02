@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -14,8 +15,24 @@ import type {
   CityItem,
   DepartmentItem,
   EpsItem,
+  PatientRegisterErrors,
   PatientRegisterFormData,
 } from "../types";
+
+const MONTHS = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
 
 type Props = {
   form: PatientRegisterFormData;
@@ -26,6 +43,8 @@ type Props = {
   loadingEps: boolean;
   loadingDepartments: boolean;
   loadingCities: boolean;
+  errors: PatientRegisterErrors;
+  registrationChannel: "email" | "phone";
   onChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void | Promise<void>;
@@ -41,21 +60,70 @@ export function PatientRegisterForm({
   loadingEps,
   loadingDepartments,
   loadingCities,
+  errors,
+  registrationChannel,
   onChange,
   onSubmit,
 }: Props) {
   const inputClass =
     "w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500";
+  const invalidInputClass =
+    "border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100";
+  const getInputClass = (error?: string) =>
+    error ? `${inputClass} ${invalidInputClass}` : inputClass;
 
-  const today = new Date();
-  const maximumBirthDate = today.toISOString().split("T")[0];
+  const initialBirthParts = form.fechaNacimiento.split("-");
+  const [birthYear, setBirthYear] = useState(initialBirthParts[0] || "");
+  const [birthMonth, setBirthMonth] = useState(initialBirthParts[1] || "");
+  const [birthDay, setBirthDay] = useState(initialBirthParts[2] || "");
 
-  const minimumBirthDateObject = new Date(today);
-  minimumBirthDateObject.setFullYear(today.getFullYear() - 120);
+  const currentYear = new Date().getFullYear();
+  const years = useMemo(
+    () => Array.from({ length: 121 }, (_, index) => currentYear - index),
+    [currentYear],
+  );
+  const daysInSelectedMonth = useMemo(() => {
+    if (!birthMonth) return 31;
+    return new Date(
+      Number(birthYear) || currentYear,
+      Number(birthMonth),
+      0,
+    ).getDate();
+  }, [birthMonth, birthYear, currentYear]);
 
-  const minimumBirthDate = minimumBirthDateObject
-    .toISOString()
-    .split("T")[0];
+  const updateBirthDate = (day: string, month: string, year: string) => {
+    const completeDate = day && month && year ? `${year}-${month}-${day}` : "";
+    onChange({
+      target: { name: "fechaNacimiento", value: completeDate },
+    } as React.ChangeEvent<HTMLInputElement>);
+  };
+
+  const handleBirthDay = (value: string) => {
+    setBirthDay(value);
+    updateBirthDate(value, birthMonth, birthYear);
+  };
+
+  const handleBirthMonth = (value: string) => {
+    const maximumDay = new Date(
+      Number(birthYear) || currentYear,
+      Number(value),
+      0,
+    ).getDate();
+    const nextDay = Number(birthDay) > maximumDay ? "" : birthDay;
+    setBirthMonth(value);
+    setBirthDay(nextDay);
+    updateBirthDate(nextDay, value, birthYear);
+  };
+
+  const handleBirthYear = (value: string) => {
+    const maximumDay = birthMonth
+      ? new Date(Number(value), Number(birthMonth), 0).getDate()
+      : 31;
+    const nextDay = Number(birthDay) > maximumDay ? "" : birthDay;
+    setBirthYear(value);
+    setBirthDay(nextDay);
+    updateBirthDate(nextDay, birthMonth, value);
+  };
 
   return (
     <section className="mx-auto w-full max-w-6xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
@@ -112,6 +180,27 @@ export function PatientRegisterForm({
           </header>
 
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            {registrationChannel === "phone" && (
+              <label className="md:col-span-2">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">
+                  Correo electrónico *
+                </span>
+                <input
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  maxLength={150}
+                  placeholder="tu@email.com"
+                  value={form.email}
+                  onChange={onChange}
+                  className={getInputClass(errors.email)}
+                  aria-invalid={Boolean(errors.email)}
+                />
+                {errors.email && (
+                  <span className="mt-2 block text-sm text-red-600">{errors.email}</span>
+                )}
+              </label>
+            )}
             <label>
               <span className="mb-2 block text-sm font-semibold text-slate-700">
                 Tipo de documento *
@@ -121,7 +210,8 @@ export function PatientRegisterForm({
                 name="tipoDocumento"
                 value={form.tipoDocumento}
                 onChange={onChange}
-                className={inputClass}
+                className={getInputClass(errors.tipoDocumento)}
+                aria-invalid={Boolean(errors.tipoDocumento)}
               >
                 <option value="">Selecciona tipo de documento</option>
                 <option value="CC">Cédula de ciudadanía</option>
@@ -130,6 +220,11 @@ export function PatientRegisterForm({
                 <option value="RC">Registro civil</option>
                 <option value="PASAPORTE">Pasaporte</option>
               </select>
+              {errors.tipoDocumento && (
+                <span className="mt-2 block text-sm text-red-600">
+                  {errors.tipoDocumento}
+                </span>
+              )}
             </label>
 
             <label>
@@ -139,11 +234,20 @@ export function PatientRegisterForm({
 
               <input
                 name="numeroDocumento"
+                type="text"
+                inputMode={form.tipoDocumento === "PASAPORTE" ? "text" : "numeric"}
+                maxLength={form.tipoDocumento === "PASAPORTE" ? 20 : 11}
                 placeholder="Número de documento"
                 value={form.numeroDocumento}
                 onChange={onChange}
-                className={inputClass}
+                className={getInputClass(errors.numeroDocumento)}
+                aria-invalid={Boolean(errors.numeroDocumento)}
               />
+              {errors.numeroDocumento && (
+                <span className="mt-2 block text-sm text-red-600">
+                  {errors.numeroDocumento}
+                </span>
+              )}
             </label>
           </div>
         </section>
@@ -171,11 +275,16 @@ export function PatientRegisterForm({
 
               <input
                 name="primerNombre"
+                maxLength={60}
                 placeholder="Primer nombre"
                 value={form.primerNombre}
                 onChange={onChange}
-                className={inputClass}
+                className={getInputClass(errors.primerNombre)}
+                aria-invalid={Boolean(errors.primerNombre)}
               />
+              {errors.primerNombre && (
+                <span className="mt-2 block text-sm text-red-600">{errors.primerNombre}</span>
+              )}
             </label>
 
             <label>
@@ -185,11 +294,16 @@ export function PatientRegisterForm({
 
               <input
                 name="segundoNombre"
+                maxLength={60}
                 placeholder="Segundo nombre"
                 value={form.segundoNombre}
                 onChange={onChange}
-                className={inputClass}
+                className={getInputClass(errors.segundoNombre)}
+                aria-invalid={Boolean(errors.segundoNombre)}
               />
+              {errors.segundoNombre && (
+                <span className="mt-2 block text-sm text-red-600">{errors.segundoNombre}</span>
+              )}
             </label>
 
             <label>
@@ -199,11 +313,16 @@ export function PatientRegisterForm({
 
               <input
                 name="primerApellido"
+                maxLength={60}
                 placeholder="Primer apellido"
                 value={form.primerApellido}
                 onChange={onChange}
-                className={inputClass}
+                className={getInputClass(errors.primerApellido)}
+                aria-invalid={Boolean(errors.primerApellido)}
               />
+              {errors.primerApellido && (
+                <span className="mt-2 block text-sm text-red-600">{errors.primerApellido}</span>
+              )}
             </label>
 
             <label>
@@ -213,26 +332,45 @@ export function PatientRegisterForm({
 
               <input
                 name="segundoApellido"
+                maxLength={60}
                 placeholder="Segundo apellido"
                 value={form.segundoApellido}
                 onChange={onChange}
-                className={inputClass}
+                className={getInputClass(errors.segundoApellido)}
+                aria-invalid={Boolean(errors.segundoApellido)}
               />
+              {errors.segundoApellido && (
+                <span className="mt-2 block text-sm text-red-600">{errors.segundoApellido}</span>
+              )}
             </label>
 
             <label>
               <span className="mb-2 block text-sm font-semibold text-slate-700">
-                Teléfono *
+                {registrationChannel === "phone"
+                  ? "Celular para verificación"
+                  : "Teléfono *"}
               </span>
 
               <input
                 name="telefono"
                 type="tel"
+                inputMode="numeric"
+                maxLength={10}
                 placeholder="Número de teléfono"
                 value={form.telefono}
                 onChange={onChange}
-                className={inputClass}
+                readOnly={registrationChannel === "phone"}
+                className={getInputClass(errors.telefono)}
+                aria-invalid={Boolean(errors.telefono)}
               />
+              {errors.telefono && (
+                <span className="mt-2 block text-sm text-red-600">{errors.telefono}</span>
+              )}
+              {registrationChannel === "phone" && !errors.telefono && (
+                <span className="mt-2 block text-sm text-slate-500">
+                  Usaremos este número para enviarte el código de verificación.
+                </span>
+              )}
             </label>
 
             <label>
@@ -261,15 +399,60 @@ export function PatientRegisterForm({
                 Fecha de nacimiento *
               </span>
 
-              <input
-                name="fechaNacimiento"
-                type="date"
-                min={minimumBirthDate}
-                max={maximumBirthDate}
-                value={form.fechaNacimiento}
-                onChange={onChange}
-                className={inputClass}
-              />
+              <section className="grid grid-cols-1 gap-3 sm:grid-cols-[0.8fr_1.3fr_1fr]">
+                <select
+                  value={birthDay}
+                  onChange={(event) => handleBirthDay(event.target.value)}
+                  className={getInputClass(errors.fechaNacimiento)}
+                  aria-label="Día de nacimiento"
+                  aria-invalid={Boolean(errors.fechaNacimiento)}
+                >
+                  <option value="">Día</option>
+                  {Array.from({ length: daysInSelectedMonth }, (_, index) => index + 1).map(
+                    (day) => (
+                      <option key={day} value={String(day).padStart(2, "0")}>
+                        {day}
+                      </option>
+                    ),
+                  )}
+                </select>
+
+                <select
+                  value={birthMonth}
+                  onChange={(event) => handleBirthMonth(event.target.value)}
+                  className={getInputClass(errors.fechaNacimiento)}
+                  aria-label="Mes de nacimiento"
+                  aria-invalid={Boolean(errors.fechaNacimiento)}
+                >
+                  <option value="">Mes</option>
+                  {MONTHS.map((month, index) => (
+                    <option key={month} value={String(index + 1).padStart(2, "0")}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={birthYear}
+                  onChange={(event) => handleBirthYear(event.target.value)}
+                  className={getInputClass(errors.fechaNacimiento)}
+                  aria-label="Año de nacimiento"
+                  aria-invalid={Boolean(errors.fechaNacimiento)}
+                >
+                  <option value="">Año</option>
+                  {years.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </section>
+
+              {errors.fechaNacimiento && (
+                <span className="mt-2 block text-sm text-red-600">
+                  {errors.fechaNacimiento}
+                </span>
+              )}
 
               <span className="mt-2 block text-xs text-slate-500">
                 La fecha no puede ser futura ni superar los 120 años.

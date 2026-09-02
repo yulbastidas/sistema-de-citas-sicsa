@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import axios from 'axios';
 
 import { Patient } from '../patients/entities/patient.entity';
 import { Verification } from './entities/verification.entity';
 import { VerificationsGateway } from './verifications.gateway';
+import { PageRequest, pageResult } from '../common/pagination';
 
 interface JwtUser {
   sub: number;
@@ -88,18 +89,36 @@ export class VerificationsService {
     return saved;
   }
 
-  async findAll() {
-    const verifications = await this.verificationRepo.find({
-      order: { id: 'DESC' },
-    });
+  async findAll(
+    pagination: PageRequest,
+    filters: { status?: string; search?: string },
+  ) {
+    const query = this.verificationRepo.createQueryBuilder('verification')
+      .leftJoin(Patient, 'verificationPatient', 'verificationPatient.userId = verification.patientId');
+    if (filters.status && filters.status !== 'todos') {
+      query.andWhere('LOWER(verification.estado) = LOWER(:status)', { status: filters.status });
+    }
+    if (filters.search?.trim()) {
+      query.andWhere(`(verification.documento LIKE :search OR verificationPatient.email LIKE :search
+        OR verificationPatient.primerNombre LIKE :search OR verificationPatient.primerApellido LIKE :search)`,
+      { search: `%${filters.search.trim()}%` });
+    }
+    const [verifications, total] = await query.orderBy('verification.id', 'DESC')
+      .skip((pagination.page - 1) * pagination.limit).take(pagination.limit)
+      .getManyAndCount();
+
+    const patientIds = [...new Set(verifications.map((item) => item.patientId))];
+    const patients = patientIds.length
+      ? await this.patientRepo.find({ where: { userId: In(patientIds) } })
+      : [];
+    const patientByUser = new Map(patients.map((item) => [item.userId, item]));
 
     const result = await Promise.all(
       verifications.map(async (verification) => {
         const checkedVerification = await this.expireIfNeeded(verification);
-
-        const patient = await this.patientRepo.findOne({
-          where: { userId: checkedVerification?.patientId },
-        });
+        const patient = checkedVerification
+          ? patientByUser.get(checkedVerification.patientId)
+          : undefined;
 
         return {
           ...checkedVerification,
@@ -115,7 +134,7 @@ export class VerificationsService {
       }),
     );
 
-    return result;
+    return pageResult(result, total, pagination);
   }
 
   async approve(id: number, admin: JwtUser) {
@@ -154,14 +173,15 @@ export class VerificationsService {
             email: patient.email,
             documento: patient.numeroDocumento,
             eps: patient.eps,
-          });
+            idempotencyKey: `verification-approved:${savedVerification.id}`,
+          }, { timeout: Number(process.env.N8N_TIMEOUT_MS || 5000) });
 
           console.log('Webhook verificacion-aprobada enviado a n8n');
         } catch (error: unknown) {
           if (axios.isAxiosError(error)) {
             console.error(
               'Error enviando webhook a n8n:',
-              error.response?.data || error.message,
+              error.message,
             );
           } else if (error instanceof Error) {
             console.error('Error enviando webhook a n8n:', error.message);

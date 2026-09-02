@@ -30,13 +30,14 @@ export default function DoctorHistoryPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-5 py-6 lg:px-8">
+    <main className="min-h-screen bg-slate-100">
       <HistoryHeader
         loading={loading}
         totalHistory={totalHistory}
         totalWithReport={totalWithReport}
       />
 
+      <section className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8">
       <HistoryFilters
         search={search}
         dateFilter={dateFilter}
@@ -45,12 +46,14 @@ export default function DoctorHistoryPage() {
       />
 
       <HistoryList
+        key={`${search}|${dateFilter}`}
         loading={loading}
         errorMessage={errorMessage}
         filteredAppointments={filteredAppointments}
         downloadingId={downloadingId}
         onDownloadPdf={handleDownloadPdf}
       />
+      </section>
     </main>
   );
 }

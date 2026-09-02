@@ -19,4 +19,11 @@ describe('AppController', () => {
       expect(appController.getHello()).toBe('Hello World!');
     });
   });
+
+  it('returns a minimal health response without environment details', () => {
+    expect(appController.getHealth()).toEqual({
+      status: 'ok',
+      service: 'sicsa-backend',
+    });
+  });
 });

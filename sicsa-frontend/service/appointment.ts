@@ -94,9 +94,11 @@ export async function createAppointment(
 
 export async function getMyAppointments(
   token: string,
+  page = 1,
+  limit = 20,
 ) {
   const response = await fetch(
-    `${API_URL}/appointments/my`,
+    `${API_URL}/appointments/my?page=${page}&limit=${limit}`,
     {
       method: "GET",
       headers: authHeaders(token),
@@ -186,9 +188,17 @@ export async function cancelAppointment(
 
 export async function getAllAppointments(
   token: string,
+  options: { page?: number; limit?: number; status?: string; date?: string; search?: string } = {},
 ) {
+  const params = new URLSearchParams({
+    page: String(options.page || 1),
+    limit: String(options.limit || 20),
+  });
+  if (options.status && options.status !== "todos") params.set("status", options.status);
+  if (options.date) params.set("date", options.date);
+  if (options.search?.trim()) params.set("search", options.search.trim());
   const response = await fetch(
-    `${API_URL}/appointments/all`,
+    `${API_URL}/appointments/all?${params.toString()}`,
     {
       method: "GET",
       headers: authHeaders(token),
@@ -212,9 +222,16 @@ export async function getAllAppointments(
 export async function getDoctorAppointments(
   token: string,
   doctorId: number,
+  options: { page?: number; limit?: number; status?: string; date?: string } = {},
 ) {
+  const params = new URLSearchParams({
+    page: String(options.page || 1),
+    limit: String(options.limit || 20),
+  });
+  if (options.status) params.set("status", options.status);
+  if (options.date) params.set("date", options.date);
   const response = await fetch(
-    `${API_URL}/appointments/doctor/${doctorId}`,
+    `${API_URL}/appointments/doctor/${doctorId}?${params.toString()}`,
     {
       method: "GET",
       headers: authHeaders(token),
@@ -506,5 +523,21 @@ export async function markAppointmentNoShow(
     );
   }
 
+  return result;
+}
+
+export async function getDoctorHistory(
+  token: string,
+  doctorId: number,
+  options: { page?: number; limit?: number; search?: string; date?: string } = {},
+) {
+  const params = new URLSearchParams({ page: String(options.page || 1), limit: String(options.limit || 20) });
+  if (options.search?.trim()) params.set("search", options.search.trim());
+  if (options.date) params.set("date", options.date);
+  const response = await fetch(`${API_URL}/appointments/doctor/${doctorId}/history?${params.toString()}`, {
+    headers: authHeaders(token),
+  });
+  const result = await parseResponse(response);
+  if (!response.ok) throw new Error(buildErrorMessage(result, "Error al consultar el historial"));
   return result;
 }

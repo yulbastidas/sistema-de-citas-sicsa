@@ -1,166 +1,63 @@
 "use client";
 
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  BarChart3,
-  CalendarDays,
-  ClipboardList,
-  LogOut,
-  ShieldCheck,
-  Sparkles,
-  UsersRound,
-} from "lucide-react";
+import { BarChart3, CalendarDays, ShieldCheck, UsersRound } from "lucide-react";
 import { getUser, logout } from "@/service/session";
+import { RoleProfileMenu } from "./RoleProfileMenu";
+import { useSyncExternalStore } from "react";
 
-type SessionUser = {
-  id?: number;
-  sub?: number;
-  email?: string;
-  role?: string | number;
-  emailVerified?: boolean;
-  canViewReports?: boolean;
-};
+type SessionUser = { email?: string; canViewReports?: boolean };
+
+const subscribeToClient = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 export default function AdminSidebar() {
   const router = useRouter();
   const pathname = usePathname();
-
-  /*
-   * Obtiene el usuario guardado al iniciar sesión.
-   * Solo el usuario con canViewReports=true podrá ver Reportes.
-   */
-  const user = getUser() as SessionUser | null;
-  const canViewReports = user?.canViewReports === true;
-
+  const isClient = useSyncExternalStore(
+    subscribeToClient,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
+  const user = isClient ? (getUser() as SessionUser | null) : null;
   const items = [
-    {
-      label: "Verificaciones",
-      href: "/dashboard/admin",
-      icon: ShieldCheck,
-    },
-    {
-      label: "Citas",
-      href: "/dashboard/admin/appointments",
-      icon: CalendarDays,
-    },
-    {
-      label: "Pacientes",
-      href: "/dashboard/admin/patients",
-      icon: UsersRound,
-    },
-
-    /*
-     * Esta opción solamente se agrega al menú cuando
-     * el usuario autenticado tiene permiso para reportes.
-     */
-    ...(canViewReports
-      ? [
-        {
-          label: "Reportes",
-          href: "/dashboard/admin/reports",
-          icon: BarChart3,
-        },
-      ]
-      : []),
+    { label: "Verificaciones", href: "/dashboard/admin", icon: ShieldCheck },
+    { label: "Citas", href: "/dashboard/admin/appointments", icon: CalendarDays },
+    { label: "Pacientes", href: "/dashboard/admin/patients", icon: UsersRound },
+    ...(user?.canViewReports === true ? [{ label: "Reportes", href: "/dashboard/admin/reports", icon: BarChart3 }] : []),
   ];
 
-  const handleLogout = () => {
-    logout();
-    router.push("/login?role=admin");
-  };
-
   return (
-    <aside className="sticky top-0 min-h-screen w-80 border-r border-slate-200 bg-white/95 px-6 py-8 shadow-sm backdrop-blur">
-      <header className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 px-6 py-6 text-white shadow-lg">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-blue-100">
-          SICSA
-        </p>
+    <section className="relative z-20 border-b border-white/10 px-5 py-4 sm:px-7 lg:px-8">
+      <section className="flex flex-col gap-5 xl:flex-row xl:items-center">
+        <section className="flex min-w-0 items-center gap-3">
+          <figure className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white/10 p-1 shadow-inner">
+            <Image src="/hospital.jpg" alt="Logo E.S.E. Hospital Clarita Santos" width={48} height={48} className="h-full w-full rounded-xl object-contain mix-blend-screen" />
+          </figure>
+          <section className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">SICSA</p>
+            <p className="truncate text-sm font-semibold text-white sm:text-base">Panel administrativo</p>
+          </section>
+        </section>
 
-        <h1 className="mt-3 text-3xl font-bold">Administración</h1>
+        <nav aria-label="Navegación administrativa" className="grid flex-1 grid-cols-2 gap-3 sm:flex sm:flex-wrap xl:justify-center">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const active = pathname === item.href;
+            return (
+              <button key={item.href} type="button" onClick={() => router.push(item.href)} aria-current={active ? "page" : undefined}
+                className={`inline-flex min-h-14 items-center justify-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 sm:min-w-36 sm:text-base lg:px-5 ${active ? "border-white bg-white text-blue-950 shadow-lg ring-2 ring-cyan-200/30" : "border-white/15 bg-white/10 text-white shadow-sm hover:-translate-y-0.5 hover:border-cyan-200/50 hover:bg-white/15"}`}>
+                <Icon size={20} aria-hidden="true" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
 
-        <p className="mt-2 text-sm text-slate-200">
-          Gestión hospitalaria, operativa y seguimiento clínico.
-        </p>
-      </header>
-
-      <nav className="mt-8 space-y-3">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href;
-
-          return (
-            <button
-              key={item.href}
-              type="button"
-              onClick={() => router.push(item.href)}
-              className={`flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left transition ${active
-                  ? "border border-blue-200 bg-blue-50 text-blue-900 shadow-sm"
-                  : "border border-transparent bg-white text-slate-700 hover:border-slate-200 hover:bg-slate-50"
-                }`}
-            >
-              <span
-                className={`flex h-10 w-10 items-center justify-center rounded-xl ${active ? "bg-blue-100" : "bg-slate-100"
-                  }`}
-              >
-                <Icon size={18} />
-              </span>
-
-              <span className="font-semibold">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      <section className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-        <header className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm">
-            <ClipboardList size={18} className="text-slate-700" />
-          </span>
-
-          <article>
-            <h2 className="text-sm font-semibold text-slate-900">
-              Acceso rápido
-            </h2>
-
-            <p className="text-xs text-slate-500">Resumen del panel</p>
-          </article>
-        </header>
-
-        <p className="mt-4 text-sm leading-6 text-slate-600">
-          Revisa verificaciones, administra citas, actualiza datos de pacientes
-          y mantén control del flujo operativo del sistema.
-        </p>
+        <RoleProfileMenu name={user?.email} roleLabel="Administrador" onLogout={() => { logout(); router.push("/login?role=admin"); }} />
       </section>
-
-      <section className="mt-6 rounded-3xl border border-blue-100 bg-blue-50 p-5">
-        <header className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm">
-            <Sparkles size={18} className="text-blue-700" />
-          </span>
-
-          <article>
-            <h2 className="text-sm font-semibold text-blue-900">
-              Panel interno
-            </h2>
-
-            <p className="text-xs text-blue-700">Uso administrativo</p>
-          </article>
-        </header>
-
-        <p className="mt-3 text-sm leading-6 text-blue-800">
-          Este espacio está diseñado para el control de personal interno,
-          trazabilidad y seguimiento administrativo.
-        </p>
-      </section>
-
-      <button
-        type="button"
-        onClick={handleLogout}
-        className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 font-semibold text-red-700 transition hover:bg-red-100"
-      >
-        <LogOut size={18} />
-        Cerrar sesión
-      </button>
-    </aside>
+    </section>
   );
 }

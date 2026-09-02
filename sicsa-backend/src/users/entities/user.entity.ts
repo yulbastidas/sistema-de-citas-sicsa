@@ -23,4 +23,7 @@ export class User {
 
   @Column({ default: false })
   canViewReports!: boolean;
+
+  @Column({ type: 'int', default: 0 })
+  tokenVersion!: number;
 }

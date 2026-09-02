@@ -15,7 +15,7 @@ export class AppointmentScheduleService {
     private appointmentRepo: Repository<Appointment>,
   ) {}
 
-  getAppointmentDuration(specialtyId?: number | null): number {
+  getAppointmentDurationBySpecialty(specialtyId?: number | null): number {
     const specialtyIdNumber = Number(specialtyId);
 
     switch (specialtyIdNumber) {
@@ -29,11 +29,18 @@ export class AppointmentScheduleService {
     }
   }
 
+  /** @deprecated Use getAppointmentDurationBySpecialty para evitar confundirlo con appointmentClassId. */
+  getAppointmentDuration(specialtyId?: number | null): number {
+    return this.getAppointmentDurationBySpecialty(specialtyId);
+  }
+
   validateBusinessSchedule(
     fecha: string,
     hora: string,
     durationMinutes: number,
   ): void {
+    this.validateAppointmentDate(fecha);
+
     const day = this.getDayOfWeek(fecha);
     const startMinutes = this.timeToMinutes(hora);
 
@@ -47,7 +54,7 @@ export class AppointmentScheduleService {
       const opening = this.timeToMinutes('08:00');
       const closing = this.timeToMinutes('17:40');
 
-      if (startMinutes < opening || startMinutes > closing) {
+      if (startMinutes < opening || startMinutes + durationMinutes > closing) {
         throw new BadRequestException(
           'Los martes y miércoles las citas inician desde las 08:00',
         );
@@ -58,7 +65,7 @@ export class AppointmentScheduleService {
       const opening = this.timeToMinutes('07:00');
       const closing = this.timeToMinutes('17:40');
 
-      if (startMinutes < opening || startMinutes > closing) {
+      if (startMinutes < opening || startMinutes + durationMinutes > closing) {
         throw new BadRequestException(
           'Los jueves y viernes las citas inician desde las 07:00',
         );
@@ -69,14 +76,14 @@ export class AppointmentScheduleService {
       const opening = this.timeToMinutes('07:00');
       const closing = this.timeToMinutes('12:40');
 
-      if (startMinutes < opening || startMinutes > closing) {
+      if (startMinutes < opening || startMinutes + durationMinutes > closing) {
         throw new BadRequestException(
           'Los sábados solo se pueden agendar citas hasta las 12:40',
         );
       }
     }
 
-    void durationMinutes;
+    this.validateNotPastTime(fecha, hora);
   }
 
   validateRadiologyBase(data: AppointmentInput): void {
@@ -98,12 +105,15 @@ export class AppointmentScheduleService {
   }
 
   async isSlotAvailable(
+    doctorId: number,
     fecha: string,
     hora: string,
     durationMinutes: number,
+    repository: Repository<Appointment> = this.appointmentRepo,
   ): Promise<boolean> {
-    const appointments = await this.appointmentRepo.find({
+    const appointments = await repository.find({
       where: {
+        doctorId,
         fecha,
         estado: In(this.getBlockingStates()),
       },
@@ -115,8 +125,9 @@ export class AppointmentScheduleService {
   async getAvailableHours(
     fecha: string,
     specialtyId?: number,
+    doctorIds?: number[],
   ): Promise<string[]> {
-    const duration = this.getAppointmentDuration(specialtyId);
+    const duration = this.getAppointmentDurationBySpecialty(specialtyId);
 
     const hours = this.generateAvailableHoursByDate(fecha, duration);
 
@@ -131,7 +142,20 @@ export class AppointmentScheduleService {
       try {
         this.validateBusinessSchedule(fecha, hour, duration);
 
-        return !this.hasScheduleConflict(hour, duration, appointments);
+        if (!doctorIds?.length) {
+          return !this.hasScheduleConflict(hour, duration, appointments);
+        }
+
+        return doctorIds.some(
+          (doctorId) =>
+            !this.hasScheduleConflict(
+              hour,
+              duration,
+              appointments.filter(
+                (appointment) => appointment.doctorId === doctorId,
+              ),
+            ),
+        );
       } catch {
         return false;
       }
@@ -191,16 +215,13 @@ export class AppointmentScheduleService {
     return appointments.some((appointment) => {
       const appointmentStart = this.timeToMinutes(appointment.hora);
 
-      const appointmentDuration = this.getAppointmentDuration(
+      const appointmentDuration = this.getAppointmentDurationBySpecialty(
         appointment.specialtyId,
       );
 
       const appointmentEnd = appointmentStart + appointmentDuration;
 
-      return (
-        requestedStart < appointmentEnd &&
-        requestedEnd > appointmentStart
-      );
+      return requestedStart < appointmentEnd && requestedEnd > appointmentStart;
     });
   }
 
@@ -208,6 +229,56 @@ export class AppointmentScheduleService {
     const [year, month, day] = fecha.split('-').map(Number);
 
     return new Date(year, month - 1, day).getDay();
+  }
+
+  private validateAppointmentDate(fecha: string): void {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      throw new BadRequestException('La fecha debe tener formato YYYY-MM-DD');
+    }
+
+    const [year, month, day] = fecha.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+
+    if (
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      throw new BadRequestException('La fecha de la cita no es válida');
+    }
+
+    const todayInColombia = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    if (fecha < todayInColombia) {
+      throw new BadRequestException('No se pueden agendar citas en el pasado');
+    }
+  }
+
+  private validateNotPastTime(fecha: string, hora: string): void {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    const parts = Object.fromEntries(
+      formatter
+        .formatToParts(new Date())
+        .map((part) => [part.type, part.value]),
+    );
+    const today = `${parts.year}-${parts.month}-${parts.day}`;
+    const nowMinutes = Number(parts.hour) * 60 + Number(parts.minute);
+    if (fecha === today && this.timeToMinutes(hora) <= nowMinutes) {
+      throw new BadRequestException('No se puede agendar una hora que ya pasó');
+    }
   }
 
   timeToMinutes(time: string): number {

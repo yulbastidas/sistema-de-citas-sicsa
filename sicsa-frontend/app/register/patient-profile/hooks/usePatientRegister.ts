@@ -2,18 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { registerPatient } from "@/service/auth";
+import { registerPatient, registerPatientByPhone } from "@/service/auth";
+import { notifySicsa as alert } from "@/app/components/SicsaFeedback";
 import type {
   CityItem,
   DepartmentItem,
   EpsItem,
+  PatientRegisterErrors,
   PatientRegisterFormData,
 } from "../types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const COLOMBIA_API = "https://api-colombia.com/api/v1";
+const NAME_PATTERN = /^[\p{L}\p{M}]+(?:[ '\-][\p{L}\p{M}]+)*$/u;
+
+const DOCUMENT_RULES: Record<
+  string,
+  { min: number; max: number; pattern: RegExp; message: string }
+> = {
+  CC: { min: 3, max: 10, pattern: /^\d+$/, message: "La cédula debe contener entre 3 y 10 dígitos." },
+  TI: { min: 10, max: 11, pattern: /^\d+$/, message: "La tarjeta de identidad debe contener entre 10 y 11 dígitos." },
+  CE: { min: 4, max: 10, pattern: /^\d+$/, message: "La cédula de extranjería debe contener entre 4 y 10 dígitos." },
+  RC: { min: 10, max: 11, pattern: /^\d+$/, message: "El registro civil debe contener entre 10 y 11 dígitos." },
+  PASAPORTE: { min: 5, max: 20, pattern: /^[A-Z0-9]+$/, message: "El pasaporte debe contener entre 5 y 20 letras o números." },
+};
 
 const EMPTY_FORM: PatientRegisterFormData = {
+  email: "",
   tipoDocumento: "",
   numeroDocumento: "",
   primerNombre: "",
@@ -43,6 +58,31 @@ export function usePatientRegister() {
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   const [loadingCities, setLoadingCities] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<PatientRegisterErrors>({});
+  const [registrationChannel, setRegistrationChannel] = useState<"email" | "phone">("email");
+
+  useEffect(() => {
+    const raw = localStorage.getItem("register_credentials");
+    if (!raw) return;
+    try {
+      const credentials = JSON.parse(raw) as { channel?: "email" | "phone"; phone?: string };
+      if (credentials.channel === "phone" && credentials.phone) {
+        setRegistrationChannel("phone");
+        setForm((previous) => ({ ...previous, telefono: credentials.phone ?? "" }));
+      }
+    } catch {
+      // handleSubmit conserva la validación y limpieza del estado inválido.
+    }
+  }, []);
+
+  const clearError = (field: keyof PatientRegisterErrors) => {
+    setErrors((previous) => {
+      if (!previous[field]) return previous;
+      const next = { ...previous };
+      delete next[field];
+      return next;
+    });
+  };
 
   useEffect(() => {
     const loadEps = async () => {
@@ -121,6 +161,45 @@ export function usePatientRegister() {
   ) => {
     const { name, value } = e.target;
 
+    if (name === "tipoDocumento") {
+      const isPassport = value === "PASAPORTE";
+
+      setForm((prev) => ({
+        ...prev,
+        tipoDocumento: value,
+        numeroDocumento: isPassport
+          ? prev.numeroDocumento
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, "")
+              .slice(0, 20)
+          : prev.numeroDocumento.replace(/\D/g, "").slice(0, 11),
+      }));
+      clearError("tipoDocumento");
+      clearError("numeroDocumento");
+      return;
+    }
+
+    if (name === "numeroDocumento") {
+      const normalized =
+        form.tipoDocumento === "PASAPORTE"
+          ? value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20)
+          : value.replace(/\D/g, "").slice(0, 11);
+
+      setForm((prev) => ({ ...prev, numeroDocumento: normalized }));
+      clearError("numeroDocumento");
+      return;
+    }
+
+    if (name === "telefono") {
+      if (registrationChannel === "phone") return;
+      setForm((prev) => ({
+        ...prev,
+        telefono: value.replace(/\D/g, "").slice(0, 10),
+      }));
+      clearError("telefono");
+      return;
+    }
+
     if (name === "epsId") {
       const selectedEps = epsList.find((item) => String(item.id) === value);
 
@@ -166,6 +245,110 @@ export function usePatientRegister() {
       ...prev,
       [name]: value,
     }));
+
+    if (
+      [
+        "primerNombre",
+        "email",
+        "segundoNombre",
+        "primerApellido",
+        "segundoApellido",
+        "fechaNacimiento",
+      ].includes(name)
+    ) {
+      clearError(name as keyof PatientRegisterErrors);
+    }
+  };
+
+  const validateRegistrationFields = () => {
+    const nextErrors: PatientRegisterErrors = {};
+    const documentRule = DOCUMENT_RULES[form.tipoDocumento];
+    if (registrationChannel === "phone") {
+      const email = form.email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 150) {
+        nextErrors.email = "Ingresa un correo electrónico válido.";
+      }
+    }
+
+    if (!documentRule) {
+      nextErrors.tipoDocumento = "Selecciona un tipo de documento válido.";
+    }
+
+    const document = form.numeroDocumento.trim();
+    if (!document) {
+      nextErrors.numeroDocumento = "Ingresa el número de documento.";
+    } else if (
+      !documentRule ||
+      !documentRule.pattern.test(document) ||
+      document.length < documentRule.min ||
+      document.length > documentRule.max
+    ) {
+      nextErrors.numeroDocumento =
+        documentRule?.message || "Ingresa un documento válido.";
+    }
+
+    const validateName = (
+      field:
+        | "primerNombre"
+        | "segundoNombre"
+        | "primerApellido"
+        | "segundoApellido",
+      value: string,
+      required: boolean,
+      label: string,
+    ) => {
+      const normalized = value.trim();
+
+      if (!normalized && required) {
+        nextErrors[field] = `${label} es obligatorio.`;
+      } else if (
+        normalized &&
+        (normalized.length < 2 ||
+          normalized.length > 60 ||
+          !NAME_PATTERN.test(normalized))
+      ) {
+        nextErrors[field] =
+          `${label} debe tener entre 2 y 60 caracteres y usar solo letras, espacios, guiones o apóstrofes.`;
+      }
+    };
+
+    validateName("primerNombre", form.primerNombre, true, "El primer nombre");
+    validateName("segundoNombre", form.segundoNombre, false, "El segundo nombre");
+    validateName("primerApellido", form.primerApellido, true, "El primer apellido");
+    validateName("segundoApellido", form.segundoApellido, false, "El segundo apellido");
+
+    if (!/^3\d{9}$/.test(form.telefono)) {
+      nextErrors.telefono =
+        "Ingresa un celular colombiano válido de 10 dígitos que comience por 3.";
+    }
+
+    if (!form.fechaNacimiento) {
+      nextErrors.fechaNacimiento = "Selecciona el día, mes y año de nacimiento.";
+    } else {
+      const [year, month, day] = form.fechaNacimiento.split("-").map(Number);
+      const birthDate = new Date(year, month - 1, day);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const oldestAllowedDate = new Date(today);
+      oldestAllowedDate.setFullYear(today.getFullYear() - 120);
+
+      const isRealDate =
+        birthDate.getFullYear() === year &&
+        birthDate.getMonth() === month - 1 &&
+        birthDate.getDate() === day;
+
+      if (!isRealDate) {
+        nextErrors.fechaNacimiento = "Ingresa una fecha de nacimiento válida.";
+      } else if (birthDate > today) {
+        nextErrors.fechaNacimiento = "La fecha de nacimiento no puede ser futura.";
+      } else if (birthDate < oldestAllowedDate) {
+        nextErrors.fechaNacimiento =
+          "La fecha de nacimiento no puede superar los 120 años.";
+      }
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleSubmit = async () => {
@@ -178,21 +361,22 @@ export function usePatientRegister() {
     }
 
     let parsedCredentials: {
-      email: string;
+      channel?: "email" | "phone";
+      email?: string;
+      phone?: string;
       password: string;
     };
 
     try {
-      parsedCredentials = JSON.parse(credentials) as {
-        email: string;
-        password: string;
-      };
+      parsedCredentials = JSON.parse(credentials);
     } catch {
       localStorage.removeItem("register_credentials");
       alert("Los datos del primer paso no son válidos. Intenta nuevamente.");
       router.push("/register");
       return;
     }
+
+    if (!validateRegistrationFields()) return;
 
     if (
       !form.tipoDocumento ||
@@ -210,40 +394,12 @@ export function usePatientRegister() {
       return;
     }
 
-    /*
-     * Validación de la fecha de nacimiento.
-     * Se agrega T00:00:00 para evitar diferencias por zona horaria.
-     */
-    const birthDate = new Date(`${form.fechaNacimiento}T00:00:00`);
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (Number.isNaN(birthDate.getTime())) {
-      alert("Ingresa una fecha de nacimiento válida");
-      return;
-    }
-
-    if (birthDate > today) {
-      alert("La fecha de nacimiento no puede ser futura");
-      return;
-    }
-
-    const oldestAllowedDate = new Date(today);
-    oldestAllowedDate.setFullYear(today.getFullYear() - 120);
-
-    if (birthDate < oldestAllowedDate) {
-      alert("La fecha de nacimiento no puede superar los 120 años");
-      return;
-    }
-
     try {
       setLoading(true);
 
-      await registerPatient({
-        email: parsedCredentials.email,
+      const payload = {
+        email: registrationChannel === "phone" ? form.email.trim().toLowerCase() : parsedCredentials.email,
         password: parsedCredentials.password,
-        role: "patient",
         tipoDocumento: form.tipoDocumento,
         numeroDocumento: form.numeroDocumento,
         primerNombre: form.primerNombre,
@@ -257,7 +413,16 @@ export function usePatientRegister() {
         fechaNacimiento: form.fechaNacimiento,
         departamento: form.departamento,
         municipio: form.municipio,
-      });
+      };
+
+      if (registrationChannel === "phone") {
+        const result = await registerPatientByPhone(payload);
+        localStorage.removeItem("register_credentials");
+        router.push(`/verify?channel=phone&registrationId=${result.registrationId}&challengeId=${encodeURIComponent(result.challengeId)}&phone=${encodeURIComponent(result.maskedPhone)}`);
+        return;
+      }
+
+      await registerPatient(payload);
 
       localStorage.removeItem("register_credentials");
 
@@ -266,7 +431,7 @@ export function usePatientRegister() {
       );
 
       router.push(
-        `/verify?email=${encodeURIComponent(parsedCredentials.email)}`,
+        `/verify?email=${encodeURIComponent(parsedCredentials.email ?? "")}`,
       );
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -288,6 +453,8 @@ export function usePatientRegister() {
     loadingEps,
     loadingDepartments,
     loadingCities,
+    errors,
+    registrationChannel,
     handleChange,
     handleSubmit,
   };

@@ -72,7 +72,7 @@ export default function DoctorMedicalReportPage() {
 
   if (checkingAuth || loadingData) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6">
         <section className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
           <LoaderCircle
             size={22}
@@ -88,7 +88,7 @@ export default function DoctorMedicalReportPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-slate-100">
       <ReportHeader
         appointmentId={appointmentId}
         completedFields={completedFields}
@@ -96,7 +96,7 @@ export default function DoctorMedicalReportPage() {
         onBack={() => router.push("/dashboard/doctor")}
       />
 
-      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8">
         <PatientSummaryCard
           appointmentId={appointmentId}
           completedFields={completedFields}

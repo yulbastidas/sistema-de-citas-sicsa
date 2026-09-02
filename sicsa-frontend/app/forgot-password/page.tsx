@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
     ArrowLeft,
     CheckCircle2,
@@ -12,22 +12,38 @@ import {
     Loader2,
     LockKeyhole,
     Mail,
+    Phone,
     ShieldCheck,
 } from "lucide-react";
 
 import {
     forgotPassword,
+    forgotPasswordByPhone,
     resetPassword,
+    resetPasswordByPhone,
+    verifyPhoneResetCode,
     verifyResetCode,
+    ApiRequestError,
 } from "@/service/auth";
+import { notifySicsa as alert } from "@/app/components/SicsaFeedback";
 
 type RecoveryStep = 1 | 2 | 3;
+type RecoveryChannel = "email" | "phone";
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const role = searchParams.get("role");
+    const selectedRole = role === "doctor" || role === "admin" ? role : "patient";
+    const patientRecovery = selectedRole === "patient";
 
     const [step, setStep] = useState<RecoveryStep>(1);
+    const [channel, setChannel] = useState<RecoveryChannel>("email");
     const [email, setEmail] = useState("");
+    const [phone, setPhone] = useState("");
+    const [maskedPhone, setMaskedPhone] = useState("");
+    const [challengeId, setChallengeId] = useState("");
+    const [resetToken, setResetToken] = useState("");
     const [code, setCode] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -39,6 +55,15 @@ export default function ForgotPasswordPage() {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] =
         useState(false);
+    const [resendSeconds, setResendSeconds] = useState(0);
+
+    useEffect(() => {
+        if (resendSeconds <= 0) return;
+        const timer = window.setInterval(() => {
+            setResendSeconds((seconds) => Math.max(0, seconds - 1));
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, [resendSeconds]);
 
     const clearMessages = () => {
         setMessage("");
@@ -51,18 +76,33 @@ export default function ForgotPasswordPage() {
         event.preventDefault();
         clearMessages();
 
-        if (!email.trim()) {
-            setError("Ingresa tu correo");
+        if (channel === "email" && !/^\S+@\S+\.\S+$/.test(email.trim())) {
+            setError("Ingresa un correo electrónico válido");
+            return;
+        }
+
+        if (channel === "phone" && !/^3\d{9}$/.test(phone.trim())) {
+            setError("Ingresa un celular colombiano válido de 10 dígitos");
             return;
         }
 
         try {
             setLoading(true);
 
-            const response = await forgotPassword(email);
-
-            setEmail(email.trim().toLowerCase());
-            setMessage(response.message);
+            let responseMessage: string;
+            if (channel === "email") {
+                const response = await forgotPassword(email);
+                setEmail(email.trim().toLowerCase());
+                responseMessage = response.message;
+            } else {
+                const response = await forgotPasswordByPhone(phone);
+                setPhone(phone.trim());
+                setChallengeId(response.challengeId);
+                setMaskedPhone(response.maskedPhone);
+                setResendSeconds(60);
+                responseMessage = response.message;
+            }
+            setMessage(responseMessage);
             setStep(2);
         } catch (requestError: unknown) {
             setError(
@@ -89,11 +129,20 @@ export default function ForgotPasswordPage() {
         try {
             setLoading(true);
 
-            const response = await verifyResetCode(email, code);
+            const response = channel === "email"
+                ? await verifyResetCode(email, code)
+                : await verifyPhoneResetCode(phone, challengeId, code);
 
             if (!response.valid) {
                 setError("El código no es válido");
                 return;
+            }
+
+            if (channel === "phone") {
+                const phoneResponse = response as Awaited<
+                    ReturnType<typeof verifyPhoneResetCode>
+                >;
+                setResetToken(phoneResponse.resetToken);
             }
 
             setMessage("Código verificado correctamente");
@@ -143,15 +192,22 @@ export default function ForgotPasswordPage() {
         try {
             setLoading(true);
 
-            const response = await resetPassword(
-                email,
-                code,
-                newPassword,
-                confirmPassword,
-            );
+            const response = channel === "email"
+                ? await resetPassword(
+                    email,
+                    code,
+                    newPassword,
+                    confirmPassword,
+                )
+                : await resetPasswordByPhone(
+                    phone,
+                    resetToken,
+                    newPassword,
+                    confirmPassword,
+                );
 
             alert(response.message);
-            router.replace("/login?role=patient");
+            router.replace(`/login?role=${selectedRole}`);
         } catch (requestError: unknown) {
             setError(
                 requestError instanceof Error
@@ -169,11 +225,21 @@ export default function ForgotPasswordPage() {
         try {
             setLoading(true);
 
-            const response = await forgotPassword(email);
-
             setCode("");
-            setMessage(response.message);
+            if (channel === "email") {
+                const response = await forgotPassword(email);
+                setMessage(response.message);
+            } else {
+                const response = await forgotPasswordByPhone(phone);
+                setChallengeId(response.challengeId);
+                setMaskedPhone(response.maskedPhone);
+                setResendSeconds(60);
+                setMessage(response.message);
+            }
         } catch (requestError: unknown) {
+            if (requestError instanceof ApiRequestError && requestError.retryAfterSeconds) {
+                setResendSeconds(requestError.retryAfterSeconds);
+            }
             setError(
                 requestError instanceof Error
                     ? requestError.message
@@ -185,10 +251,20 @@ export default function ForgotPasswordPage() {
     };
 
     return (
-        <main className="min-h-screen bg-slate-100 px-4 py-10">
-            <section className="mx-auto max-w-xl rounded-3xl bg-white p-8 shadow-xl">
+        <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_75%_20%,rgba(14,165,233,0.24),transparent_32%),radial-gradient(circle_at_12%_85%,rgba(8,145,178,0.18),transparent_30%),linear-gradient(135deg,#020617_0%,#082f49_48%,#0c4a6e_100%)] px-4 py-8 sm:py-10">
+            <div className="pointer-events-none absolute -left-24 -top-28 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
+            <section className="relative mx-auto max-w-xl rounded-[2rem] border border-cyan-100/25 bg-white p-6 shadow-[0_32px_90px_-28px_rgba(2,132,199,0.42)] sm:p-8">
+                <header className="mb-7 flex items-center gap-3 border-b border-sky-100 pb-5">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-cyan-400 text-white shadow-lg shadow-cyan-500/20">
+                        <ShieldCheck size={23} />
+                    </span>
+                    <div>
+                        <p className="font-extrabold tracking-wide text-slate-950">SICSA</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Recuperación segura</p>
+                    </div>
+                </header>
                 <Link
-                    href="/login?role=patient"
+                    href={`/login?role=${selectedRole}`}
                     className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:underline"
                 >
                     <ArrowLeft size={18} />
@@ -238,24 +314,53 @@ export default function ForgotPasswordPage() {
                         onSubmit={handleRequestCode}
                         className="mt-8 space-y-6"
                     >
+                        {patientRecovery && (
+                            <section>
+                                <p className="mb-3 font-semibold text-slate-800">
+                                    ¿Cómo deseas recuperar tu contraseña?
+                                </p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setChannel("email"); clearMessages(); }}
+                                        className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${channel === "email" ? "border-blue-600 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600"}`}
+                                    >
+                                        Correo electrónico
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setChannel("phone"); clearMessages(); }}
+                                        className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${channel === "phone" ? "border-blue-600 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600"}`}
+                                    >
+                                        Número de celular
+                                    </button>
+                                </div>
+                            </section>
+                        )}
                         <section>
                             <label className="mb-2 block font-semibold text-slate-800">
-                                Correo electrónico
+                                {channel === "email" ? "Correo electrónico" : "Número de celular"}
                             </label>
 
                             <section className="relative">
-                                <Mail
+                                {channel === "email" ? <Mail
                                     className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                                     size={20}
-                                />
+                                /> : <Phone
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                                    size={20}
+                                />}
 
                                 <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(event) => setEmail(event.target.value)}
-                                    placeholder="tu@email.com"
+                                    type={channel === "email" ? "email" : "tel"}
+                                    inputMode={channel === "phone" ? "numeric" : "email"}
+                                    value={channel === "email" ? email : phone}
+                                    onChange={(event) => channel === "email"
+                                        ? setEmail(event.target.value)
+                                        : setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))}
+                                    placeholder={channel === "email" ? "Correo electrónico" : "Número de celular"}
                                     disabled={loading}
-                                    className="input pl-12"
+                                    className="input input-with-leading-icon"
                                 />
                             </section>
                         </section>
@@ -282,22 +387,16 @@ export default function ForgotPasswordPage() {
                         className="mt-8 space-y-6"
                     >
                         <section>
+                            {channel === "phone" && maskedPhone && (
+                                <p className="mb-4 rounded-xl bg-blue-50 p-3 text-center text-sm text-blue-800">
+                                    Código enviado a {maskedPhone}
+                                </p>
+                            )}
                             <label className="mb-2 block font-semibold text-slate-800">
                                 Código de seis dígitos
                             </label>
 
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                maxLength={6}
-                                value={code}
-                                onChange={(event) =>
-                                    setCode(event.target.value.replace(/\D/g, ""))
-                                }
-                                placeholder="000000"
-                                disabled={loading}
-                                className="input text-center text-2xl font-bold tracking-[0.4em]"
-                            />
+                            <RecoveryCodeFields value={code} onChange={setCode} disabled={loading} />
                         </section>
 
                         <button
@@ -317,10 +416,12 @@ export default function ForgotPasswordPage() {
                         <button
                             type="button"
                             onClick={handleResendCode}
-                            disabled={loading}
+                            disabled={loading || (channel === "phone" && resendSeconds > 0)}
                             className="w-full text-center text-sm font-semibold text-blue-700 hover:underline"
                         >
-                            Reenviar código
+                            {channel === "phone" && resendSeconds > 0
+                                ? `Podrás reenviar en ${resendSeconds} s`
+                                : "Reenviar código"}
                         </button>
                     </form>
                 )}
@@ -337,7 +438,7 @@ export default function ForgotPasswordPage() {
 
                             <section className="relative">
                                 <LockKeyhole
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                                     size={20}
                                 />
 
@@ -349,7 +450,7 @@ export default function ForgotPasswordPage() {
                                     }
                                     placeholder="Nueva contraseña"
                                     disabled={loading}
-                                    className="input px-12"
+                                    className="input input-with-leading-icon input-with-trailing-action"
                                 />
 
                                 <button
@@ -357,7 +458,7 @@ export default function ForgotPasswordPage() {
                                     onClick={() =>
                                         setShowNewPassword((previous) => !previous)
                                     }
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                                 >
                                     {showNewPassword ? (
                                         <EyeOff size={20} />
@@ -375,7 +476,7 @@ export default function ForgotPasswordPage() {
 
                             <section className="relative">
                                 <LockKeyhole
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                                     size={20}
                                 />
 
@@ -387,7 +488,7 @@ export default function ForgotPasswordPage() {
                                     }
                                     placeholder="Confirma la contraseña"
                                     disabled={loading}
-                                    className="input px-12"
+                                    className="input input-with-leading-icon input-with-trailing-action"
                                 />
 
                                 <button
@@ -395,7 +496,7 @@ export default function ForgotPasswordPage() {
                                     onClick={() =>
                                         setShowConfirmPassword((previous) => !previous)
                                     }
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                                 >
                                     {showConfirmPassword ? (
                                         <EyeOff size={20} />
@@ -427,5 +528,68 @@ export default function ForgotPasswordPage() {
                 )}
             </section>
         </main>
+    );
+}
+
+function RecoveryCodeFields({
+    value,
+    onChange,
+    disabled,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    disabled: boolean;
+}) {
+    const refs = useRef<Array<HTMLInputElement | null>>([]);
+    const setDigit = (index: number, rawValue: string) => {
+        const digit = rawValue.replace(/\D/g, "").slice(-1);
+        const digits = value.padEnd(6, " ").split("");
+        digits[index] = digit || " ";
+        onChange(digits.join("").trimEnd());
+        if (digit && index < 5) refs.current[index + 1]?.focus();
+    };
+
+    return (
+        <div
+            className="grid grid-cols-6 gap-2 sm:gap-3"
+            role="group"
+            aria-label="Código de recuperación de seis dígitos"
+            onPaste={(event) => {
+                const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+                if (!pasted) return;
+                event.preventDefault();
+                onChange(pasted);
+                refs.current[Math.min(pasted.length, 6) - 1]?.focus();
+            }}
+        >
+            {Array.from({ length: 6 }, (_, index) => (
+                <input
+                    key={index}
+                    ref={(element) => { refs.current[index] = element; }}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete={index === 0 ? "one-time-code" : "off"}
+                    maxLength={1}
+                    value={value[index] ?? ""}
+                    disabled={disabled}
+                    onChange={(event) => setDigit(index, event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === "Backspace" && !value[index] && index > 0) {
+                            refs.current[index - 1]?.focus();
+                        }
+                    }}
+                    aria-label={`Dígito ${index + 1} de 6`}
+                    className="aspect-square min-w-0 rounded-xl border-2 border-slate-200 text-center text-xl font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                />
+            ))}
+        </div>
+    );
+}
+
+export default function ForgotPasswordPage() {
+    return (
+        <Suspense fallback={<main className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-cyan-900" />}>
+            <ForgotPasswordContent />
+        </Suspense>
     );
 }

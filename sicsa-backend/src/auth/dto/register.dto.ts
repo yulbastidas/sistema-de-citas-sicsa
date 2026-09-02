@@ -1,99 +1,155 @@
+import { Transform } from 'class-transformer';
 import {
   IsEmail,
+  IsIn,
   IsInt,
   IsNotEmpty,
-  IsOptional,
   IsString,
+  Matches,
+  MaxLength,
+  Min,
   MinLength,
   Validate,
-  ValidatorConstraint,
-  ValidatorConstraintInterface,
+  ValidateIf,
 } from 'class-validator';
-
-// --- VALIDADOR PERSONALIZADO PARA LA FECHA ---
-@ValidatorConstraint({ name: 'isRealBirthDate', async: false })
-export class IsRealBirthDateConstraint implements ValidatorConstraintInterface {
-  validate(value: string) {
-    const birthDate = new Date(value);
-    const today = new Date();
-    // Si la fecha es inválida, no pasa
-    if (isNaN(birthDate.getTime())) return false;
-
-    // No puede ser una fecha futura
-    if (birthDate > today) return false;
-
-    // No puede tener más de 120 años
-    const minDate = new Date();
-    minDate.setFullYear(today.getFullYear() - 120);
-    if (birthDate < minDate) return false;
-
-    return true;
-  }
-
-  defaultMessage() {
-    return 'La fecha de nacimiento no es válida (no puede ser futura ni mayor a 120 años)';
-  }
-}
+import {
+  DOCUMENT_TYPES,
+  GENDER_VALUES,
+  IsCivilBirthDateConstraint,
+  IsValidDocumentNumberConstraint,
+  NAME_PATTERN,
+  normalizeDocumentNumber,
+  normalizeEmail,
+  trimString,
+} from '../../patients/dto/patient-validation';
 
 export class RegisterDto {
-  @IsEmail({}, { message: 'Correo electrónico no válido' })
+  @Transform(({ value }) => normalizeEmail(value as unknown))
+  @IsString({ message: 'El correo electrónico debe ser texto' })
+  @IsNotEmpty({ message: 'El correo electrónico es obligatorio' })
+  @MaxLength(150, {
+    message: 'El correo electrónico no puede superar 150 caracteres',
+  })
+  @IsEmail({}, { message: 'Ingresa un correo electrónico válido' })
   email!: string;
 
   @IsString({ message: 'La contraseña debe ser texto' })
   @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
   password!: string;
 
-  @IsString({ message: 'Tipo de documento inválido' })
-  @IsNotEmpty({ message: 'El tipo de documento es obligatorio' })
+  @Transform(({ value }) => trimString(value))
+  @IsString({ message: 'El tipo de documento debe ser texto' })
+  @IsIn(DOCUMENT_TYPES, {
+    message: 'El tipo de documento debe ser CC, TI, CE, RC o PASAPORTE',
+  })
   tipoDocumento!: string;
 
-  @IsString({ message: 'Número de documento inválido' })
+  @Transform(({ value, obj }) =>
+    normalizeDocumentNumber(
+      value as unknown,
+      (obj as { tipoDocumento?: unknown }).tipoDocumento,
+    ),
+  )
+  @IsString({ message: 'El número de documento debe ser texto' })
   @IsNotEmpty({ message: 'El número de documento es obligatorio' })
+  @Validate(IsValidDocumentNumberConstraint)
   numeroDocumento!: string;
 
-  @IsString({ message: 'El primer nombre es obligatorio' })
-  @IsNotEmpty({ message: 'El primer nombre es obligatorio' })
+  @Transform(({ value }) => trimString(value))
+  @IsString({ message: 'El primer nombre debe ser texto' })
+  @MinLength(2, { message: 'El primer nombre debe tener mínimo 2 caracteres' })
+  @MaxLength(60, { message: 'El primer nombre no puede superar 60 caracteres' })
+  @Matches(NAME_PATTERN, {
+    message:
+      'El primer nombre solo puede contener letras, espacios, guiones o apóstrofes',
+  })
   primerNombre!: string;
 
-  @IsOptional()
+  @Transform(({ value }) => trimString(value))
+  @ValidateIf((_, value) => value !== undefined && value !== '')
   @IsString({ message: 'El segundo nombre debe ser texto' })
+  @MinLength(2, { message: 'El segundo nombre debe tener mínimo 2 caracteres' })
+  @MaxLength(60, {
+    message: 'El segundo nombre no puede superar 60 caracteres',
+  })
+  @Matches(NAME_PATTERN, {
+    message:
+      'El segundo nombre solo puede contener letras, espacios, guiones o apóstrofes',
+  })
   segundoNombre?: string;
 
-  @IsString({ message: 'El primer apellido es obligatorio' })
-  @IsNotEmpty({ message: 'El primer apellido es obligatorio' })
+  @Transform(({ value }) => trimString(value))
+  @IsString({ message: 'El primer apellido debe ser texto' })
+  @MinLength(2, {
+    message: 'El primer apellido debe tener mínimo 2 caracteres',
+  })
+  @MaxLength(60, {
+    message: 'El primer apellido no puede superar 60 caracteres',
+  })
+  @Matches(NAME_PATTERN, {
+    message:
+      'El primer apellido solo puede contener letras, espacios, guiones o apóstrofes',
+  })
   primerApellido!: string;
 
-  @IsOptional()
+  @Transform(({ value }) => trimString(value))
+  @ValidateIf((_, value) => value !== undefined && value !== '')
   @IsString({ message: 'El segundo apellido debe ser texto' })
+  @MinLength(2, {
+    message: 'El segundo apellido debe tener mínimo 2 caracteres',
+  })
+  @MaxLength(60, {
+    message: 'El segundo apellido no puede superar 60 caracteres',
+  })
+  @Matches(NAME_PATTERN, {
+    message:
+      'El segundo apellido solo puede contener letras, espacios, guiones o apóstrofes',
+  })
   segundoApellido?: string;
 
-  @IsString({ message: 'El teléfono es obligatorio' })
-  @IsNotEmpty({ message: 'El teléfono es obligatorio' })
+  @Transform(({ value }) => trimString(value))
+  @IsString({ message: 'El celular debe ser texto' })
+  @Matches(/^3\d{9}$/, {
+    message:
+      'Ingresa un celular colombiano válido de 10 dígitos que comience por 3',
+  })
   telefono!: string;
 
-  @IsString({ message: 'La EPS es obligatoria' })
+  @Transform(({ value }) => trimString(value))
+  @IsString({ message: 'La EPS debe ser texto' })
   @IsNotEmpty({ message: 'La EPS es obligatoria' })
+  @MaxLength(150, { message: 'La EPS no puede superar 150 caracteres' })
   eps!: string;
 
-  @IsOptional()
-  @IsInt({ message: 'epsId debe ser numérico' })
-  epsId?: number;
+  @IsInt({ message: 'Debes seleccionar una EPS válida' })
+  @Min(1, { message: 'Debes seleccionar una EPS válida' })
+  epsId!: number;
 
-  @IsString({ message: 'El género es obligatorio' })
-  @IsNotEmpty({ message: 'El género es obligatorio' })
+  @Transform(({ value }) => trimString(value))
+  @IsString({ message: 'El género debe ser texto' })
+  @IsIn(GENDER_VALUES, {
+    message:
+      'El género debe ser Femenino, Masculino, Otro o Prefiero no decirlo',
+  })
   genero!: string;
 
-  // --- VALIDACIÓN APLICADA AQUÍ ---
+  @Transform(({ value }) => trimString(value))
+  @IsString({ message: 'La fecha de nacimiento debe ser texto' })
   @IsNotEmpty({ message: 'La fecha de nacimiento es obligatoria' })
-  @IsString({ message: 'La fecha de nacimiento debe ser un texto válido' })
-  @Validate(IsRealBirthDateConstraint)
+  @Validate(IsCivilBirthDateConstraint)
   fechaNacimiento!: string;
 
-  @IsString({ message: 'El departamento es obligatorio' })
+  @Transform(({ value }) => trimString(value))
+  @IsString({ message: 'El departamento debe ser texto' })
   @IsNotEmpty({ message: 'El departamento es obligatorio' })
+  @MaxLength(100, {
+    message: 'El departamento no puede superar 100 caracteres',
+  })
   departamento!: string;
 
-  @IsString({ message: 'El municipio es obligatorio' })
+  @Transform(({ value }) => trimString(value))
+  @IsString({ message: 'El municipio debe ser texto' })
   @IsNotEmpty({ message: 'El municipio es obligatorio' })
+  @MaxLength(100, { message: 'El municipio no puede superar 100 caracteres' })
   municipio!: string;
 }

@@ -10,11 +10,17 @@ import {
   requestVerification,
 } from "@/service/verification";
 import { getMyAppointments } from "@/service/appointment";
-import { getMyPatient } from "@/service/patient";
+import {
+  getMyPatient,
+  getMyPhoneStatus,
+  type PhoneVerificationStatus,
+} from "@/service/patient";
 import { isAppointmentUpcoming } from '@/utils/appointment-date';
+import { notifySicsa as alert } from "@/app/components/SicsaFeedback";
 
 import type {
   AppointmentItem,
+  PatientSummary,
   SessionUser,
   VerificationForm,
   VerificationResponse,
@@ -31,10 +37,13 @@ export function usePatientDashboard() {
 
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [patient, setPatient] = useState<PatientSummary | null>(null);
   const [verificationStatus, setVerificationStatus] =
     useState<VerificationState>("none");
   const [requestLoading, setRequestLoading] = useState(false);
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
+  const [phoneVerificationStatus, setPhoneVerificationStatus] =
+    useState<PhoneVerificationStatus | null>(null);
 
   const [form, setForm] = useState<VerificationForm>({
     documento: "",
@@ -79,6 +88,11 @@ export function usePatientDashboard() {
       const patient = await getMyPatient(token);
 
       if (!mountedRef.current) return;
+
+      setPatient({
+        primerNombre: patient?.primerNombre,
+        primerApellido: patient?.primerApellido,
+      });
 
       setForm((prev) => ({
         documento: patient?.numeroDocumento || prev.documento || "",
@@ -159,6 +173,19 @@ export function usePatientDashboard() {
     }
   }, []);
 
+  const loadPhoneVerificationStatus = useCallback(async () => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      const status = await getMyPhoneStatus(token);
+      if (mountedRef.current) setPhoneVerificationStatus(status);
+    } catch {
+      // Compatibilidad mientras el backend remoto recibe esta capacidad.
+      if (mountedRef.current) setPhoneVerificationStatus(null);
+    }
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       const token = getToken();
@@ -185,6 +212,7 @@ export function usePatientDashboard() {
         loadPatientData(),
         loadVerificationStatus(),
         loadAppointments(),
+        loadPhoneVerificationStatus(),
       ]);
 
       if (mountedRef.current) {
@@ -193,7 +221,13 @@ export function usePatientDashboard() {
     };
 
     void init();
-  }, [router, loadPatientData, loadVerificationStatus, loadAppointments]);
+  }, [
+    router,
+    loadPatientData,
+    loadVerificationStatus,
+    loadAppointments,
+    loadPhoneVerificationStatus,
+  ]);
 
   useEffect(() => {
     if (checkingAuth) return;
@@ -209,10 +243,13 @@ export function usePatientDashboard() {
 
   useEffect(() => {
     if (checkingAuth) return;
+    const token = getToken();
+    if (!token) return;
 
     const socket = io(SOCKET_URL, {
       transports: ["websocket"],
       withCredentials: true,
+      auth: { token: `Bearer ${token}` },
     });
 
     socketRef.current = socket;
@@ -353,8 +390,10 @@ export function usePatientDashboard() {
   return {
     checkingAuth,
     user,
+    patient,
     form,
     appointments,
+    phoneVerificationStatus,
     activeAppointments,
     nextActiveAppointment,
     verificationStatus,

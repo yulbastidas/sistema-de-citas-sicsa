@@ -14,11 +14,15 @@ import { AppointmentWaitlistService } from './services/appointment-waitlist.serv
 import { AppointmentNotificationService } from './services/appointment-notification.service';
 import { AppointmentPriorityService } from './services/appointment-priority.service';
 import { AppointmentMapperService } from './services/appointment-mapper.service';
+import { N8nInternalGuard } from '../auth/guards/n8n-internal.guard';
+import { RealtimeModule } from '../realtime/realtime.module';
+import { MedicalReport } from '../medical-reports/entities/medical-report.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Appointment, Verification, Patient, Doctor]),
+    TypeOrmModule.forFeature([Appointment, Verification, Patient, Doctor, MedicalReport]),
     MedicalReportsModule,
+    RealtimeModule,
   ],
   controllers: [AppointmentsController],
   providers: [
@@ -30,6 +34,7 @@ import { AppointmentMapperService } from './services/appointment-mapper.service'
     AppointmentNotificationService,
     AppointmentPriorityService,
     AppointmentMapperService,
+    N8nInternalGuard,
   ],
 })
 export class AppointmentsModule {}

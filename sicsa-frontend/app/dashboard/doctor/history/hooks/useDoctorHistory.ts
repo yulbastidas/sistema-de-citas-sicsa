@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   downloadAppointmentPdf,
-  getDoctorAppointments,
+  getDoctorHistory,
 } from "@/service/appointment";
 import { getToken, getUser, logout } from "@/service/session";
+import { notifySicsa as alert } from "@/app/components/SicsaFeedback";
 import { HistoryAppointmentItem, SessionUser } from "../types";
 
 function normalizeRole(role: string | number | undefined): string | undefined {
@@ -62,15 +63,13 @@ export function useDoctorHistory() {
           return;
         }
 
-        const result = await getDoctorAppointments(token, savedUser.sub);
+        const result = await getDoctorHistory(token, savedUser.sub, {
+          search,
+          date: dateFilter,
+        });
         const items = Array.isArray(result) ? result : result?.data || [];
 
-        const historyItems = items.filter((item: HistoryAppointmentItem) => {
-          const estado = String(item.estado || "").toLowerCase();
-          return estado === "atendida" || !!item.medicalReport?.exists;
-        });
-
-        setAppointments(historyItems);
+        setAppointments(items);
       } catch (error: unknown) {
         if (error instanceof Error) {
           const message = error.message.toLowerCase();
@@ -98,7 +97,7 @@ export function useDoctorHistory() {
     if (checkingAuth) return;
 
     void loadHistory();
-  }, [checkingAuth]);
+  }, [checkingAuth, search, dateFilter]);
 
   const filteredAppointments = useMemo(() => {
     return appointments.filter((item) => {

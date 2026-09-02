@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import {
   adminCreateAppointment,
@@ -14,6 +14,7 @@ import {
 } from "@/service/appointment";
 import { getToken, getUser } from "@/service/session";
 import { getSpecialties } from "@/service/specialty";
+import { confirmSicsa, notifySicsa as alert } from "@/app/components/SicsaFeedback";
 
 import type {
   AdminAppointmentForm,
@@ -99,13 +100,18 @@ export function useAdminAppointments() {
   }, []);
 
   // ── Loaders ──
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     const token = getToken();
     if (!token) return;
 
     try {
       setLoading(true);
-      const result = await getAllAppointments(token);
+      const result = await getAllAppointments(token, {
+        limit: 100,
+        status: statusFilter,
+        date: dateFilter,
+        search: searchTerm,
+      });
       const items = Array.isArray(result) ? result : result?.data || [];
       setAppointments(items);
     } catch (error: unknown) {
@@ -117,7 +123,13 @@ export function useAdminAppointments() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateFilter, searchTerm, statusFilter]);
+
+  const loadAppointmentsRef = useRef(loadAppointments);
+
+  useEffect(() => {
+    loadAppointmentsRef.current = loadAppointments;
+  }, [loadAppointments]);
 
   const loadQueue = async (fecha: string) => {
     const token = getToken();
@@ -205,10 +217,15 @@ export function useAdminAppointments() {
   // ── Effects ──
   useEffect(() => {
     if (checkingAuth) return;
-    void loadAppointments();
     void loadQueue(selectedDate);
     void loadCatalogs();
   }, [checkingAuth, selectedDate]);
+
+  useEffect(() => {
+    if (checkingAuth) return;
+    const timeout = window.setTimeout(() => void loadAppointments(), 300);
+    return () => window.clearTimeout(timeout);
+  }, [checkingAuth, loadAppointments]);
 
   useEffect(() => {
     if (!form.fecha) {
@@ -222,10 +239,13 @@ export function useAdminAppointments() {
   // ── Socket (fuente de verdad para actualizaciones en tiempo real) ──
   useEffect(() => {
     if (checkingAuth) return;
+    const token = getToken();
+    if (!token) return;
 
     const socket = io(SOCKET_URL, {
       transports: ["websocket"],
       withCredentials: true,
+      auth: { token: `Bearer ${token}` },
     });
 
     socketRef.current = socket;
@@ -235,25 +255,25 @@ export function useAdminAppointments() {
     });
 
     socket.on("appointmentCreated", () => {
-      void loadAppointments();
+      void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
       if (form.fecha) void loadAvailableHours(form.fecha);
     });
 
     socket.on("appointmentUpdated", () => {
-      void loadAppointments();
+      void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
       if (form.fecha) void loadAvailableHours(form.fecha);
     });
 
     socket.on("appointmentCancelled", () => {
-      void loadAppointments();
+      void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
       if (form.fecha) void loadAvailableHours(form.fecha);
     });
 
     socket.on("queueUpdated", () => {
-      void loadAppointments();
+      void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
       if (form.fecha) void loadAvailableHours(form.fecha);
     });
@@ -323,7 +343,11 @@ export function useAdminAppointments() {
     const token = getToken();
     if (!token) return;
 
-    const confirmed = window.confirm("¿Deseas cancelar esta cita?");
+    const confirmed = await confirmSicsa({
+      title: "Cancelar cita",
+      message: "¿Estás seguro de que deseas cancelar esta cita?",
+      confirmLabel: "Sí, cancelar",
+    });
     if (!confirmed) return;
 
     try {

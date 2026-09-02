@@ -31,9 +31,9 @@ export function DoctorSidebar({
   );
 
   return (
-    <section className="mt-6 overflow-hidden rounded-2xl border border-cyan-200 bg-white shadow-sm">
+    <section className="mt-4 overflow-hidden rounded-3xl border border-cyan-200 bg-white shadow-sm">
       <section className="grid lg:grid-cols-[1fr_auto]">
-        <article className="p-5 sm:p-6">
+        <article className="p-5">
           <header className="flex items-start gap-3">
             <figure className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-700 text-white">
               <Clock3 size={21} />
@@ -103,7 +103,7 @@ export function DoctorSidebar({
           )}
         </article>
 
-        <aside className="flex flex-col justify-center gap-3 border-t border-cyan-100 bg-cyan-50 p-5 lg:min-w-72 lg:border-l lg:border-t-0">
+        <aside className="flex flex-col justify-center gap-3 border-t border-cyan-100 bg-gradient-to-br from-cyan-50 to-blue-50 p-5 lg:min-w-72 lg:border-l lg:border-t-0">
           <section className="grid grid-cols-2 gap-3">
             <article>
               <p className="text-xs font-medium text-slate-500">

@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 
 import { AppointmentsController } from './appointments.controller';
 import { AppointmentsService } from './appointments.service';
+import { AuditService } from '../audit/audit.service';
 
 describe('AppointmentsController', () => {
   let controller: AppointmentsController;
@@ -32,6 +33,7 @@ describe('AppointmentsController', () => {
           provide: AppointmentsService,
           useValue: mockAppointmentsService,
         },
+        { provide: AuditService, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 

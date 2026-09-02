@@ -37,3 +37,8 @@ export type VerificationForm = {
   eps: string;
   epsId: string;
 };
+
+export type PatientSummary = {
+  primerNombre?: string;
+  primerApellido?: string;
+};

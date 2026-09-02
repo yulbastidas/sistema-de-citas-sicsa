@@ -35,7 +35,7 @@ export function PatientListItem({
         <button
             type="button"
             onClick={() => onSelect(patient)}
-            className={`group w-full rounded-2xl border p-4 text-left transition ${selected
+            className={`group w-full rounded-2xl border p-3.5 text-left transition ${selected
                     ? "border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-100"
                     : "border-slate-200 bg-slate-50 hover:border-blue-200 hover:bg-white hover:shadow-sm"
                 }`}
@@ -71,7 +71,7 @@ export function PatientListItem({
                 )}
             </header>
 
-            <section className="mt-4 space-y-2">
+            <section className="mt-3 grid gap-x-3 gap-y-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                 <p className="flex items-center gap-2 text-sm text-slate-600">
                     <Mail
                         size={15}

@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  useEffect,
   useMemo,
   useState,
 } from "react";
 
 import {
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -109,8 +109,10 @@ export function PatientAppointmentList({
   loadingAppointments,
   onCancel,
 }: PatientAppointmentListProps) {
-  const [currentPage, setCurrentPage] =
-    useState(1);
+  const [pagination, setPagination] = useState({
+    appointmentCount: appointments.length,
+    page: 1,
+  });
 
   const totalPages = Math.max(
     1,
@@ -120,23 +122,10 @@ export function PatientAppointmentList({
     ),
   );
 
-  /*
-   * Cuando cambia la cantidad de citas,
-   * regresamos a la primera página.
-   */
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [appointments.length]);
-
-  /*
-   * Evita quedar ubicado en una página
-   * que ya no existe.
-   */
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  const currentPage =
+    pagination.appointmentCount === appointments.length
+      ? Math.min(pagination.page, totalPages)
+      : 1;
 
   const paginatedAppointments =
     useMemo(() => {
@@ -167,27 +156,32 @@ export function PatientAppointmentList({
   );
 
   const goToPreviousPage = () => {
-    setCurrentPage((previousPage) =>
-      Math.max(previousPage - 1, 1),
-    );
+    setPagination({
+      appointmentCount: appointments.length,
+      page: Math.max(currentPage - 1, 1),
+    });
   };
 
   const goToNextPage = () => {
-    setCurrentPage((previousPage) =>
-      Math.min(
-        previousPage + 1,
-        totalPages,
-      ),
-    );
+    setPagination({
+      appointmentCount: appointments.length,
+      page: Math.min(currentPage + 1, totalPages),
+    });
   };
 
   const goToPage = (page: number) => {
-    setCurrentPage(page);
+    setPagination({
+      appointmentCount: appointments.length,
+      page,
+    });
   };
 
   return (
-    <section className="mt-6 overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-xl">
-      <header className="border-b border-slate-100 bg-gradient-to-r from-white via-sky-50/50 to-cyan-50/70 px-6 py-6 sm:px-8">
+    <details
+      open
+      className="group/section mt-5 overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-xl"
+    >
+      <summary className="cursor-pointer list-none border-b border-slate-100 bg-gradient-to-r from-white via-sky-50/50 to-cyan-50/70 px-6 py-5 outline-none marker:hidden transition-colors hover:bg-sky-50/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:px-7 [&::-webkit-details-marker]:hidden">
         <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <section className="flex items-start gap-4">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 shadow-md shadow-blue-100">
@@ -211,28 +205,34 @@ export function PatientAppointmentList({
             </section>
           </section>
 
-          <section className="flex w-fit items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
-              <CalendarDays
-                className="text-blue-600"
-                size={18}
-              />
-            </span>
+          <section className="flex items-center gap-3">
+            <section className="flex w-fit items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
+                <CalendarDays
+                  className="text-blue-600"
+                  size={18}
+                />
+              </span>
 
-            <section>
-              <p className="text-xs font-medium text-slate-500">
-                Citas registradas
-              </p>
+              <section>
+                <p className="text-xs font-medium text-slate-500">
+                  Citas registradas
+                </p>
 
-              <p className="text-xl font-bold text-slate-900">
-                {appointments.length}
-              </p>
+                <p className="text-xl font-bold text-slate-900">
+                  {appointments.length}
+                </p>
+              </section>
             </section>
+
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 shadow-sm transition-transform duration-200 group-open/section:rotate-180">
+              <ChevronDown size={21} strokeWidth={2.4} />
+            </span>
           </section>
         </section>
-      </header>
+      </summary>
 
-      <section className="p-6 sm:p-8">
+      <section className="p-5 sm:p-6">
         {loadingAppointments ? (
           <article className="flex min-h-[220px] items-center justify-center rounded-[1.75rem] border border-slate-200 bg-slate-50/70">
             <section className="text-center">
@@ -316,7 +316,7 @@ export function PatientAppointmentList({
           </article>
         ) : (
           <>
-            <section className="grid gap-5">
+            <section className="grid gap-2.5">
               {paginatedAppointments.map(
                 (item) => {
                   const status = (
@@ -328,13 +328,42 @@ export function PatientAppointmentList({
                     "lista_espera";
 
                   return (
-                    <article
+                    <details
                       key={item.id}
-                      className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg"
+                      className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:border-blue-200 hover:bg-slate-50/40 hover:shadow-md open:border-blue-200 open:bg-white open:shadow-md"
                     >
-                      <section className="h-1.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-400" />
+                      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 outline-none marker:hidden transition-colors duration-200 hover:bg-blue-50/40 focus-visible:bg-blue-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:px-5 [&::-webkit-details-marker]:hidden">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50">
+                          <Stethoscope className="text-blue-600" size={18} />
+                        </span>
 
-                      <section className="p-5 sm:p-6">
+                        <section className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(110px,0.7fr)_minmax(170px,1.35fr)_minmax(95px,0.6fr)] sm:items-center">
+                          <section className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-bold text-slate-900">Cita #{item.id}</h3>
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${getStatusBadgeClass(item.estado)}`}>
+                              {getStatusLabel(item.estado)}
+                            </span>
+                          </section>
+
+                          <span className="flex items-center gap-2 text-sm font-semibold capitalize text-slate-700">
+                            <CalendarDays className="shrink-0 text-blue-600" size={16} />
+                            {formatAppointmentDate(item.fecha)}
+                          </span>
+
+                          <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <Clock3 className="shrink-0 text-cyan-600" size={16} />
+                            {isWaitlist ? "Por asignar" : item.hora || "-"}
+                          </span>
+                        </section>
+
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all duration-200 group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-700 group-open:rotate-180 group-open:border-blue-200 group-open:bg-blue-50 group-open:text-blue-700">
+                          <ChevronDown size={19} strokeWidth={2.4} />
+                        </span>
+                      </summary>
+
+                      <section className="h-px bg-gradient-to-r from-blue-500 via-cyan-400 to-transparent" />
+
+                      <section className="p-4 transition-opacity duration-200 sm:p-5">
                         <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                           <section className="flex min-w-0 items-start gap-4">
                             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50">
@@ -390,7 +419,7 @@ export function PatientAppointmentList({
                             )}
                         </header>
 
-                        <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                             <section className="flex items-center gap-2">
                               <CalendarDays
@@ -506,7 +535,7 @@ export function PatientAppointmentList({
                           </section>
                         )}
 
-                        <section className="mt-5 grid gap-4 lg:grid-cols-2">
+                        <section className="mt-4 grid gap-3 lg:grid-cols-2">
                           <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                             <section className="flex items-center gap-2">
                               <Stethoscope
@@ -545,14 +574,14 @@ export function PatientAppointmentList({
                           </article>
                         </section>
                       </section>
-                    </article>
+                    </details>
                   );
                 },
               )}
             </section>
 
             {/* Paginación de las citas del paciente */}
-            <footer className="mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <footer className="mt-5 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
               <section>
                 <p className="text-sm font-semibold text-slate-700">
                   Mostrando{" "}
@@ -642,6 +671,6 @@ export function PatientAppointmentList({
           </>
         )}
       </section>
-    </section>
+    </details>
   );
 }

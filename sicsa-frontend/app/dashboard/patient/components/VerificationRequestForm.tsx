@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import type { VerificationForm } from "../types";
 
 type Props = {
@@ -8,7 +8,6 @@ type Props = {
   requestLoading: boolean;
   isPending: boolean;
   onSubmit: () => void;
-  onLogout: () => void;
 };
 
 export function VerificationRequestForm({
@@ -16,7 +15,6 @@ export function VerificationRequestForm({
   requestLoading,
   isPending,
   onSubmit,
-  onLogout,
 }: Props) {
   return (
     <section className="mt-6 rounded-[2rem] border border-cyan-100 bg-white/90 p-6 shadow-lg backdrop-blur">
@@ -74,15 +72,6 @@ export function VerificationRequestForm({
               : "Solicitar verificación"}
         </button>
 
-        <button
-          onClick={onLogout}
-          className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
-        >
-          <span className="inline-flex items-center gap-2">
-            <LogOut size={16} />
-            Cerrar sesión
-          </span>
-        </button>
       </section>
     </section>
   );
