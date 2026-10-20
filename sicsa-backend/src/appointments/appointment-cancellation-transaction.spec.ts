@@ -63,7 +63,7 @@ describe('Appointment cancellation transaction', () => {
       {} as never,
       {} as never,
       {
-        getAppointmentDurationBySpecialty: jest.fn().mockReturnValue(30),
+        resolveAppointmentDuration: jest.fn().mockResolvedValue(30),
         getBlockingStates: jest.fn().mockReturnValue(['confirmada']),
       } as never,
       {} as never,
@@ -71,6 +71,7 @@ describe('Appointment cancellation transaction', () => {
       { attachPatientData: jest.fn(async (value) => value) } as never,
       waitlist as never,
       dataSource as never,
+      { assertAvailableForNewAppointment: jest.fn() } as never,
     );
 
     await expect(service.cancel(44, user)).resolves.toMatchObject({
@@ -103,6 +104,7 @@ describe('Appointment cancellation transaction', () => {
       {} as never,
       {} as never,
       {} as never,
+      { assertAvailableForNewAppointment: jest.fn() } as never,
     );
 
     await expect(service.cancel(44, user)).rejects.toBeInstanceOf(

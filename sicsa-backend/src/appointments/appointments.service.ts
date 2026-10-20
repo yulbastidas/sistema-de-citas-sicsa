@@ -24,6 +24,7 @@ import { AppointmentMapperService } from './services/appointment-mapper.service'
 import { AppointmentWaitlistService } from './services/appointment-waitlist.service';
 import { PageRequest, pageResult } from '../common/pagination';
 import { MedicalReport } from '../medical-reports/entities/medical-report.entity';
+import { AppointmentClassService } from '../appointment-class/appointment-class.service';
 
 interface JwtUser {
   sub: number;
@@ -78,6 +79,7 @@ export class AppointmentsService {
     private mapperService: AppointmentMapperService,
     private waitlistService: AppointmentWaitlistService,
     private dataSource: DataSource,
+    private appointmentClassService: AppointmentClassService,
   ) {}
 
   async create(
@@ -92,7 +94,11 @@ export class AppointmentsService {
       throw new NotFoundException('Perfil de paciente no encontrado');
     }
 
-    const duration = this.scheduleService.getAppointmentDuration(
+    await this.appointmentClassService.assertAvailableForNewAppointment(
+      data.appointmentClassId,
+    );
+
+    const duration = await this.scheduleService.resolveAppointmentDuration(
       data.specialtyId,
     );
 
@@ -171,7 +177,11 @@ export class AppointmentsService {
       throw new NotFoundException('Paciente no encontrado');
     }
 
-    const duration = this.scheduleService.getAppointmentDuration(
+    await this.appointmentClassService.assertAvailableForNewAppointment(
+      data.appointmentClassId,
+    );
+
+    const duration = await this.scheduleService.resolveAppointmentDuration(
       data.specialtyId,
     );
 
@@ -406,7 +416,7 @@ export class AppointmentsService {
         }
 
         const releasedDuration =
-          this.scheduleService.getAppointmentDurationBySpecialty(
+          await this.scheduleService.resolveAppointmentDuration(
             lockedAppointment.specialtyId,
           );
         const shouldPromote =

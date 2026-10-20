@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  Activity,
-  AlertTriangle,
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   ClipboardList,
   FileText,
   MapPin,
@@ -17,6 +13,7 @@ import {
   Sparkles,
   Stethoscope,
 } from "lucide-react";
+import AppointmentPriorityFields from "@/app/components/AppointmentPriorityFields";
 
 import type {
   AppointmentClassItem,
@@ -46,409 +43,6 @@ const STEPS = [
   { id: 4, label: "Detalles", icon: FileText },
 ] as const;
 
-const PAIN_LEVELS = ["Sin dolor", "Leve", "Moderado", "Fuerte"] as const;
-
-const ONSET_OPTIONS = [
-  "Hoy",
-  "2–3 días",
-  "Menos de una semana",
-  "1 semana o más",
-] as const;
-
-type ClinicalType =
-  | "general"
-  | "dental"
-  | "oral-hygiene"
-  | "gynecology"
-  | "pediatrics"
-  | "mental-health"
-  | "generic";
-
-type ClinicalConfig = {
-  type: ClinicalType;
-  title: string;
-  description: string;
-  question: string;
-  primaryOptions: readonly string[];
-  secondaryOptions: readonly string[];
-  showPain: boolean;
-  showOnset: boolean;
-  showPriorityPreview: boolean;
-};
-
-const GENERAL_CONFIG: ClinicalConfig = {
-  type: "general",
-  title: "Información sobre tus síntomas",
-  description:
-    "Selecciona únicamente los síntomas que presentas actualmente.",
-  question: "¿Presentas alguno de estos síntomas?",
-  primaryOptions: [
-    "Fiebre",
-    "Tos",
-    "Dolor de cabeza",
-    "Dolor abdominal",
-    "Náuseas o vómito",
-    "Dificultad para respirar",
-  ],
-  secondaryOptions: [
-    "Dolor en el pecho",
-    "Diarrea",
-    "Mareo",
-    "Dolor muscular",
-    "Fatiga",
-    "Erupciones en la piel",
-    "Sangrado",
-  ],
-  showPain: true,
-  showOnset: true,
-  showPriorityPreview: true,
-};
-
-const DENTAL_CONFIG: ClinicalConfig = {
-  type: "dental",
-  title: "Información odontológica",
-  description:
-    "Indica el motivo principal para orientar correctamente la atención.",
-  question: "¿Cuál es el motivo de la cita?",
-  primaryOptions: [
-    "Limpieza dental",
-    "Control odontológico",
-    "Dolor dental",
-    "Caries",
-    "Diente fracturado",
-    "Inflamación de encía",
-  ],
-  secondaryOptions: [
-    "Sangrado de encías",
-    "Extracción dental",
-    "Tratamiento pendiente",
-    "Golpe o trauma dental",
-    "Inflamación facial",
-    "Dificultad para abrir la boca",
-    "Otro motivo odontológico",
-  ],
-  showPain: true,
-  showOnset: true,
-  showPriorityPreview: true,
-};
-
-const ORAL_HYGIENE_CONFIG: ClinicalConfig = {
-  type: "oral-hygiene",
-  title: "Motivo de atención en higiene oral",
-  description:
-    "Selecciona el servicio o motivo relacionado con tu cuidado oral.",
-  question: "¿Qué atención necesitas?",
-  primaryOptions: [
-    "Limpieza oral",
-    "Control de higiene oral",
-    "Aplicación de flúor",
-    "Revisión de encías",
-    "Educación en higiene oral",
-    "Control de placa",
-  ],
-  secondaryOptions: [
-    "Sangrado de encías",
-    "Mal aliento persistente",
-    "Sensibilidad dental",
-    "Otro motivo",
-  ],
-  showPain: false,
-  showOnset: false,
-  showPriorityPreview: false,
-};
-
-const GYNECOLOGY_CONFIG: ClinicalConfig = {
-  type: "gynecology",
-  title: "Información para la consulta",
-  description:
-    "Selecciona el motivo relacionado con tu atención ginecológica.",
-  question: "¿Cuál es el motivo principal?",
-  primaryOptions: [
-    "Control ginecológico",
-    "Dolor pélvico",
-    "Sangrado anormal",
-    "Flujo o molestias",
-    "Planificación familiar",
-    "Control de embarazo",
-  ],
-  secondaryOptions: [
-    "Resultado de examen",
-    "Irregularidad menstrual",
-    "Dolor intenso",
-    "Fiebre",
-    "Otro motivo",
-  ],
-  showPain: true,
-  showOnset: true,
-  showPriorityPreview: true,
-};
-
-const PEDIATRICS_CONFIG: ClinicalConfig = {
-  type: "pediatrics",
-  title: "Información sobre el menor",
-  description:
-    "Selecciona el motivo principal de la consulta pediátrica.",
-  question: "¿Cuál es el motivo de la consulta?",
-  primaryOptions: [
-    "Control de crecimiento",
-    "Fiebre",
-    "Tos",
-    "Dolor",
-    "Náuseas o vómito",
-    "Problemas digestivos",
-  ],
-  secondaryOptions: [
-    "Diarrea",
-    "Erupción en la piel",
-    "Dificultad para respirar",
-    "Falta de apetito",
-    "Fatiga",
-    "Otro motivo",
-  ],
-  showPain: true,
-  showOnset: true,
-  showPriorityPreview: true,
-};
-
-const MENTAL_HEALTH_CONFIG: ClinicalConfig = {
-  type: "mental-health",
-  title: "Motivo de atención",
-  description:
-    "Selecciona el motivo general. No necesitas indicar un diagnóstico.",
-  question: "¿Cuál es el motivo principal?",
-  primaryOptions: [
-    "Primera valoración",
-    "Control",
-    "Ansiedad",
-    "Cambios de ánimo",
-    "Problemas de sueño",
-    "Seguimiento de tratamiento",
-  ],
-  secondaryOptions: [
-    "Crisis emocional",
-    "Dificultad para concentrarse",
-    "Estrés",
-    "Otro motivo",
-  ],
-  showPain: false,
-  showOnset: true,
-  showPriorityPreview: false,
-};
-
-const GENERIC_CONFIG: ClinicalConfig = {
-  type: "generic",
-  title: "Información de la consulta",
-  description:
-    "Describe brevemente el motivo para orientar la atención solicitada.",
-  question: "Puedes seleccionar una opción relacionada",
-  primaryOptions: [
-    "Primera valoración",
-    "Control",
-    "Seguimiento de tratamiento",
-    "Resultado de examen",
-    "Procedimiento programado",
-    "Otro motivo",
-  ],
-  secondaryOptions: [],
-  showPain: false,
-  showOnset: true,
-  showPriorityPreview: false,
-};
-
-const CLINICAL_BLOCK_START =
-  "--- Información clínica (autogenerado) ---";
-const CLINICAL_BLOCK_END = "--- fin información clínica ---";
-
-const CLINICAL_BLOCK_REGEX = new RegExp(
-  `${CLINICAL_BLOCK_START}[\\s\\S]*?${CLINICAL_BLOCK_END}\\n?`,
-);
-
-type PriorityLevel = "baja" | "media" | "alta";
-
-function normalizeText(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}
-
-function getClinicalConfig(
-  specialtyId: string,
-  specialties: SpecialtyItem[],
-): ClinicalConfig {
-  const selectedSpecialty = specialties.find(
-    (specialty) => String(specialty.id) === specialtyId,
-  );
-
-  const specialtyName = normalizeText(selectedSpecialty?.nombre || "");
-
-  if (
-    specialtyId === "13" ||
-    specialtyName.includes("medico general") ||
-    specialtyName.includes("medicina general")
-  ) {
-    return GENERAL_CONFIG;
-  }
-
-  if (
-    specialtyId === "15" ||
-    specialtyName.includes("odontolog")
-  ) {
-    return DENTAL_CONFIG;
-  }
-
-  if (
-    specialtyId === "9" ||
-    specialtyName.includes("higienista") ||
-    specialtyName.includes("higiene oral")
-  ) {
-    return ORAL_HYGIENE_CONFIG;
-  }
-
-  if (
-    specialtyName.includes("ginecolog") ||
-    specialtyName.includes("obstetric")
-  ) {
-    return GYNECOLOGY_CONFIG;
-  }
-
-  if (specialtyName.includes("pediatr")) {
-    return PEDIATRICS_CONFIG;
-  }
-
-  if (
-    specialtyName.includes("psicolog") ||
-    specialtyName.includes("psiquiatr")
-  ) {
-    return MENTAL_HEALTH_CONFIG;
-  }
-
-  return GENERIC_CONFIG;
-}
-
-const GENERAL_CRITICAL_OPTIONS = [
-  "Dificultad para respirar",
-  "Dolor en el pecho",
-  "Sangrado",
-];
-
-const DENTAL_CRITICAL_OPTIONS = [
-  "Inflamación facial",
-  "Dificultad para abrir la boca",
-  "Golpe o trauma dental",
-];
-
-function calculatePriority(
-  clinicalType: ClinicalType,
-  selectedOptions: string[],
-  pain: string,
-  onset: string,
-): {
-  level: PriorityLevel;
-  label: string;
-  note: string;
-} {
-  let score = 0;
-
-  if (clinicalType === "general" || clinicalType === "pediatrics") {
-    selectedOptions.forEach((option) => {
-      score += GENERAL_CRITICAL_OPTIONS.includes(option) ? 4 : 1;
-    });
-  } else if (
-    clinicalType === "dental" ||
-    clinicalType === "gynecology"
-  ) {
-    selectedOptions.forEach((option) => {
-      score += DENTAL_CRITICAL_OPTIONS.includes(option) ? 3 : 1;
-    });
-  } else {
-    selectedOptions.forEach(() => {
-      score += 1;
-    });
-  }
-
-  if (pain === "Leve") score += 1;
-  if (pain === "Moderado") score += 2;
-  if (pain === "Fuerte") score += 4;
-
-  if (onset === "Hoy") score += 1;
-  if (onset === "2–3 días") score += 1;
-
-  if (score >= 7) {
-    return {
-      level: "alta",
-      label: "Requiere revisión prioritaria",
-      note:
-        "Las respuestas contienen factores que deben ser revisados por el personal encargado.",
-    };
-  }
-
-  if (score >= 3) {
-    return {
-      level: "media",
-      label: "Prioridad preliminar media",
-      note:
-        "La información será analizada por el sistema de priorización.",
-    };
-  }
-
-  return {
-    level: "baja",
-    label: "Registro normal",
-    note:
-      "No se identificaron factores preliminares de alta prioridad.",
-  };
-}
-
-function buildClinicalBlock(
-  specialtyName: string,
-  clinicalTitle: string,
-  selectedOptions: string[],
-  pain: string,
-  onset: string,
-): string {
-  const optionsText =
-    selectedOptions.length === 0
-      ? "Ninguno seleccionado"
-      : selectedOptions.join(", ");
-
-  return [
-    CLINICAL_BLOCK_START,
-    `Especialidad: ${specialtyName || "No indicada"}`,
-    `Tipo de información: ${clinicalTitle}`,
-    `Motivos o síntomas seleccionados: ${optionsText}`,
-    `Intensidad del dolor: ${pain || "No indicada"}`,
-    `Inicio o tiempo de evolución: ${onset || "No indicado"}`,
-    CLINICAL_BLOCK_END,
-  ].join("\n");
-}
-
-const priorityStyles: Record<
-  PriorityLevel,
-  {
-    border: string;
-    bg: string;
-    text: string;
-  }
-> = {
-  baja: {
-    border: "border-emerald-200",
-    bg: "bg-emerald-50",
-    text: "text-emerald-800",
-  },
-  media: {
-    border: "border-amber-200",
-    bg: "bg-amber-50",
-    text: "text-amber-800",
-  },
-  alta: {
-    border: "border-rose-200",
-    bg: "bg-rose-50",
-    text: "text-rose-800",
-  },
-};
-
 export function PatientAppointmentForm({
   form,
   specialties,
@@ -460,10 +54,6 @@ export function PatientAppointmentForm({
   onSubmit,
 }: PatientAppointmentFormProps) {
   const [step, setStep] = useState(1);
-  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
-  const [pain, setPain] = useState("");
-  const [onset, setOnset] = useState("");
-  const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   const selectedSpecialty = useMemo(
     () =>
@@ -474,44 +64,6 @@ export function PatientAppointmentForm({
     [specialties, form.specialtyId],
   );
 
-  const clinicalConfig = useMemo(
-    () => getClinicalConfig(form.specialtyId, specialties),
-    [form.specialtyId, specialties],
-  );
-
-  const priority = useMemo(
-    () =>
-      calculatePriority(
-        clinicalConfig.type,
-        selectedOptions,
-        pain,
-        onset,
-      ),
-    [clinicalConfig.type, selectedOptions, pain, onset],
-  );
-
-  useEffect(() => {
-    setSelectedOptions([]);
-    setPain("");
-    setOnset("");
-    setShowMoreOptions(false);
-
-    const cleanObservaciones = form.observaciones
-      .replace(CLINICAL_BLOCK_REGEX, "")
-      .trim();
-
-    if (cleanObservaciones !== form.observaciones) {
-      onChange({
-        target: {
-          name: "observaciones",
-          value: cleanObservaciones,
-        },
-      } as React.ChangeEvent<HTMLTextAreaElement>);
-    }
-
-    // Se limpia la información clínica cuando cambia la especialidad.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.specialtyId]);
 
   const goNext = () => {
     setStep((previous) =>
@@ -523,60 +75,6 @@ export function PatientAppointmentForm({
     setStep((previous) => Math.max(previous - 1, 1));
   };
 
-  const syncClinicalSummary = (
-    nextOptions: string[],
-    nextPain: string,
-    nextOnset: string,
-  ) => {
-    const hasClinicalInformation =
-      nextOptions.length > 0 || Boolean(nextPain) || Boolean(nextOnset);
-
-    const cleanObservaciones = form.observaciones
-      .replace(CLINICAL_BLOCK_REGEX, "")
-      .trim();
-
-    const clinicalBlock = buildClinicalBlock(
-      selectedSpecialty?.nombre || "",
-      clinicalConfig.title,
-      nextOptions,
-      nextPain,
-      nextOnset,
-    );
-
-    const nextValue = hasClinicalInformation
-      ? `${clinicalBlock}\n${cleanObservaciones}`.trim()
-      : cleanObservaciones;
-
-    onChange({
-      target: {
-        name: "observaciones",
-        value: nextValue,
-      },
-    } as React.ChangeEvent<HTMLTextAreaElement>);
-  };
-
-  const toggleOption = (option: string) => {
-    const nextOptions = selectedOptions.includes(option)
-      ? selectedOptions.filter((item) => item !== option)
-      : [...selectedOptions, option];
-
-    setSelectedOptions(nextOptions);
-    syncClinicalSummary(nextOptions, pain, onset);
-  };
-
-  const selectPain = (level: string) => {
-    const nextPain = pain === level ? "" : level;
-
-    setPain(nextPain);
-    syncClinicalSummary(selectedOptions, nextPain, onset);
-  };
-
-  const selectOnset = (option: string) => {
-    const nextOnset = onset === option ? "" : option;
-
-    setOnset(nextOnset);
-    syncClinicalSummary(selectedOptions, pain, nextOnset);
-  };
 
   const inputClass =
     "w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white disabled:bg-slate-100 disabled:text-slate-400";
@@ -586,24 +84,6 @@ export function PatientAppointmentForm({
 
   const labelClass =
     "mb-2 block text-sm font-medium text-slate-700";
-
-  const optionButtonClass = (checked: boolean) =>
-    `flex min-h-12 items-center justify-between gap-2 rounded-2xl border-2 px-4 py-3 text-left text-sm font-medium transition ${checked
-      ? "border-blue-500 bg-blue-50 text-blue-800 shadow-sm"
-      : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
-    } ${!canCreateAppointment
-      ? "pointer-events-none opacity-50"
-      : ""
-    }`;
-
-  const choiceButtonClass = (checked: boolean) =>
-    `rounded-2xl border-2 px-4 py-2.5 text-sm font-medium transition ${checked
-      ? "border-blue-500 bg-blue-50 text-blue-800"
-      : "border-slate-200 bg-white text-slate-700 hover:border-blue-200"
-    } ${!canCreateAppointment
-      ? "pointer-events-none opacity-50"
-      : ""
-    }`;
 
   return (
     <section className="min-w-0 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/60 sm:p-6 lg:p-7">
@@ -737,13 +217,15 @@ export function PatientAppointmentForm({
               name="appointmentClassId"
               value={form.appointmentClassId}
               onChange={onChange}
-              disabled={!canCreateAppointment || loadingCatalogs}
+              disabled={!canCreateAppointment || loadingCatalogs || !form.specialtyId}
               className={inputClass}
             >
               <option value="">
                 {loadingCatalogs
                   ? "Cargando clases..."
-                  : "Selecciona clase de cita"}
+                  : form.specialtyId
+                    ? "Selecciona clase de cita"
+                    : "Selecciona primero una especialidad"}
               </option>
 
               {appointmentClasses.map((item) => (
@@ -853,14 +335,14 @@ export function PatientAppointmentForm({
       )}
 
       {step === 4 && (
-        <section className="space-y-6">
+        <section className="space-y-5">
           <header>
             <h3 className="text-lg font-semibold text-slate-900">
-              {clinicalConfig.title}
+              Motivo y prioridad administrativa
             </h3>
 
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              {clinicalConfig.description}
+              Registra solo la información necesaria para organizar la solicitud.
             </p>
           </header>
 
@@ -883,14 +365,8 @@ export function PatientAppointmentForm({
               name="motivoConsulta"
               value={form.motivoConsulta}
               onChange={onChange}
-              rows={4}
-              placeholder={
-                clinicalConfig.type === "dental"
-                  ? "Ejemplo: Tengo dolor fuerte en una muela desde hace dos días."
-                  : clinicalConfig.type === "oral-hygiene"
-                    ? "Ejemplo: Solicito una limpieza y control de higiene oral."
-                    : "Describe brevemente el motivo principal de la consulta."
-              }
+              rows={3}
+              placeholder="Describe brevemente el motivo principal de la consulta."
               disabled={!canCreateAppointment}
               className={inputClass}
             />
@@ -901,173 +377,12 @@ export function PatientAppointmentForm({
             </p>
           </article>
 
-          <article>
-            <p className={labelClass}>
-              {clinicalConfig.question}
-            </p>
-
-            <section className="grid gap-2.5 sm:grid-cols-2">
-              {clinicalConfig.primaryOptions.map((option) => {
-                const checked = selectedOptions.includes(option);
-
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => toggleOption(option)}
-                    disabled={!canCreateAppointment}
-                    className={optionButtonClass(checked)}
-                  >
-                    <span>{option}</span>
-
-                    {checked && (
-                      <CheckCircle2
-                        size={16}
-                        className="shrink-0 text-blue-600"
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </section>
-
-            {clinicalConfig.secondaryOptions.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowMoreOptions((previous) => !previous)
-                  }
-                  className="mt-3 flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800"
-                >
-                  {showMoreOptions ? (
-                    <>
-                      Ver menos opciones
-                      <ChevronUp size={16} />
-                    </>
-                  ) : (
-                    <>
-                      Ver más opciones
-                      <ChevronDown size={16} />
-                    </>
-                  )}
-                </button>
-
-                {showMoreOptions && (
-                  <section className="mt-3 grid gap-2.5 sm:grid-cols-2">
-                    {clinicalConfig.secondaryOptions.map(
-                      (option) => {
-                        const checked =
-                          selectedOptions.includes(option);
-
-                        return (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => toggleOption(option)}
-                            disabled={!canCreateAppointment}
-                            className={optionButtonClass(checked)}
-                          >
-                            <span>{option}</span>
-
-                            {checked && (
-                              <CheckCircle2
-                                size={16}
-                                className="shrink-0 text-blue-600"
-                              />
-                            )}
-                          </button>
-                        );
-                      },
-                    )}
-                  </section>
-                )}
-              </>
-            )}
-          </article>
-
-          {clinicalConfig.showPain && (
-            <article>
-              <p className={labelClass}>
-                Intensidad del dolor o molestia
-              </p>
-
-              <section className="flex flex-wrap gap-2">
-                {PAIN_LEVELS.map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => selectPain(level)}
-                    disabled={!canCreateAppointment}
-                    className={choiceButtonClass(pain === level)}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </section>
-            </article>
-          )}
-
-          {clinicalConfig.showOnset && (
-            <article>
-              <p className={labelClass}>
-                ¿Hace cuánto comenzó o necesitas esta atención?
-              </p>
-
-              <section className="flex flex-wrap gap-2">
-                {ONSET_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => selectOnset(option)}
-                    disabled={!canCreateAppointment}
-                    className={choiceButtonClass(onset === option)}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </section>
-            </article>
-          )}
-
-          {clinicalConfig.showPriorityPreview &&
-            (selectedOptions.length > 0 || pain || onset) && (
-              <section
-                className={`flex items-start gap-3 rounded-3xl border p-4 ${priorityStyles[priority.level].border} ${priorityStyles[priority.level].bg}`}
-              >
-                {priority.level === "alta" ? (
-                  <AlertTriangle
-                    className={`mt-0.5 shrink-0 ${priorityStyles[priority.level].text}`}
-                    size={18}
-                  />
-                ) : (
-                  <Activity
-                    className={`mt-0.5 shrink-0 ${priorityStyles[priority.level].text}`}
-                    size={18}
-                  />
-                )}
-
-                <section>
-                  <p
-                    className={`text-sm font-semibold ${priorityStyles[priority.level].text}`}
-                  >
-                    {priority.label}
-                  </p>
-
-                  <p
-                    className={`mt-1 text-sm leading-6 ${priorityStyles[priority.level].text}`}
-                  >
-                    {priority.note}
-                  </p>
-
-                  <p className="mt-2 text-xs italic text-slate-500">
-                    Esta es una orientación preliminar. La prioridad
-                    definitiva será calculada y revisada al registrar
-                    la cita.
-                  </p>
-                </section>
-              </section>
-            )}
+          <AppointmentPriorityFields
+            value={form}
+            disabled={!canCreateAppointment}
+            onTextChange={onChange}
+            onCheckboxChange={onChange}
+          />
 
           <article>
             <label className={labelClass}>
@@ -1085,8 +400,7 @@ export function PatientAppointmentForm({
             />
 
             <p className="mt-2 text-xs leading-5 text-slate-400">
-              Las opciones seleccionadas se agregan automáticamente a
-              la información enviada con la cita.
+              No incluyas diagnósticos si no han sido establecidos por un profesional.
             </p>
           </article>
         </section>

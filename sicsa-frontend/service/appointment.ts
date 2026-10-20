@@ -67,6 +67,13 @@ export async function createAppointment(
     appointmentClassId?: number;
     observaciones?: string;
     ordenMedicaUrl?: string;
+    edad?: number;
+    embarazada?: boolean;
+    discapacidad?: boolean;
+    dolorIntenso?: boolean;
+    sangrado?: boolean;
+    dificultadRespiratoria?: boolean;
+    fiebre?: boolean;
   },
 ) {
   const response = await fetch(
@@ -498,7 +505,17 @@ export async function getAppointmentClasses() {
     );
   }
 
-  return result;
+  if (!Array.isArray(result)) return result;
+
+  return result.filter((item: unknown) => {
+    if (!item || typeof item !== "object" || !("nombre" in item)) return true;
+    const name = String((item as { nombre?: unknown }).nombre ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
+    return name !== "lectura de resultados";
+  });
 }
 export async function markAppointmentNoShow(
   token: string,

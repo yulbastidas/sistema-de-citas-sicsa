@@ -65,4 +65,11 @@ export type AppointmentForm = {
   municipio: string;
   appointmentClassId: string;
   observaciones: string;
+  edad: string;
+  embarazada: boolean;
+  discapacidad: boolean;
+  dolorIntenso: boolean;
+  sangrado: boolean;
+  dificultadRespiratoria: boolean;
+  fiebre: boolean;
 };

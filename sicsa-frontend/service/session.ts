@@ -5,6 +5,7 @@ export type SessionUser = {
   role?: string | number;
   emailVerified?: boolean;
   canViewReports?: boolean;
+  exp?: number;
 };
 
 function normalizeRole(
@@ -21,7 +22,7 @@ function normalizeRole(
   return undefined;
 }
 
-function decodeJwt(token: string): SessionUser | null {
+export function decodeJwt(token: string): SessionUser | null {
   try {
     const payload = token.split(".")[1];
 
@@ -138,7 +139,19 @@ export function getToken(): string | null {
     return null;
   }
 
-  return getStorageItem("access_token");
+  const token = getStorageItem("access_token");
+
+  if (token && isTokenExpired(token)) {
+    logout();
+    return null;
+  }
+
+  return token;
+}
+
+export function isTokenExpired(token: string, now = Date.now()): boolean {
+  const decoded = decodeJwt(token);
+  return !decoded?.exp || decoded.exp * 1000 <= now;
 }
 
 export function getUser(): SessionUser | null {
@@ -196,4 +209,19 @@ export function getUser(): SessionUser | null {
   );
 
   return recoveredUser;
+}
+
+export function getValidSession(): {
+  token: string;
+  user: SessionUser;
+} | null {
+  const token = getToken();
+  const user = token ? getUser() : null;
+
+  if (!token || !user) {
+    logout();
+    return null;
+  }
+
+  return { token, user };
 }

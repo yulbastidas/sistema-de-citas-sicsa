@@ -5,7 +5,7 @@ import { AppointmentScheduleService } from './appointment-schedule.service';
 import { Appointment } from '../entities/appointment.entity';
 
 describe('AppointmentScheduleService date validation', () => {
-  const service = new AppointmentScheduleService({} as never);
+  const service = new AppointmentScheduleService({} as never, {} as never);
 
   it('rechaza una fecha civil imposible', () => {
     expect(() =>
@@ -27,8 +27,32 @@ describe('AppointmentScheduleService date validation', () => {
 
   it('rechaza una cita que termina después del cierre institucional', () => {
     expect(() =>
-      service.validateBusinessSchedule('2099-09-15', '17:20', 30),
+      service.validateBusinessSchedule('2099-09-15', '17:40', 30),
     ).toThrow(BadRequestException);
+  });
+
+  it('rechaza el intervalo no laboral entre 12:00 y 14:00', () => {
+    expect(() =>
+      service.validateBusinessSchedule('2099-09-15', '11:50', 20),
+    ).toThrow(BadRequestException);
+    expect(() =>
+      service.validateBusinessSchedule('2099-09-15', '13:40', 20),
+    ).toThrow(BadRequestException);
+  });
+
+  it('permite los límites completos de ambas jornadas', () => {
+    expect(() =>
+      service.validateBusinessSchedule('2099-09-15', '11:40', 20),
+    ).not.toThrow();
+    expect(() =>
+      service.validateBusinessSchedule('2099-09-15', '17:40', 20),
+    ).not.toThrow();
+  });
+
+  it('rechaza festivos nacionales de Colombia', () => {
+    expect(() =>
+      service.validateBusinessSchedule('2099-07-20', '08:00', 20),
+    ).toThrow('festivos nacionales de Colombia');
   });
 
   it('rechaza una hora que ya pasó hoy en America/Bogota', () => {
@@ -55,7 +79,10 @@ describe('AppointmentScheduleService date validation', () => {
     const repository = {
       find: jest.fn().mockResolvedValue([]),
     };
-    const schedule = new AppointmentScheduleService(repository as never);
+    const schedule = new AppointmentScheduleService(
+      repository as never,
+      { find: jest.fn().mockResolvedValue([]) } as never,
+    );
 
     await expect(
       schedule.isSlotAvailable(22, '2099-09-15', '08:00', 30),
@@ -67,5 +94,25 @@ describe('AppointmentScheduleService date validation', () => {
         estado: expect.anything(),
       },
     });
+  });
+
+  it('resuelve Psicología por nombre y conserva reglas existentes para otras especialidades', async () => {
+    const specialtyRepository = {
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce({ id: 44, nombre: 'Psicología', activa: true })
+        .mockResolvedValueOnce({
+          id: 13,
+          nombre: 'Médico general',
+          activa: true,
+        }),
+    };
+    const schedule = new AppointmentScheduleService(
+      {} as never,
+      specialtyRepository as never,
+    );
+
+    await expect(schedule.resolveAppointmentDuration(44)).resolves.toBe(20);
+    await expect(schedule.resolveAppointmentDuration(13)).resolves.toBe(20);
   });
 });

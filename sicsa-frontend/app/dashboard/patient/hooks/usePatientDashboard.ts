@@ -143,8 +143,6 @@ export function usePatientDashboard() {
     try {
       const verification: VerificationResponse = await getMyVerification(token);
 
-      console.log("VERIFICATION DASHBOARD:", verification);
-
       applyVerificationState(verification);
       fillVerificationForm(verification, savedUser);
     } catch (error) {
@@ -336,7 +334,9 @@ export function usePatientDashboard() {
       }
 
       await loadVerificationStatus();
-      alert("Solicitud de verificación enviada correctamente");
+      alert(
+        "Tu solicitud fue enviada correctamente. El tiempo estimado de revisión es de 2 a 3 minutos. Cuando sea aprobada podrás continuar con el proceso.",
+      );
     } catch (error: unknown) {
       if (error instanceof Error) {
         alert(error.message);

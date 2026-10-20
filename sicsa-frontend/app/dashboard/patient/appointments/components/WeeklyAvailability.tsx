@@ -10,6 +10,7 @@ import {
 
 import { WaitlistCard } from "./WaitlistCard";
 import type { AppointmentItem } from "../types";
+import { getAppointmentDateRestriction } from "@/utils/colombian-holidays";
 
 type WeeklyAvailabilityProps = {
   form: {
@@ -114,11 +115,7 @@ export function WeeklyAvailability({
     for (let day = 1; day <= daysInMonth; day += 1) {
       const date = new Date(visibleYear, visibleMonth, day);
       const ymd = formatDateToYMD(date);
-      const weekDay = date.getDay();
-
-      const isSunday = weekDay === 0;
-      const isMonday = weekDay === 1;
-      const isClosedDay = isSunday || isMonday;
+      const isClosedDay = Boolean(getAppointmentDateRestriction(ymd));
       const isPast = ymd < today;
 
       days.push({
@@ -218,7 +215,7 @@ export function WeeklyAvailability({
                     Selecciona una fecha
                   </p>
                   <p className="text-xs text-slate-500">
-                    Los lunes y domingos no hay atención.
+                    Lunes, domingos y festivos nacionales no tienen atención.
                   </p>
                 </section>
               </section>

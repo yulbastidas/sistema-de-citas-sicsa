@@ -36,7 +36,7 @@ describe('AppointmentsService atomic doctor assignment', () => {
       transaction: jest.fn(async (work) => work(manager)),
     };
     const schedule = {
-      getAppointmentDuration: jest.fn().mockReturnValue(30),
+      resolveAppointmentDuration: jest.fn().mockResolvedValue(30),
       validateBusinessSchedule: jest.fn(),
       validateRadiologyBase: jest.fn(),
       isSlotAvailable: jest.fn(async () => availability.shift() ?? false),
@@ -68,6 +68,7 @@ describe('AppointmentsService atomic doctor assignment', () => {
       mapper as never,
       {} as never,
       dataSource as never,
+      { assertAvailableForNewAppointment: jest.fn() } as never,
     );
 
     return { service, schedule, savedAppointments };

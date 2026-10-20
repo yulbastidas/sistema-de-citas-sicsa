@@ -70,6 +70,7 @@ describe('Doctor resource ownership', () => {
         mapperService as never,
         {} as never,
         {} as never,
+        { assertAvailableForNewAppointment: jest.fn() } as never,
       ),
     };
   };

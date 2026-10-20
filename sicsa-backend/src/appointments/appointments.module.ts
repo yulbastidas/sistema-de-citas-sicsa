@@ -17,12 +17,22 @@ import { AppointmentMapperService } from './services/appointment-mapper.service'
 import { N8nInternalGuard } from '../auth/guards/n8n-internal.guard';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { MedicalReport } from '../medical-reports/entities/medical-report.entity';
+import { Specialty } from '../specialties/entities/specialty.entity';
+import { AppointmentClassModule } from '../appointment-class/appointment-class.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Appointment, Verification, Patient, Doctor, MedicalReport]),
+    TypeOrmModule.forFeature([
+      Appointment,
+      Verification,
+      Patient,
+      Doctor,
+      MedicalReport,
+      Specialty,
+    ]),
     MedicalReportsModule,
     RealtimeModule,
+    AppointmentClassModule,
   ],
   controllers: [AppointmentsController],
   providers: [

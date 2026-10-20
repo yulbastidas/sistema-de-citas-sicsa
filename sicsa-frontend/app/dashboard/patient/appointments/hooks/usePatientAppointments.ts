@@ -68,6 +68,13 @@ const EMPTY_FORM: AppointmentForm = {
   municipio: "",
   appointmentClassId: "",
   observaciones: "",
+  edad: "",
+  embarazada: false,
+  discapacidad: false,
+  dolorIntenso: false,
+  sangrado: false,
+  dificultadRespiratoria: false,
+  fiebre: false,
 };
 
 export function usePatientAppointments() {
@@ -584,10 +591,17 @@ export function usePatientAppointments() {
     >,
   ) => {
     const { name, value } = e.target;
+    const nextValue =
+      e.target instanceof HTMLInputElement && e.target.type === "checkbox"
+        ? e.target.checked
+        : value;
 
     setForm((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: nextValue,
+      ...(name === "specialtyId"
+        ? { appointmentClassId: "", hora: "" }
+        : {}),
     }));
   };
 
@@ -669,6 +683,13 @@ export function usePatientAppointments() {
           form.appointmentClassId,
         ),
         observaciones: form.observaciones,
+        edad: form.edad ? Number(form.edad) : undefined,
+        embarazada: form.embarazada,
+        discapacidad: form.discapacidad,
+        dolorIntenso: form.dolorIntenso,
+        sangrado: form.sangrado,
+        dificultadRespiratoria: form.dificultadRespiratoria,
+        fiebre: form.fiebre,
       });
 
       alert("Cita creada correctamente");
@@ -739,6 +760,13 @@ export function usePatientAppointments() {
           form.appointmentClassId,
         ),
         observaciones: form.observaciones,
+        edad: form.edad ? Number(form.edad) : undefined,
+        embarazada: form.embarazada,
+        discapacidad: form.discapacidad,
+        dolorIntenso: form.dolorIntenso,
+        sangrado: form.sangrado,
+        dificultadRespiratoria: form.dificultadRespiratoria,
+        fiebre: form.fiebre,
       });
 
       alert(

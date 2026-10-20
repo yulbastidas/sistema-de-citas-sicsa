@@ -3,8 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 
 import { Appointment } from '../entities/appointment.entity';
+import { Specialty } from '../../specialties/entities/specialty.entity';
 import { CreateAppointmentDto } from '../dto/appointment.dto';
 import { CreateAdminAppointmentDto } from '../dto/create-admin-appointment.dto';
+import { isColombianNationalHoliday } from './colombian-holidays';
 
 type AppointmentInput = CreateAppointmentDto | CreateAdminAppointmentDto;
 
@@ -13,7 +15,27 @@ export class AppointmentScheduleService {
   constructor(
     @InjectRepository(Appointment)
     private appointmentRepo: Repository<Appointment>,
+    @InjectRepository(Specialty)
+    private specialtyRepo: Repository<Specialty>,
   ) {}
+
+  async resolveAppointmentDuration(specialtyId: number): Promise<number> {
+    const specialty = await this.specialtyRepo.findOne({
+      where: { id: specialtyId, activa: true },
+    });
+
+    if (!specialty) {
+      throw new BadRequestException(
+        'La especialidad seleccionada no está disponible',
+      );
+    }
+
+    if (this.normalizeName(specialty.nombre).includes('psicolog')) {
+      return 20;
+    }
+
+    return this.getAppointmentDurationBySpecialty(specialtyId);
+  }
 
   getAppointmentDurationBySpecialty(specialtyId?: number | null): number {
     const specialtyIdNumber = Number(specialtyId);
@@ -44,41 +66,43 @@ export class AppointmentScheduleService {
     const day = this.getDayOfWeek(fecha);
     const startMinutes = this.timeToMinutes(hora);
 
+    if (isColombianNationalHoliday(fecha)) {
+      throw new BadRequestException(
+        'No se pueden agendar citas en festivos nacionales de Colombia',
+      );
+    }
+
     if (day === 0 || day === 1) {
       throw new BadRequestException(
         'No se pueden agendar citas los domingos ni los lunes',
       );
     }
 
-    if (day === 2 || day === 3) {
-      const opening = this.timeToMinutes('08:00');
-      const closing = this.timeToMinutes('17:40');
+    if (day >= 2 && day <= 5) {
+      const morningStart = this.timeToMinutes('08:00');
+      const morningEnd = this.timeToMinutes('12:00');
+      const afternoonStart = this.timeToMinutes('14:00');
+      const afternoonEnd = this.timeToMinutes('18:00');
+      const endMinutes = startMinutes + durationMinutes;
+      const fitsMorning =
+        startMinutes >= morningStart && endMinutes <= morningEnd;
+      const fitsAfternoon =
+        startMinutes >= afternoonStart && endMinutes <= afternoonEnd;
 
-      if (startMinutes < opening || startMinutes + durationMinutes > closing) {
+      if (!fitsMorning && !fitsAfternoon) {
         throw new BadRequestException(
-          'Los martes y miércoles las citas inician desde las 08:00',
-        );
-      }
-    }
-
-    if (day === 4 || day === 5) {
-      const opening = this.timeToMinutes('07:00');
-      const closing = this.timeToMinutes('17:40');
-
-      if (startMinutes < opening || startMinutes + durationMinutes > closing) {
-        throw new BadRequestException(
-          'Los jueves y viernes las citas inician desde las 07:00',
+          'De martes a viernes se atiende de 08:00 a 12:00 y de 14:00 a 18:00',
         );
       }
     }
 
     if (day === 6) {
       const opening = this.timeToMinutes('07:00');
-      const closing = this.timeToMinutes('12:40');
+      const closing = this.timeToMinutes('13:00');
 
       if (startMinutes < opening || startMinutes + durationMinutes > closing) {
         throw new BadRequestException(
-          'Los sábados solo se pueden agendar citas hasta las 12:40',
+          'Los sábados se atiende de 07:00 a 13:00',
         );
       }
     }
@@ -119,7 +143,13 @@ export class AppointmentScheduleService {
       },
     });
 
-    return !this.hasScheduleConflict(hora, durationMinutes, appointments);
+    const durationMap = await this.getDurationMap(appointments);
+    return !this.hasScheduleConflict(
+      hora,
+      durationMinutes,
+      appointments,
+      durationMap,
+    );
   }
 
   async getAvailableHours(
@@ -127,7 +157,9 @@ export class AppointmentScheduleService {
     specialtyId?: number,
     doctorIds?: number[],
   ): Promise<string[]> {
-    const duration = this.getAppointmentDurationBySpecialty(specialtyId);
+    if (!specialtyId) return [];
+
+    const duration = await this.resolveAppointmentDuration(specialtyId);
 
     const hours = this.generateAvailableHoursByDate(fecha, duration);
 
@@ -137,13 +169,19 @@ export class AppointmentScheduleService {
         estado: In(this.getBlockingStates()),
       },
     });
+    const durationMap = await this.getDurationMap(appointments);
 
     return hours.filter((hour) => {
       try {
         this.validateBusinessSchedule(fecha, hour, duration);
 
         if (!doctorIds?.length) {
-          return !this.hasScheduleConflict(hour, duration, appointments);
+          return !this.hasScheduleConflict(
+            hour,
+            duration,
+            appointments,
+            durationMap,
+          );
         }
 
         return doctorIds.some(
@@ -154,6 +192,7 @@ export class AppointmentScheduleService {
               appointments.filter(
                 (appointment) => appointment.doctorId === doctorId,
               ),
+              durationMap,
             ),
         );
       } catch {
@@ -168,20 +207,26 @@ export class AppointmentScheduleService {
   ): string[] {
     const day = this.getDayOfWeek(fecha);
 
-    if (day === 0 || day === 1) {
+    if (day === 0 || day === 1 || isColombianNationalHoliday(fecha)) {
       return [];
     }
 
     if (day === 2 || day === 3) {
-      return this.generateHours('08:00', '17:40', durationMinutes);
+      return [
+        ...this.generateHours('08:00', '12:00', durationMinutes),
+        ...this.generateHours('14:00', '18:00', durationMinutes),
+      ];
     }
 
     if (day === 4 || day === 5) {
-      return this.generateHours('07:00', '17:40', durationMinutes);
+      return [
+        ...this.generateHours('08:00', '12:00', durationMinutes),
+        ...this.generateHours('14:00', '18:00', durationMinutes),
+      ];
     }
 
     if (day === 6) {
-      return this.generateHours('07:00', '12:40', durationMinutes);
+      return this.generateHours('07:00', '13:00', durationMinutes);
     }
 
     return [];
@@ -192,7 +237,7 @@ export class AppointmentScheduleService {
     let current = this.timeToMinutes(start);
     const limit = this.timeToMinutes(end);
 
-    while (current <= limit) {
+    while (current + stepMinutes <= limit) {
       hours.push(this.minutesToTime(current));
       current += stepMinutes;
     }
@@ -208,6 +253,7 @@ export class AppointmentScheduleService {
     requestedHour: string,
     requestedDuration: number,
     appointments: Appointment[],
+    durationMap: Map<number, number> = new Map(),
   ): boolean {
     const requestedStart = this.timeToMinutes(requestedHour);
     const requestedEnd = requestedStart + requestedDuration;
@@ -215,9 +261,9 @@ export class AppointmentScheduleService {
     return appointments.some((appointment) => {
       const appointmentStart = this.timeToMinutes(appointment.hora);
 
-      const appointmentDuration = this.getAppointmentDurationBySpecialty(
-        appointment.specialtyId,
-      );
+      const appointmentDuration =
+        durationMap.get(appointment.specialtyId) ??
+        this.getAppointmentDurationBySpecialty(appointment.specialtyId);
 
       const appointmentEnd = appointmentStart + appointmentDuration;
 
@@ -295,5 +341,40 @@ export class AppointmentScheduleService {
       2,
       '0',
     )}`;
+  }
+
+  private normalizeName(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+  }
+
+  private async getDurationMap(
+    appointments: Appointment[],
+  ): Promise<Map<number, number>> {
+    const ids = [
+      ...new Set(
+        appointments
+          .map((appointment) => Number(appointment.specialtyId))
+          .filter((id) => Number.isInteger(id) && id > 0),
+      ),
+    ];
+
+    if (ids.length === 0) return new Map();
+
+    const specialties = await this.specialtyRepo.find({
+      where: { id: In(ids) },
+    });
+
+    return new Map(
+      specialties.map((specialty) => [
+        specialty.id,
+        this.normalizeName(specialty.nombre).includes('psicolog')
+          ? 20
+          : this.getAppointmentDurationBySpecialty(specialty.id),
+      ]),
+    );
   }
 }

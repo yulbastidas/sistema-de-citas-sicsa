@@ -26,7 +26,7 @@ describe('AppointmentWaitlistService', () => {
     };
     const manager = { getRepository: jest.fn(() => repository) };
     const schedule = {
-      getAppointmentDurationBySpecialty: jest.fn().mockReturnValue(30),
+      resolveAppointmentDuration: jest.fn().mockResolvedValue(30),
       validateBusinessSchedule: jest.fn(),
       isSlotAvailable: jest.fn().mockResolvedValue(true),
     };
@@ -46,7 +46,7 @@ describe('AppointmentWaitlistService', () => {
       3,
     );
 
-    expect(schedule.getAppointmentDurationBySpecialty).toHaveBeenCalledWith(3);
+    expect(schedule.resolveAppointmentDuration).toHaveBeenCalledWith(3);
     expect(schedule.isSlotAvailable).toHaveBeenCalledWith(
       22,
       '2099-09-15',
@@ -80,7 +80,7 @@ describe('AppointmentWaitlistService', () => {
     };
     const service = new AppointmentWaitlistService(
       {
-        getAppointmentDurationBySpecialty: jest.fn().mockReturnValue(30),
+        resolveAppointmentDuration: jest.fn().mockResolvedValue(30),
       } as never,
       {} as never,
       {} as never,

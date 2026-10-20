@@ -101,10 +101,9 @@ export class CreateAdminAppointmentDto {
   @MaxLength(100)
   municipio?: string;
 
-  @IsOptional()
   @IsInt()
   @IsPositive()
-  appointmentClassId?: number;
+  appointmentClassId!: number;
 
   @IsOptional()
   @Trim()

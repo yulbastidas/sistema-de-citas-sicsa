@@ -15,6 +15,7 @@ import {
 import { getToken, getUser } from "@/service/session";
 import { getSpecialties } from "@/service/specialty";
 import { confirmSicsa, notifySicsa as alert } from "@/app/components/SicsaFeedback";
+import { getAppointmentDateRestriction } from "@/utils/colombian-holidays";
 
 import type {
   AdminAppointmentForm,
@@ -152,16 +153,20 @@ export function useAdminAppointments() {
     }
   };
 
-  const loadAvailableHours = async (fecha: string) => {
+  const loadAvailableHours = async (fecha: string, specialtyId: string) => {
     const token = getToken();
-    if (!token || !fecha) {
+    if (!token || !fecha || !specialtyId) {
       setAvailableHours([]);
       return;
     }
 
     try {
       setLoadingHours(true);
-      const result = await getAvailableAppointments(token, fecha);
+      const result = await getAvailableAppointments(
+        token,
+        fecha,
+        Number(specialtyId),
+      );
       const hours = Array.isArray(result) ? result : result?.data || [];
       setAvailableHours(hours);
     } catch (error: unknown) {
@@ -228,13 +233,13 @@ export function useAdminAppointments() {
   }, [checkingAuth, loadAppointments]);
 
   useEffect(() => {
-    if (!form.fecha) {
+    if (!form.fecha || !form.specialtyId) {
       setAvailableHours([]);
       return;
     }
     setForm((prev) => ({ ...prev, hora: "" }));
-    void loadAvailableHours(form.fecha);
-  }, [form.fecha]);
+    void loadAvailableHours(form.fecha, form.specialtyId);
+  }, [form.fecha, form.specialtyId]);
 
   // ── Socket (fuente de verdad para actualizaciones en tiempo real) ──
   useEffect(() => {
@@ -257,25 +262,25 @@ export function useAdminAppointments() {
     socket.on("appointmentCreated", () => {
       void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
-      if (form.fecha) void loadAvailableHours(form.fecha);
+      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId);
     });
 
     socket.on("appointmentUpdated", () => {
       void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
-      if (form.fecha) void loadAvailableHours(form.fecha);
+      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId);
     });
 
     socket.on("appointmentCancelled", () => {
       void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
-      if (form.fecha) void loadAvailableHours(form.fecha);
+      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId);
     });
 
     socket.on("queueUpdated", () => {
       void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
-      if (form.fecha) void loadAvailableHours(form.fecha);
+      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId);
     });
 
     socket.on("disconnect", () => {
@@ -292,7 +297,7 @@ export function useAdminAppointments() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [checkingAuth, selectedDate, form.fecha]);
+  }, [checkingAuth, selectedDate, form.fecha, form.specialtyId]);
 
   // ── Handlers ──
   const handleTextChange = (
@@ -312,7 +317,22 @@ export function useAdminAppointments() {
       return;
     }
 
-    setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === "fecha" && value) {
+      const restriction = getAppointmentDateRestriction(value);
+      if (restriction) {
+        alert(restriction);
+        setForm((prev) => ({ ...prev, fecha: "", hora: "" }));
+        return;
+      }
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "specialtyId"
+        ? { appointmentClassId: "", hora: "" }
+        : {}),
+    }));
   };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,7 +349,7 @@ export function useAdminAppointments() {
       alert("Cita aprobada correctamente");
       await loadAppointments();
       await loadQueue(selectedDate);
-      if (form.fecha) await loadAvailableHours(form.fecha);
+      if (form.fecha && form.specialtyId) await loadAvailableHours(form.fecha, form.specialtyId);
     } catch (error: unknown) {
       if (error instanceof Error) {
         alert(error.message);
@@ -355,7 +375,7 @@ export function useAdminAppointments() {
       alert("Cita cancelada correctamente");
       await loadAppointments();
       await loadQueue(selectedDate);
-      if (form.fecha) await loadAvailableHours(form.fecha);
+      if (form.fecha && form.specialtyId) await loadAvailableHours(form.fecha, form.specialtyId);
     } catch (error: unknown) {
       if (error instanceof Error) {
         alert(error.message);

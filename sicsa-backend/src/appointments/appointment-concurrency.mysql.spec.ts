@@ -5,6 +5,7 @@ import { Doctor } from '../doctors/entities/doctor.entity';
 import { AppointmentsService } from './appointments.service';
 import { AppointmentScheduleService } from './services/appointment-schedule.service';
 import { AppointmentWaitlistService } from './services/appointment-waitlist.service';
+import { Specialty } from '../specialties/entities/specialty.entity';
 
 const describeWithMysql =
   process.env.RUN_MYSQL_INTEGRATION === 'true' ? describe : describe.skip;
@@ -82,7 +83,10 @@ describeWithMysql('Appointment concurrency with MySQL', () => {
 
   const createService = () => {
     const appointmentRepository = dataSource.getRepository(Appointment);
-    const schedule = new AppointmentScheduleService(appointmentRepository);
+    const schedule = new AppointmentScheduleService(
+      appointmentRepository,
+      dataSource.getRepository(Specialty),
+    );
     const mapper = { attachPatientData: jest.fn(async (value) => value) };
 
     return new AppointmentsService(
@@ -113,6 +117,7 @@ describeWithMysql('Appointment concurrency with MySQL', () => {
       mapper as never,
       {} as never,
       dataSource,
+      { assertAvailableForNewAppointment: jest.fn() } as never,
     );
   };
 
@@ -175,7 +180,10 @@ describeWithMysql('Appointment concurrency with MySQL', () => {
 
   it('dos promociones simultáneas no confirman dos citas en el mismo intervalo', async () => {
     const appointmentRepository = dataSource.getRepository(Appointment);
-    const schedule = new AppointmentScheduleService(appointmentRepository);
+    const schedule = new AppointmentScheduleService(
+      appointmentRepository,
+      dataSource.getRepository(Specialty),
+    );
     const waitlist = new AppointmentWaitlistService(
       schedule,
       {} as never,

@@ -2,18 +2,13 @@
 
 import { useState } from "react";
 import {
-  Accessibility,
-  Activity,
   ArrowLeft,
   ArrowRight,
   Building2,
   CalendarDays,
   Check,
   Clock3,
-  Droplets,
   FilePlus2,
-  Flame,
-  HeartPulse,
   MapPin,
   Send,
   ShieldAlert,
@@ -27,6 +22,7 @@ import type {
   EpsItem,
   SpecialtyItem,
 } from "../types";
+import AppointmentPriorityFields from "@/app/components/AppointmentPriorityFields";
 
 type AdminAppointmentFormProps = {
   form: AdminAppointmentForm;
@@ -371,13 +367,15 @@ const goToStep = (step: StepNumber) => {
                   name="appointmentClassId"
                   value={form.appointmentClassId}
                   onChange={onTextChange}
-                  disabled={loadingCatalogs}
+                  disabled={loadingCatalogs || !form.specialtyId}
                   className={inputClassName}
                 >
                   <option value="">
                     {loadingCatalogs
                       ? "Cargando clases..."
-                      : "Selecciona clase"}
+                      : form.specialtyId
+                        ? "Selecciona clase"
+                        : "Selecciona primero una especialidad"}
                   </option>
 
                   {appointmentClasses.map((item) => (
@@ -408,6 +406,7 @@ const goToStep = (step: StepNumber) => {
                     min={today}
                     value={form.fecha}
                     onChange={onTextChange}
+                    disabled={!form.specialtyId}
                     className={`${inputClassName} pl-10`}
                   />
                 </section>
@@ -585,132 +584,23 @@ const goToStep = (step: StepNumber) => {
 
                 <section>
                   <p className="text-sm font-bold text-amber-900">
-                    Indicadores de prioridad clínica
+                    Factores de prioridad administrativa
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-amber-700">
-                    Selecciona únicamente las condiciones que correspondan al
-                    paciente.
+                    Registra únicamente los factores informados por el paciente;
+                    este apoyo no realiza diagnósticos ni triaje clínico.
                   </p>
                 </section>
               </section>
             </article>
 
-            <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition ${
-                  form.embarazada
-                    ? "border-pink-300 bg-pink-50 text-pink-700 ring-2 ring-pink-100"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  name="embarazada"
-                  checked={form.embarazada}
-                  onChange={onCheckboxChange}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-
-                <HeartPulse size={17} />
-                Embarazada
-              </label>
-
-              <label
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition ${
-                  form.discapacidad
-                    ? "border-violet-300 bg-violet-50 text-violet-700 ring-2 ring-violet-100"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  name="discapacidad"
-                  checked={form.discapacidad}
-                  onChange={onCheckboxChange}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-
-                <Accessibility size={17} />
-                Discapacidad
-              </label>
-
-              <label
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition ${
-                  form.dolorIntenso
-                    ? "border-orange-300 bg-orange-50 text-orange-700 ring-2 ring-orange-100"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  name="dolorIntenso"
-                  checked={form.dolorIntenso}
-                  onChange={onCheckboxChange}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-
-                <Activity size={17} />
-                Dolor intenso
-              </label>
-
-              <label
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition ${
-                  form.sangrado
-                    ? "border-red-300 bg-red-50 text-red-700 ring-2 ring-red-100"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  name="sangrado"
-                  checked={form.sangrado}
-                  onChange={onCheckboxChange}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-
-                <Droplets size={17} />
-                Sangrado
-              </label>
-
-              <label
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition ${
-                  form.dificultadRespiratoria
-                    ? "border-sky-300 bg-sky-50 text-sky-700 ring-2 ring-sky-100"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  name="dificultadRespiratoria"
-                  checked={form.dificultadRespiratoria}
-                  onChange={onCheckboxChange}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-
-                <Activity size={17} />
-                Dificultad respiratoria
-              </label>
-
-              <label
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition ${
-                  form.fiebre
-                    ? "border-amber-300 bg-amber-50 text-amber-700 ring-2 ring-amber-100"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  name="fiebre"
-                  checked={form.fiebre}
-                  onChange={onCheckboxChange}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-
-                <Flame size={17} />
-                Fiebre
-              </label>
-            </section>
+            <AppointmentPriorityFields
+              value={form}
+              showAge={false}
+              onTextChange={onTextChange}
+              onCheckboxChange={onCheckboxChange}
+            />
 
             <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm font-bold text-slate-900">

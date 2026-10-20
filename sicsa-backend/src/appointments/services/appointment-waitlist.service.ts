@@ -40,7 +40,7 @@ export class AppointmentWaitlistService {
 
     for (const candidate of waitlistAppointments) {
       const candidateDuration =
-        this.scheduleService.getAppointmentDurationBySpecialty(
+        await this.scheduleService.resolveAppointmentDuration(
           candidate.specialtyId,
         );
 
