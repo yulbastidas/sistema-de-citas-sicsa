@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/colombian_holidays.dart';
 import '../services/appointment_service.dart';
 import '../widgets/appointment_form_card.dart';
 import '../widgets/patient_data_card.dart';
@@ -9,7 +10,9 @@ import '../widgets/patient_header_card.dart';
 import '../widgets/waitlist_card.dart';
 
 class CreateAppointmentScreen extends StatefulWidget {
-  const CreateAppointmentScreen({super.key});
+  const CreateAppointmentScreen({super.key, this.service});
+
+  final AppointmentService? service;
 
   @override
   State<CreateAppointmentScreen> createState() =>
@@ -17,7 +20,7 @@ class CreateAppointmentScreen extends StatefulWidget {
 }
 
 class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
-  final AppointmentService _service = AppointmentService();
+  late final AppointmentService _service;
 
   final TextEditingController _motivoController = TextEditingController();
   final TextEditingController _observacionesController =
@@ -48,6 +51,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
   @override
   void initState() {
     super.initState();
+    _service = widget.service ?? AppointmentService();
     _loadInitialData();
   }
 
@@ -99,6 +103,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
       initialDate: _selectedDate ?? now,
       firstDate: now,
       lastDate: DateTime(now.year + 1),
+      selectableDayPredicate: (date) => !ColombianHolidays.isClosedDay(date),
     );
 
     if (selected == null) return;
@@ -113,7 +118,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
   }
 
   Future<void> _loadAvailableHours() async {
-    if (_selectedDate == null) return;
+    if (_selectedDate == null || _selectedSpecialtyId == null) return;
 
     setState(() {
       _loading = true;
@@ -127,7 +132,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
 
       final data = await _service.getAvailableHours(
         fecha: fecha,
-        appointmentClassId: _selectedAppointmentClassId,
+        specialtyId: _selectedSpecialtyId!,
       );
 
       if (!mounted) return;
@@ -162,7 +167,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
         hora: _selectedHour!,
         motivo: _motivoController.text.trim(),
         specialtyId: _selectedSpecialtyId!,
-        appointmentClassId: _selectedAppointmentClassId,
+        appointmentClassId: _selectedAppointmentClassId!,
         observaciones: _observacionesController.text.trim(),
         edad: _calcularEdad(),
         embarazada: _embarazada,
@@ -199,10 +204,8 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
   Future<void> _joinWaitlist() async {
     if (!_validateBaseFields(requireHour: false)) return;
 
-    final day = _selectedDate!.weekday;
-
-    if (day == DateTime.sunday || day == DateTime.monday) {
-      _showMessage('No puedes unirte a lista de espera en domingo o lunes');
+    if (ColombianHolidays.isClosedDay(_selectedDate!)) {
+      _showMessage('No puedes unirte a lista de espera en un día no laborable');
       return;
     }
 
@@ -217,7 +220,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
         horaBase: _getWaitlistBaseHour(_selectedDate!),
         motivo: _motivoController.text.trim(),
         specialtyId: _selectedSpecialtyId!,
-        appointmentClassId: _selectedAppointmentClassId,
+        appointmentClassId: _selectedAppointmentClassId!,
         observaciones: _observacionesController.text.trim(),
         edad: _calcularEdad(),
         embarazada: _embarazada,
@@ -283,7 +286,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
   String _getWaitlistBaseHour(DateTime date) {
     final day = date.weekday;
 
-    if (day == DateTime.tuesday || day == DateTime.wednesday) {
+    if (day >= DateTime.tuesday && day <= DateTime.friday) {
       return '08:00';
     }
 
@@ -343,8 +346,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
 
     int age = today.year - birthDate.year;
 
-    final hasHadBirthdayThisYear =
-        today.month > birthDate.month ||
+    final hasHadBirthdayThisYear = today.month > birthDate.month ||
         (today.month == birthDate.month && today.day >= birthDate.day);
 
     if (!hasHadBirthdayThisYear) {
@@ -365,6 +367,16 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
   }
 
   Widget _buildHoursSection() {
+    if (_selectedSpecialtyId == null) {
+      return const _InfoBox(
+        icon: Icons.medical_services_outlined,
+        title: 'Selecciona una especialidad',
+        message: 'La disponibilidad depende de la atención seleccionada.',
+        color: AppColors.secondary,
+        background: Color(0xFFEFF6FF),
+      );
+    }
+
     if (_selectedDate == null) {
       return const _InfoBox(
         icon: Icons.calendar_today_outlined,
@@ -407,8 +419,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
             color: isSelected ? Colors.white : AppColors.textPrimary,
             fontWeight: FontWeight.w800,
           ),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         );
       }).toList(),
     );
@@ -464,8 +475,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
                       const SizedBox(height: 20),
                       AppointmentFormCard(
                         selectedSpecialtyId: _selectedSpecialtyId,
-                        selectedAppointmentClassId:
-                            _selectedAppointmentClassId,
+                        selectedAppointmentClassId: _selectedAppointmentClassId,
                         selectedDate: _selectedDate,
                         specialties: _specialties,
                         appointmentClasses: _appointmentClasses,
@@ -475,7 +485,13 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
                         onSpecialtyChanged: (value) {
                           setState(() {
                             _selectedSpecialtyId = value;
+                            _selectedAppointmentClassId = null;
+                            _selectedHour = null;
+                            _hours = [];
                           });
+                          if (_selectedDate != null && value != null) {
+                            _loadAvailableHours();
+                          }
                         },
                         onClassChanged: (value) async {
                           setState(() {
@@ -492,8 +508,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
                         discapacidad: _discapacidad,
                         dolorIntenso: _dolorIntenso,
                         sangrado: _sangrado,
-                        dificultadRespiratoria:
-                            _dificultadRespiratoria,
+                        dificultadRespiratoria: _dificultadRespiratoria,
                         fiebre: _fiebre,
                         onEmbarazadaChanged: (value) {
                           setState(() => _embarazada = value);
@@ -508,19 +523,16 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
                           setState(() => _sangrado = value);
                         },
                         onDificultadRespiratoriaChanged: (value) {
-                          setState(
-                              () => _dificultadRespiratoria = value);
+                          setState(() => _dificultadRespiratoria = value);
                         },
                         onFiebreChanged: (value) {
                           setState(() => _fiebre = value);
                         },
                         motivoController: _motivoController,
-                        observacionesController:
-                            _observacionesController,
+                        observacionesController: _observacionesController,
                         error: _error,
                         saving: _saving,
-                        onBack: () =>
-                            context.go('/patient/dashboard'),
+                        onBack: () => context.go('/patient/dashboard'),
                         onSubmit: _submit,
                       ),
                     ],
@@ -562,8 +574,7 @@ class _InfoBox extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,

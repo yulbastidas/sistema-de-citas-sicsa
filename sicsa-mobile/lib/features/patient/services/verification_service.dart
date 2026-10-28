@@ -1,4 +1,7 @@
+import 'package:dio/dio.dart';
+
 import '../../../core/network/api_client.dart';
+import '../../../core/utils/error_handler.dart';
 
 class VerificationService {
   final ApiClient _apiClient;
@@ -13,8 +16,9 @@ class VerificationService {
       if (response.data == null) return null;
 
       return Map<String, dynamic>.from(response.data);
-    } catch (_) {
-      return null;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) return null;
+      throw Exception(ErrorHandler.getErrorMessage(error));
     }
   }
 
@@ -37,13 +41,12 @@ class VerificationService {
       throw Exception('Tu perfil no tiene EPS registrada');
     }
 
-    await _apiClient.dio.post(
-      '/verifications/request',
-      data: {
-        'documento': documento,
-        'eps': eps,
-      },
-    );
+    try {
+      await _apiClient.dio.post('/verifications/request',
+          data: {'documento': documento, 'eps': eps});
+    } on DioException catch (error) {
+      throw Exception(ErrorHandler.getErrorMessage(error));
+    }
   }
 
   Future<void> expireMyVerification() async {

@@ -8,14 +8,16 @@ import '../widgets/appointments_header_card.dart';
 import '../widgets/patient_message_card.dart';
 
 class AppointmentsScreen extends StatefulWidget {
-  const AppointmentsScreen({super.key});
+  const AppointmentsScreen({super.key, this.service});
+
+  final AppointmentService? service;
 
   @override
   State<AppointmentsScreen> createState() => _AppointmentsScreenState();
 }
 
 class _AppointmentsScreenState extends State<AppointmentsScreen> {
-  final AppointmentService _service = AppointmentService();
+  late final AppointmentService _service;
 
   List<dynamic> _appointments = [];
   bool _loading = true;
@@ -25,6 +27,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   @override
   void initState() {
     super.initState();
+    _service = widget.service ?? AppointmentService();
     _loadAppointments();
   }
 
@@ -130,6 +133,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           estado == 'lista_espera';
     }).length;
   }
+
   Color _statusColor(String estado) {
     switch (estado.toLowerCase()) {
       case 'confirmada':
@@ -144,7 +148,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       case 'rechazada':
         return AppColors.error;
       case 'atendida':
-        return const Color(0xFF7C3AED); // puedes dejarlo así o crear en AppColors
+        return const Color(
+            0xFF7C3AED); // puedes dejarlo así o crear en AppColors
+      case 'no_asistida':
+      case 'no asistida':
+        return AppColors.warning;
       default:
         return AppColors.textSecondary;
     }
@@ -168,6 +176,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         return 'Rechazada';
       case 'atendida':
         return 'Atendida';
+      case 'no_asistida':
+      case 'no asistida':
+        return 'No asistida';
       default:
         return estado;
     }
@@ -212,6 +223,19 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     }
 
     return 'Paciente';
+  }
+
+  String? _nestedName(Map<String, dynamic> item, String key) {
+    final value = item[key];
+    if (value is Map) {
+      final name = value['nombre'] ?? value['name'];
+      if (name != null) return name.toString();
+      final fullName = [value['primerNombre'], value['primerApellido']]
+          .where((part) => part != null && part.toString().trim().isNotEmpty)
+          .join(' ');
+      if (fullName.isNotEmpty) return fullName;
+    }
+    return null;
   }
 
   Widget _buildAppointmentsContent() {
@@ -264,6 +288,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           especialidad: _getSpecialtyName(item),
           paciente: _getPatientName(item),
           motivo: motivo,
+          claseCita: _nestedName(item, 'appointmentClass') ??
+              _nestedName(item, 'claseCita'),
+          medico: _nestedName(item, 'doctor'),
           canCancel: _canCancel(estado) && !_cancelling,
           onCancel: () => _cancelAppointment(item),
         );
@@ -302,7 +329,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               const Text(
                 'Historial de citas',
                 style: TextStyle(
-                  color: AppColors.textPrimary, 
+                  color: AppColors.textPrimary,
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                 ),

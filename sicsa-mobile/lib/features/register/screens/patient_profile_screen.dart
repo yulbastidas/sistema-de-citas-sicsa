@@ -258,7 +258,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
     final selectedDate = await showDatePicker(
       context: context,
-      initialDate: _fechaNacimiento ?? DateTime(now.year - 18, now.month, now.day),
+      initialDate:
+          _fechaNacimiento ?? DateTime(now.year - 18, now.month, now.day),
       firstDate: DateTime(1900),
       lastDate: now,
     );
@@ -297,9 +298,12 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       return;
     }
 
-    if (_departamento == null || _municipio == null || _eps == null) {
+    if (_departamento == null ||
+        _municipio == null ||
+        _eps == null ||
+        _genero == null) {
       setState(() {
-        _error = 'Completa departamento, municipio y EPS';
+        _error = 'Completa género, departamento, municipio y EPS';
       });
       return;
     }
@@ -372,8 +376,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
     if (text.isEmpty) return 'Campo requerido';
 
-    if (!RegExp(r'^\d{7,15}$').hasMatch(text)) {
-      return 'Teléfono inválido';
+    if (!RegExp(r'^3\d{9}$').hasMatch(text)) {
+      return 'Ingresa un celular colombiano válido de 10 dígitos';
     }
 
     return null;
@@ -413,7 +417,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                   children: [
                     const RegisterHeader(),
                     const SizedBox(height: 24),
-
                     DropdownButtonFormField<String>(
                       value: _tipoDocumento,
                       isExpanded: true,
@@ -438,9 +441,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                           ? 'Seleccione un tipo de documento'
                           : null,
                     ),
-
                     const SizedBox(height: 16),
-
                     RegisterTextField(
                       controller: _numeroDocumentoController,
                       label: 'Número de documento',
@@ -448,43 +449,33 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                       keyboardType: TextInputType.number,
                       validator: _documentValidator,
                     ),
-
                     const SizedBox(height: 16),
-
                     RegisterTextField(
                       controller: _primerNombreController,
                       label: 'Primer nombre',
                       icon: Icons.person_outline,
                       validator: _requiredValidator,
                     ),
-
                     const SizedBox(height: 16),
-
                     RegisterTextField(
                       controller: _segundoNombreController,
                       label: 'Segundo nombre (opcional)',
                       icon: Icons.person_outline,
                     ),
-
                     const SizedBox(height: 16),
-
                     RegisterTextField(
                       controller: _primerApellidoController,
                       label: 'Primer apellido',
                       icon: Icons.person_outline,
                       validator: _requiredValidator,
                     ),
-
                     const SizedBox(height: 16),
-
                     RegisterTextField(
                       controller: _segundoApellidoController,
                       label: 'Segundo apellido (opcional)',
                       icon: Icons.person_outline,
                     ),
-
                     const SizedBox(height: 16),
-
                     RegisterTextField(
                       controller: _telefonoController,
                       label: 'Teléfono',
@@ -492,9 +483,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                       keyboardType: TextInputType.phone,
                       validator: _phoneValidator,
                     ),
-
                     const SizedBox(height: 16),
-
                     DropdownButtonFormField<String>(
                       value: _genero,
                       isExpanded: true,
@@ -512,21 +501,20 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                         });
                       },
                       decoration: registerInputDecoration(
-                        label: 'Género (opcional)',
+                        label: 'Género',
                         icon: Icons.transgender,
                       ),
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Seleccione un género'
+                          : null,
                     ),
-
                     const SizedBox(height: 16),
-
                     BirthDateField(
                       fechaNacimiento: _fechaNacimiento,
                       age: age,
                       onTap: _pickBirthDate,
                     ),
-
                     const SizedBox(height: 16),
-
                     DropdownButtonFormField<String>(
                       value: _departamento,
                       isExpanded: true,
@@ -559,9 +547,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                           ? 'Seleccione un departamento'
                           : null,
                     ),
-
                     const SizedBox(height: 16),
-
                     DropdownButtonFormField<String>(
                       value: _municipio,
                       isExpanded: true,
@@ -590,9 +576,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                           ? 'Seleccione un municipio'
                           : null,
                     ),
-
                     const SizedBox(height: 16),
-
                     DropdownButtonFormField<EpsItem>(
                       value: _selectedEps,
                       isExpanded: true,
@@ -619,28 +603,25 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                       validator: (value) =>
                           value == null ? 'Seleccione una EPS' : null,
                     ),
-
                     const SizedBox(height: 24),
-
                     if (_error != null) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(12),
-                         ),
-                    child: Text(
-                        _error!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                        color: AppColors.error,
-                        fontWeight: FontWeight.w600,
-                     ),
-                     ),
-                    ),
-                    const SizedBox(height: 16),
+                          color: AppColors.error.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                     ],
-
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(

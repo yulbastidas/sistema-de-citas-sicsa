@@ -18,7 +18,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _emailController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
 
   final AuthService _authService = AuthService();
@@ -29,7 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final loginModel = LoginModel(
-        email: _emailController.text.trim().toLowerCase(),
+        identifier: _identifierController.text.trim().toLowerCase(),
         password: _passwordController.text.trim(),
       );
 
@@ -79,14 +79,13 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  String? _emailValidator(String? value) {
-    final email = value?.trim() ?? '';
-
-    if (email.isEmpty) return 'Ingresa tu correo';
-
-    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-      return 'Correo inválido';
-    }
+  String? _identifierValidator(String? value) {
+    final identifier = value?.trim() ?? '';
+    if (identifier.isEmpty) return 'Ingresa tu correo o celular';
+    final email = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(identifier);
+    final phone =
+        RegExp(r'^(?:3\d{9}|573\d{9}|\+573\d{9})$').hasMatch(identifier);
+    if (!email && !phone) return 'Ingresa un correo o celular válido';
 
     return null;
   }
@@ -124,17 +123,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     /// EMAIL
                     TextFormField(
-                      controller: _emailController,
+                      controller: _identifierController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
-                        labelText: 'Correo electrónico',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        labelText: 'Correo electrónico o celular',
+                        hintText: 'Correo o celular',
+                        prefixIcon: Icon(Icons.person_outline),
                       ),
-                      validator: _emailValidator,
+                      validator: _identifierValidator,
                     ),
 
                     const SizedBox(height: 16),
+
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _loading
+                            ? null
+                            : () => context.go('/forgot-password'),
+                        child: const Text('¿Olvidaste tu contraseña?'),
+                      ),
+                    ),
 
                     /// PASSWORD
                     AuthPasswordField(
@@ -192,7 +202,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     /// REGISTER
                     TextButton(
-                      onPressed: _loading ? null : () => context.go('/register'),
+                      onPressed:
+                          _loading ? null : () => context.go('/register'),
                       child: const Text('¿No tienes cuenta? Regístrate'),
                     ),
                   ],

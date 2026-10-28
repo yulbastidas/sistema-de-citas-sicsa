@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../services/appointment_service.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.service});
+
+  final AppointmentService? service;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final ApiClient _apiClient = ApiClient();
+  late final AppointmentService _service;
 
   bool _loading = true;
   String? _error;
@@ -21,17 +23,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _service = widget.service ?? AppointmentService();
     _loadProfile();
   }
 
   Future<void> _loadProfile() async {
     try {
-      final response = await _apiClient.dio.get('/patients/me');
+      final response = await _service.getMyProfile();
 
       if (!mounted) return;
 
       setState(() {
-        _profile = Map<String, dynamic>.from(response.data);
+        _profile = response;
       });
     } catch (e) {
       if (!mounted) return;
@@ -42,6 +45,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) {
         setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _editProfile() async {
+    final phone = TextEditingController(
+        text: _value('telefono') == 'No registrado' ? '' : _value('telefono'));
+    final department = TextEditingController(
+        text: _value('departamento') == 'No registrado'
+            ? ''
+            : _value('departamento'));
+    final city = TextEditingController(
+        text:
+            _value('municipio') == 'No registrado' ? '' : _value('municipio'));
+    final address = TextEditingController(
+        text:
+            _value('direccion') == 'No registrado' ? '' : _value('direccion'));
+    final accepted = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+              title: const Text('Editar información permitida'),
+              content: SingleChildScrollView(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: 'Celular')),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: department,
+                    decoration:
+                        const InputDecoration(labelText: 'Departamento')),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: city,
+                    decoration: const InputDecoration(labelText: 'Municipio')),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: address,
+                    decoration: const InputDecoration(labelText: 'Dirección')),
+              ])),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('Cancelar')),
+                ElevatedButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: const Text('Guardar'))
+              ],
+            ));
+    if (accepted != true || !mounted) return;
+    final normalizedPhone = phone.text.replaceAll(RegExp(r'\D'), '');
+    if (!RegExp(r'^3\d{9}$').hasMatch(normalizedPhone)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Ingresa un celular colombiano válido')));
+      return;
+    }
+    try {
+      final updated = await _service.updateMyProfile({
+        'telefono': normalizedPhone,
+        'departamento': department.text.trim(),
+        'municipio': city.text.trim(),
+        'direccion': address.text.trim()
+      });
+      if (!mounted) return;
+      setState(() => _profile = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Perfil actualizado correctamente')));
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))));
       }
     }
   }
@@ -226,9 +301,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 20),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(18),
@@ -250,7 +323,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   _item(
                     label: 'Documento',
-                    value: '${_value('tipoDocumento')} ${_value('numeroDocumento')}',
+                    value:
+                        '${_value('tipoDocumento')} ${_value('numeroDocumento')}',
                     icon: Icons.badge_outlined,
                   ),
                   _item(
@@ -281,9 +355,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 20),
-
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _editProfile,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Editar información permitida'),
+              ),
+            ),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(

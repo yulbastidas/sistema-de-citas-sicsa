@@ -1,12 +1,51 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/utils/error_handler.dart';
 
 class AppointmentService {
   final ApiClient _apiClient;
 
   AppointmentService({ApiClient? apiClient})
       : _apiClient = apiClient ?? ApiClient();
+
+  static Map<String, dynamic> availabilityQuery({
+    required String fecha,
+    required int specialtyId,
+  }) =>
+      {'fecha': fecha, 'specialtyId': specialtyId};
+
+  static Map<String, dynamic> buildCreatePayload({
+    required String fecha,
+    required String hora,
+    required String motivo,
+    required int specialtyId,
+    required int appointmentClassId,
+    String? observaciones,
+    int? edad,
+    bool embarazada = false,
+    bool discapacidad = false,
+    bool dolorIntenso = false,
+    bool sangrado = false,
+    bool dificultadRespiratoria = false,
+    bool fiebre = false,
+  }) =>
+      {
+        'fecha': fecha,
+        'hora': hora,
+        'motivoConsulta': motivo,
+        'specialtyId': specialtyId,
+        'appointmentClassId': appointmentClassId,
+        if (observaciones != null && observaciones.trim().isNotEmpty)
+          'observaciones': observaciones.trim(),
+        if (edad != null) 'edad': edad,
+        'embarazada': embarazada,
+        'discapacidad': discapacidad,
+        'dolorIntenso': dolorIntenso,
+        'sangrado': sangrado,
+        'dificultadRespiratoria': dificultadRespiratoria,
+        'fiebre': fiebre,
+      };
 
   Future<Map<String, dynamic>> getMyProfile() async {
     final response = await _apiClient.dio.get('/patients/me');
@@ -20,19 +59,25 @@ class AppointmentService {
 
   Future<List<dynamic>> getAppointmentClasses() async {
     final response = await _apiClient.dio.get('/appointment-class');
-    return response.data is List ? response.data as List<dynamic> : [];
+    final items =
+        response.data is List ? response.data as List<dynamic> : <dynamic>[];
+    return items.where((item) {
+      if (item is! Map) {
+        return true;
+      }
+      final name = (item['nombre'] ?? '').toString().toLowerCase().trim();
+      return name != 'lectura de resultados';
+    }).toList();
   }
 
   Future<List<dynamic>> getAvailableHours({
     required String fecha,
-    int? appointmentClassId,
+    required int specialtyId,
   }) async {
     final response = await _apiClient.dio.get(
       '/appointments/available',
-      queryParameters: {
-        'fecha': fecha,
-        if (appointmentClassId != null) 'appointmentClassId': appointmentClassId,
-      },
+      queryParameters:
+          availabilityQuery(fecha: fecha, specialtyId: specialtyId),
     );
 
     return response.data is List ? response.data as List<dynamic> : [];
@@ -43,7 +88,7 @@ class AppointmentService {
     required String hora,
     required String motivo,
     required int specialtyId,
-    int? appointmentClassId,
+    required int appointmentClassId,
     String? observaciones,
     int? edad,
     bool embarazada = false,
@@ -56,32 +101,24 @@ class AppointmentService {
     try {
       await _apiClient.dio.post(
         '/appointments',
-        data: {
-          'fecha': fecha,
-          'hora': hora,
-          'motivoConsulta': motivo,
-          'specialtyId': specialtyId,
-          if (appointmentClassId != null)
-            'appointmentClassId': appointmentClassId,
-          if (observaciones != null && observaciones.trim().isNotEmpty)
-            'observaciones': observaciones.trim(),
-          if (edad != null) 'edad': edad,
-          'embarazada': embarazada,
-          'discapacidad': discapacidad,
-          'dolorIntenso': dolorIntenso,
-          'sangrado': sangrado,
-          'dificultadRespiratoria': dificultadRespiratoria,
-          'fiebre': fiebre,
-        },
+        data: buildCreatePayload(
+          fecha: fecha,
+          hora: hora,
+          motivo: motivo,
+          specialtyId: specialtyId,
+          appointmentClassId: appointmentClassId,
+          observaciones: observaciones,
+          edad: edad,
+          embarazada: embarazada,
+          discapacidad: discapacidad,
+          dolorIntenso: dolorIntenso,
+          sangrado: sangrado,
+          dificultadRespiratoria: dificultadRespiratoria,
+          fiebre: fiebre,
+        ),
       );
     } on DioException catch (e) {
-      final data = e.response?.data;
-
-      if (data is Map && data['message'] != null) {
-        throw Exception(data['message'].toString());
-      }
-
-      throw Exception('No se pudo crear la cita');
+      throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
 
@@ -90,7 +127,7 @@ class AppointmentService {
     required String horaBase,
     required String motivo,
     required int specialtyId,
-    int? appointmentClassId,
+    required int appointmentClassId,
     String? observaciones,
     int? edad,
     bool embarazada = false,
@@ -117,9 +154,18 @@ class AppointmentService {
     );
   }
 
-  Future<List<dynamic>> getMyAppointments() async {
-    final response = await _apiClient.dio.get('/appointments/my');
-    return response.data is List ? response.data as List<dynamic> : [];
+  Future<List<dynamic>> getMyAppointments(
+      {int page = 1, int limit = 100}) async {
+    final response = await _apiClient.dio.get('/appointments/my',
+        queryParameters: {'page': page, 'limit': limit});
+    final payload = response.data;
+    if (payload is List) {
+      return payload;
+    }
+    if (payload is Map && payload['data'] is List) {
+      return payload['data'] as List<dynamic>;
+    }
+    return [];
   }
 
   Future<void> cancelAppointment(int id) async {
@@ -129,13 +175,22 @@ class AppointmentService {
         data: {'id': id},
       );
     } on DioException catch (e) {
-      final data = e.response?.data;
+      throw Exception(ErrorHandler.getErrorMessage(e));
+    }
+  }
 
-      if (data is Map && data['message'] != null) {
-        throw Exception(data['message'].toString());
+  Future<Map<String, dynamic>> updateMyProfile(
+      Map<String, dynamic> changes) async {
+    try {
+      final response =
+          await _apiClient.dio.patch('/patients/me', data: changes);
+      final payload = response.data;
+      if (payload is Map && payload['patient'] is Map) {
+        return Map<String, dynamic>.from(payload['patient'] as Map);
       }
-
-      throw Exception('No se pudo cancelar la cita');
+      return Map<String, dynamic>.from(payload as Map);
+    } on DioException catch (error) {
+      throw Exception(ErrorHandler.getErrorMessage(error));
     }
   }
 }

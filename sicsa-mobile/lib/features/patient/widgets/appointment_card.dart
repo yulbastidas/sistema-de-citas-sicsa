@@ -9,6 +9,8 @@ class AppointmentCard extends StatelessWidget {
   final String especialidad;
   final String paciente;
   final String motivo;
+  final String? claseCita;
+  final String? medico;
   final bool canCancel;
   final VoidCallback onCancel;
 
@@ -21,6 +23,8 @@ class AppointmentCard extends StatelessWidget {
     required this.especialidad,
     required this.paciente,
     required this.motivo,
+    this.claseCita,
+    this.medico,
     required this.canCancel,
     required this.onCancel,
   });
@@ -122,6 +126,24 @@ class AppointmentCard extends StatelessWidget {
             label: 'Paciente',
             value: paciente,
           ),
+
+          if (claseCita != null && claseCita!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _InfoRow(
+              icon: Icons.category_outlined,
+              label: 'Clase de cita',
+              value: claseCita!,
+            ),
+          ],
+
+          if (medico != null && medico!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _InfoRow(
+              icon: Icons.medical_information_outlined,
+              label: 'Médico',
+              value: medico!,
+            ),
+          ],
 
           const SizedBox(height: 10),
 

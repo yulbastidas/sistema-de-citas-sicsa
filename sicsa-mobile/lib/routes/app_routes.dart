@@ -1,6 +1,8 @@
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/screens/login_screen.dart';
+import '../features/auth/screens/session_gate_screen.dart';
+import '../features/auth/screens/forgot_password_screen.dart';
 import '../features/register/models/register_models.dart';
 import '../features/register/screens/register_screen.dart';
 import '../features/register/screens/patient_profile_screen.dart';
@@ -10,20 +12,31 @@ import '../features/patient/screens/patient_dashboard_screen.dart';
 import '../features/patient/screens/appointments_screen.dart';
 import '../features/patient/screens/create_appointment_screen.dart';
 import '../features/patient/screens/profile_screen.dart';
+import '../core/auth/session_service.dart';
 
 class AppRoutes {
   static final GoRouter router = GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/',
+    redirect: (context, state) async {
+      final protected = state.matchedLocation.startsWith('/patient/');
+      if (!protected) return null;
+      final session = await SessionService().restorePatientSession();
+      return session == null ? '/login' : null;
+    },
     routes: [
       GoRoute(
         path: '/',
-        redirect: (context, state) => '/login',
+        builder: (context, state) => const SessionGateScreen(),
       ),
 
       // LOGIN
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
       // REGISTER

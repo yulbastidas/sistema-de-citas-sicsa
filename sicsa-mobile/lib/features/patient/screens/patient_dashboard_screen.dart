@@ -8,17 +8,16 @@ import '../widgets/dashboard_option.dart';
 import '../widgets/patient_header_card.dart';
 
 class PatientDashboardScreen extends StatefulWidget {
-  const PatientDashboardScreen({super.key});
+  const PatientDashboardScreen({super.key, this.verificationService});
+
+  final VerificationService? verificationService;
 
   @override
-  State<PatientDashboardScreen> createState() =>
-      _PatientDashboardScreenState();
+  State<PatientDashboardScreen> createState() => _PatientDashboardScreenState();
 }
 
-class _PatientDashboardScreenState
-    extends State<PatientDashboardScreen> {
-  final VerificationService _verificationService =
-      VerificationService();
+class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
+  late final VerificationService _verificationService;
 
   bool _loading = true;
   bool _requesting = false;
@@ -29,6 +28,7 @@ class _PatientDashboardScreenState
   @override
   void initState() {
     super.initState();
+    _verificationService = widget.verificationService ?? VerificationService();
     _loadVerification();
   }
 
@@ -38,19 +38,20 @@ class _PatientDashboardScreenState
       _error = null;
     });
 
-    final data = await _verificationService.getMyVerification();
-
-    if (!mounted) return;
-
-    setState(() {
-      _verification = data;
-      _loading = false;
-    });
+    try {
+      final data = await _verificationService.getMyVerification();
+      if (!mounted) return;
+      setState(() => _verification = data);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   String get _verificationStatus {
-    final estado =
-        _verification?['estado']?.toString().toLowerCase();
+    final estado = _verification?['estado']?.toString().toLowerCase();
 
     if (estado == null || estado.isEmpty) {
       return 'sin_verificacion';
@@ -81,7 +82,7 @@ class _PatientDashboardScreenState
         SnackBar(
           backgroundColor: AppColors.success,
           content: const Text(
-            'Solicitud enviada correctamente',
+            'Tu solicitud fue enviada correctamente. El tiempo estimado de revisión es de 2 a 3 minutos. Cuando sea aprobada podrás continuar con el proceso.',
           ),
         ),
       );
@@ -89,8 +90,7 @@ class _PatientDashboardScreenState
       if (!mounted) return;
 
       setState(() {
-        _error =
-            error.toString().replaceFirst('Exception: ', '');
+        _error = error.toString().replaceFirst('Exception: ', '');
       });
     } finally {
       if (mounted) {
@@ -101,10 +101,6 @@ class _PatientDashboardScreenState
 
   Future<void> _logout(BuildContext context) async {
     setState(() => _loggingOut = true);
-
-    try {
-      await _verificationService.expireMyVerification();
-    } catch (_) {}
 
     await AuthService().logout();
 
@@ -223,8 +219,7 @@ class _PatientDashboardScreenState
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed:
-                    _requesting ? null : _requestVerification,
+                onPressed: _requesting ? null : _requestVerification,
                 icon: _requesting
                     ? const SizedBox(
                         width: 18,
@@ -236,9 +231,7 @@ class _PatientDashboardScreenState
                       )
                     : const Icon(Icons.send_outlined),
                 label: Text(
-                  _requesting
-                      ? 'Enviando...'
-                      : 'Solicitar verificación',
+                  _requesting ? 'Enviando...' : 'Solicitar verificación',
                 ),
               ),
             ),
@@ -257,12 +250,9 @@ class _PatientDashboardScreenState
           subtitle: _isApproved
               ? 'Solicita una nueva cita médica.'
               : 'Bloqueado hasta aprobación.',
-          color: _isApproved
-              ? AppColors.secondary
-              : AppColors.textSecondary,
+          color: _isApproved ? AppColors.secondary : AppColors.textSecondary,
           enabled: _isApproved,
-          onTap: () =>
-              context.go('/patient/create-appointment'),
+          onTap: () => context.go('/patient/create-appointment'),
         ),
         const SizedBox(height: 14),
         DashboardOption(
@@ -271,8 +261,7 @@ class _PatientDashboardScreenState
           subtitle: 'Consulta tus citas.',
           color: AppColors.primary,
           enabled: true,
-          onTap: () =>
-              context.go('/patient/appointments'),
+          onTap: () => context.go('/patient/appointments'),
         ),
         const SizedBox(height: 14),
         DashboardOption(
@@ -287,8 +276,7 @@ class _PatientDashboardScreenState
         DashboardOption(
           icon: Icons.logout,
           title: 'Cerrar sesión',
-          subtitle:
-              _loggingOut ? 'Cerrando...' : 'Salir del sistema',
+          subtitle: _loggingOut ? 'Cerrando...' : 'Salir del sistema',
           color: AppColors.error,
           enabled: !_loggingOut,
           onTap: () => _logout(context),
@@ -319,24 +307,18 @@ class _PatientDashboardScreenState
               children: [
                 const PatientHeaderCard(
                   title: 'Bienvenido al portal del paciente',
-                  subtitle:
-                      'Gestiona tus citas médicas desde SICSA.',
+                  subtitle: 'Gestiona tus citas médicas desde SICSA.',
                   icon: Icons.favorite_border,
                 ),
-
                 const SizedBox(height: 24),
-
                 _buildVerificationCard(),
-
                 if (_error != null) ...[
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color:
-                          AppColors.error.withOpacity(0.08),
-                      borderRadius:
-                          BorderRadius.circular(12),
+                      color: AppColors.error.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       _error!,
@@ -347,9 +329,7 @@ class _PatientDashboardScreenState
                     ),
                   ),
                 ],
-
                 const SizedBox(height: 28),
-
                 const Text(
                   'Opciones principales',
                   style: TextStyle(
@@ -358,9 +338,7 @@ class _PatientDashboardScreenState
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
                 _buildMainOptions(),
               ],
             ),
