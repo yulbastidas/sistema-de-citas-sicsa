@@ -9,19 +9,22 @@ import {
   getAllAppointments,
   getAppointmentClasses,
   getAvailableAppointments,
-  getEpsCatalog,
   getQueueAppointments,
 } from "@/service/appointment";
+import { getDoctorsBySpecialty } from "@/service/doctor";
+import { getPatients } from "@/service/patient";
 import { getToken, getUser } from "@/service/session";
 import { getSpecialties } from "@/service/specialty";
 import { confirmSicsa, notifySicsa as alert } from "@/app/components/SicsaFeedback";
-import { getAppointmentDateRestriction } from "@/utils/colombian-holidays";
+import { EMPTY_BOOKING_FORM, calculateAge, getWaitlistBaseHour, validateBookingForm, type BookingPriorityResult } from "@/app/components/appointment-booking/types";
+import type { Patient } from "@/app/dashboard/admin/patients/types";
 
 import type {
   AdminAppointmentForm,
   AppointmentClassItem,
   AppointmentItem,
-  EpsItem,
+  BookingDoctor,
+  BookingPatientSummary,
   QueueItem,
   SessionUser,
   SpecialtyItem,
@@ -30,26 +33,7 @@ import type {
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL || "http://74.161.42.39:3000";
 
-const EMPTY_FORM: AdminAppointmentForm = {
-  documento: "",
-  specialtyId: "",
-  fecha: "",
-  hora: "",
-  motivoConsulta: "",
-  edad: "",
-  eps: "",
-  epsId: "",
-  departamento: "Nariño",
-  municipio: "",
-  appointmentClassId: "",
-  observaciones: "",
-  embarazada: false,
-  discapacidad: false,
-  dolorIntenso: false,
-  sangrado: false,
-  dificultadRespiratoria: false,
-  fiebre: false,
-};
+const EMPTY_FORM: AdminAppointmentForm = EMPTY_BOOKING_FORM;
 
 export function useAdminAppointments() {
   const socketRef = useRef<Socket | null>(null);
@@ -59,13 +43,20 @@ export function useAdminAppointments() {
   const [loadingQueue, setLoadingQueue] = useState(false);
   const [loadingHours, setLoadingHours] = useState(false);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [loadingPatients, setLoadingPatients] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingWaitlist, setSavingWaitlist] = useState(false);
 
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [availableHours, setAvailableHours] = useState<string[]>([]);
   const [specialties, setSpecialties] = useState<SpecialtyItem[]>([]);
-  const [epsList, setEpsList] = useState<EpsItem[]>([]);
+  const [doctors, setDoctors] = useState<BookingDoctor[]>([]);
+  const [patientOptions, setPatientOptions] = useState<Patient[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<BookingPatientSummary | null>(null);
+  const [patientSearch, setPatientSearch] = useState("");
+  const [lastResult, setLastResult] = useState<BookingPriorityResult | null>(null);
   const [appointmentClasses, setAppointmentClasses] = useState<
     AppointmentClassItem[]
   >([]);
@@ -153,7 +144,7 @@ export function useAdminAppointments() {
     }
   };
 
-  const loadAvailableHours = async (fecha: string, specialtyId: string) => {
+  const loadAvailableHours = useCallback(async (fecha: string, specialtyId: string, doctorId?: string) => {
     const token = getToken();
     if (!token || !fecha || !specialtyId) {
       setAvailableHours([]);
@@ -166,6 +157,7 @@ export function useAdminAppointments() {
         token,
         fecha,
         Number(specialtyId),
+        doctorId ? Number(doctorId) : undefined,
       );
       const hours = Array.isArray(result) ? result : result?.data || [];
       setAvailableHours(hours);
@@ -179,7 +171,7 @@ export function useAdminAppointments() {
     } finally {
       setLoadingHours(false);
     }
-  };
+  }, []);
 
   const loadCatalogs = async () => {
     const token = getToken();
@@ -188,9 +180,8 @@ export function useAdminAppointments() {
     try {
       setLoadingCatalogs(true);
 
-      const [specialtiesResult, epsResult, classesResult] = await Promise.all([
+      const [specialtiesResult, classesResult] = await Promise.all([
         getSpecialties(token),
-        getEpsCatalog(),
         getAppointmentClasses(),
       ]);
 
@@ -199,7 +190,6 @@ export function useAdminAppointments() {
           ? specialtiesResult
           : specialtiesResult?.data || [],
       );
-      setEpsList(Array.isArray(epsResult) ? epsResult : epsResult?.data || []);
       setAppointmentClasses(
         Array.isArray(classesResult)
           ? classesResult
@@ -212,12 +202,27 @@ export function useAdminAppointments() {
         alert("Error al cargar catálogos");
       }
       setSpecialties([]);
-      setEpsList([]);
       setAppointmentClasses([]);
     } finally {
       setLoadingCatalogs(false);
     }
   };
+
+  const loadDoctors = useCallback(async (specialtyId: string) => {
+    const token = getToken();
+    if (!token || !specialtyId) { setDoctors([]); return; }
+    try { setLoadingDoctors(true); setDoctors(await getDoctorsBySpecialty(token, Number(specialtyId))); }
+    catch (error) { setDoctors([]); alert(error instanceof Error ? error.message : "No fue posible consultar los médicos"); }
+    finally { setLoadingDoctors(false); }
+  }, []);
+
+  const searchPatients = useCallback(async (search: string) => {
+    const token = getToken();
+    if (!token || search.trim().length < 2) { setPatientOptions([]); return; }
+    try { setLoadingPatients(true); const result = await getPatients(token, search.trim(), 1, 8); setPatientOptions(Array.isArray(result) ? result : result?.data || []); }
+    catch (error) { setPatientOptions([]); alert(error instanceof Error ? error.message : "No fue posible buscar pacientes"); }
+    finally { setLoadingPatients(false); }
+  }, []);
 
   // ── Effects ──
   useEffect(() => {
@@ -226,6 +231,9 @@ export function useAdminAppointments() {
     void loadCatalogs();
   }, [checkingAuth, selectedDate]);
 
+  useEffect(() => { const timeout = window.setTimeout(() => void searchPatients(patientSearch), 300); return () => window.clearTimeout(timeout); }, [patientSearch, searchPatients]);
+  useEffect(() => { void loadDoctors(form.specialtyId); }, [form.specialtyId, loadDoctors]);
+
   useEffect(() => {
     if (checkingAuth) return;
     const timeout = window.setTimeout(() => void loadAppointments(), 300);
@@ -233,13 +241,13 @@ export function useAdminAppointments() {
   }, [checkingAuth, loadAppointments]);
 
   useEffect(() => {
-    if (!form.fecha || !form.specialtyId) {
+    if (!form.fecha || !form.specialtyId || !form.doctorId) {
       setAvailableHours([]);
       return;
     }
     setForm((prev) => ({ ...prev, hora: "" }));
-    void loadAvailableHours(form.fecha, form.specialtyId);
-  }, [form.fecha, form.specialtyId]);
+    void loadAvailableHours(form.fecha, form.specialtyId, form.doctorId);
+  }, [form.fecha, form.specialtyId, form.doctorId, loadAvailableHours]);
 
   // ── Socket (fuente de verdad para actualizaciones en tiempo real) ──
   useEffect(() => {
@@ -262,25 +270,25 @@ export function useAdminAppointments() {
     socket.on("appointmentCreated", () => {
       void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
-      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId);
+      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId, form.doctorId);
     });
 
     socket.on("appointmentUpdated", () => {
       void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
-      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId);
+      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId, form.doctorId);
     });
 
     socket.on("appointmentCancelled", () => {
       void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
-      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId);
+      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId, form.doctorId);
     });
 
     socket.on("queueUpdated", () => {
       void loadAppointmentsRef.current();
       void loadQueue(selectedDate);
-      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId);
+      if (form.fecha && form.specialtyId) void loadAvailableHours(form.fecha, form.specialtyId, form.doctorId);
     });
 
     socket.on("disconnect", () => {
@@ -297,7 +305,7 @@ export function useAdminAppointments() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [checkingAuth, selectedDate, form.fecha, form.specialtyId]);
+  }, [checkingAuth, selectedDate, form.fecha, form.specialtyId, form.doctorId, loadAvailableHours]);
 
   // ── Handlers ──
   const handleTextChange = (
@@ -307,32 +315,25 @@ export function useAdminAppointments() {
   ) => {
     const { name, value } = e.target;
 
-    if (name === "epsId") {
-      const selectedEps = epsList.find((item) => String(item.id) === value);
-      setForm((prev) => ({
-        ...prev,
-        epsId: value,
-        eps: selectedEps?.nombre || "",
-      }));
-      return;
-    }
-
-    if (name === "fecha" && value) {
-      const restriction = getAppointmentDateRestriction(value);
-      if (restriction) {
-        alert(restriction);
-        setForm((prev) => ({ ...prev, fecha: "", hora: "" }));
-        return;
-      }
-    }
-
     setForm((prev) => ({
       ...prev,
       [name]: value,
       ...(name === "specialtyId"
-        ? { appointmentClassId: "", hora: "" }
+        ? { doctorId: "", appointmentClassId: "", fecha: "", hora: "" }
         : {}),
+      ...(name === "doctorId" || name === "fecha" ? { hora: "" } : {}),
     }));
+  };
+
+  const handleFieldChange = <K extends keyof AdminAppointmentForm>(name: K, value: AdminAppointmentForm[K]) => { setLastResult(null); setForm((prev) => ({ ...prev, [name]: value, ...(name === "specialtyId" ? { doctorId: "", appointmentClassId: "", fecha: "", hora: "" } : {}), ...(name === "doctorId" || name === "fecha" ? { hora: "" } : {}) })); };
+
+  const handleSelectPatient = (patient: Patient) => {
+    setLastResult(null);
+    const age = calculateAge(patient.fechaNacimiento);
+    const summary = { id: patient.id, documento: patient.numeroDocumento, nombre: [patient.primerNombre, patient.segundoNombre, patient.primerApellido, patient.segundoApellido].filter(Boolean).join(" "), eps: patient.eps || "", fechaNacimiento: patient.fechaNacimiento, edad: age, departamento: patient.departamento, municipio: patient.municipio };
+    setSelectedPatient(summary);
+    setForm((prev) => ({ ...prev, eps: patient.eps || "", epsId: patient.epsId ? String(patient.epsId) : "", departamento: patient.departamento || "", municipio: patient.municipio || "", edad: age === undefined ? "" : String(age) }));
+    setPatientOptions([]); setPatientSearch(summary.nombre);
   };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -349,7 +350,7 @@ export function useAdminAppointments() {
       alert("Cita aprobada correctamente");
       await loadAppointments();
       await loadQueue(selectedDate);
-      if (form.fecha && form.specialtyId) await loadAvailableHours(form.fecha, form.specialtyId);
+      if (form.fecha && form.specialtyId) await loadAvailableHours(form.fecha, form.specialtyId, form.doctorId);
     } catch (error: unknown) {
       if (error instanceof Error) {
         alert(error.message);
@@ -375,7 +376,7 @@ export function useAdminAppointments() {
       alert("Cita cancelada correctamente");
       await loadAppointments();
       await loadQueue(selectedDate);
-      if (form.fecha && form.specialtyId) await loadAvailableHours(form.fecha, form.specialtyId);
+      if (form.fecha && form.specialtyId) await loadAvailableHours(form.fecha, form.specialtyId, form.doctorId);
     } catch (error: unknown) {
       if (error instanceof Error) {
         alert(error.message);
@@ -389,29 +390,16 @@ export function useAdminAppointments() {
     const token = getToken();
     if (!token) return;
 
-    if (
-      !form.documento ||
-      !form.specialtyId ||
-      !form.fecha ||
-      !form.hora ||
-      !form.motivoConsulta ||
-      !form.epsId ||
-      !form.departamento ||
-      !form.municipio ||
-      !form.appointmentClassId
-    ) {
-      alert(
-        "Completa documento, especialidad, fecha, hora, EPS, municipio, departamento y clase de cita",
-      );
-      return;
-    }
+    const validationError = validateBookingForm(form, selectedPatient);
+    if (validationError) { alert(validationError); return; }
 
     try {
       setSaving(true);
 
-      await adminCreateAppointment(token, {
-        documento: form.documento,
+      const created = await adminCreateAppointment(token, {
+        documento: selectedPatient!.documento,
         specialtyId: Number(form.specialtyId),
+        doctorId: Number(form.doctorId),
         fecha: form.fecha,
         hora: form.hora,
         motivoConsulta: form.motivoConsulta,
@@ -426,15 +414,16 @@ export function useAdminAppointments() {
         epsId: form.epsId ? Number(form.epsId) : undefined,
         departamento: form.departamento,
         municipio: form.municipio,
-        appointmentClassId: form.appointmentClassId
-          ? Number(form.appointmentClassId)
-          : undefined,
+        appointmentClassId: Number(form.appointmentClassId),
         observaciones: form.observaciones,
+        selectedSymptoms: form.selectedSymptoms,
+        painLevel: form.painLevel || undefined,
+        symptomOnset: form.symptomOnset || undefined,
       });
 
+      setLastResult(created);
+
       alert("Cita creada correctamente");
-      setForm(EMPTY_FORM);
-      setAvailableHours([]);
       await loadAppointments();
       await loadQueue(selectedDate);
     } catch (error: unknown) {
@@ -446,6 +435,44 @@ export function useAdminAppointments() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleJoinWaitlist = async () => {
+    const token = getToken();
+    if (!token) return;
+    const validationError = validateBookingForm(form, selectedPatient, false);
+    if (validationError) { alert(validationError); return; }
+    try {
+      setSavingWaitlist(true);
+      const created = await adminCreateAppointment(token, {
+        documento: selectedPatient!.documento,
+        specialtyId: Number(form.specialtyId),
+        doctorId: Number(form.doctorId),
+        fecha: form.fecha,
+        hora: getWaitlistBaseHour(form.fecha),
+        motivoConsulta: form.motivoConsulta,
+        edad: form.edad ? Number(form.edad) : undefined,
+        embarazada: form.embarazada,
+        discapacidad: form.discapacidad,
+        dolorIntenso: form.dolorIntenso,
+        sangrado: form.sangrado,
+        dificultadRespiratoria: form.dificultadRespiratoria,
+        fiebre: form.fiebre,
+        eps: form.eps,
+        epsId: form.epsId ? Number(form.epsId) : undefined,
+        departamento: form.departamento,
+        municipio: form.municipio,
+        appointmentClassId: Number(form.appointmentClassId),
+        observaciones: form.observaciones,
+        selectedSymptoms: form.selectedSymptoms,
+        painLevel: form.painLevel || undefined,
+        symptomOnset: form.symptomOnset || undefined,
+      });
+      setLastResult(created);
+      alert("Paciente registrado en la lista de espera");
+      await loadAppointments(); await loadQueue(selectedDate);
+    } catch (error) { alert(error instanceof Error ? error.message : "No fue posible registrar la lista de espera"); }
+    finally { setSavingWaitlist(false); }
   };
 
   // ── Computed ──
@@ -517,11 +544,18 @@ export function useAdminAppointments() {
     loadingHours,
     loadingCatalogs,
     saving,
+    savingWaitlist,
     appointments,
     queueItems,
     availableHours,
     specialties,
-    epsList,
+    doctors,
+    patientOptions,
+    selectedPatient,
+    patientSearch,
+    lastResult,
+    loadingDoctors,
+    loadingPatients,
     appointmentClasses,
     selectedDate,
     statusFilter,
@@ -539,11 +573,15 @@ export function useAdminAppointments() {
     setStatusFilter,
     setDateFilter,
     setSearchTerm,
+    setPatientSearch,
     // handlers
     handleTextChange,
     handleCheckboxChange,
+    handleFieldChange,
+    handleSelectPatient,
     handleApprove,
     handleCancel,
     handleCreateAppointment,
+    handleJoinWaitlist,
   };
 }

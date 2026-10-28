@@ -109,10 +109,11 @@ export class AppointmentsController {
     @Query('date') date?: string,
     @Query('search') search?: string,
   ) {
-    return this.appointmentsService.findAll(
-      parsePageRequest(page, limit),
-      { status, date, search },
-    );
+    return this.appointmentsService.findAll(parsePageRequest(page, limit), {
+      status,
+      date,
+      search,
+    });
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -192,10 +193,18 @@ export class AppointmentsController {
   getAvailable(
     @Query('fecha') fecha: string,
     @Query('specialtyId') specialtyId?: string,
+    @Query('doctorId') doctorId?: string,
   ) {
     const parsedSpecialtyId = parseOptionalNumber(specialtyId, 'specialtyId');
+    const parsedDoctorId = parseOptionalNumber(doctorId, 'doctorId');
 
-    return this.appointmentsService.getAvailable(fecha, parsedSpecialtyId);
+    return parsedDoctorId === undefined
+      ? this.appointmentsService.getAvailable(fecha, parsedSpecialtyId)
+      : this.appointmentsService.getAvailable(
+          fecha,
+          parsedSpecialtyId,
+          parsedDoctorId,
+        );
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

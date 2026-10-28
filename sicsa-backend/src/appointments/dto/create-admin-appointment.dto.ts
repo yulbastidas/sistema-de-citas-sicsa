@@ -1,6 +1,9 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -50,6 +53,11 @@ export class CreateAdminAppointmentDto {
 
   @IsOptional()
   @IsInt()
+  @IsPositive()
+  doctorId?: number;
+
+  @IsOptional()
+  @IsInt()
   @Min(0)
   @Max(120)
   edad?: number;
@@ -77,6 +85,21 @@ export class CreateAdminAppointmentDto {
   @IsOptional()
   @IsBoolean()
   fiebre?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  selectedSymptoms?: string[];
+
+  @IsOptional()
+  @IsIn(['none', 'mild', 'moderate', 'severe'])
+  painLevel?: 'none' | 'mild' | 'moderate' | 'severe';
+
+  @IsOptional()
+  @IsIn(['today', '2-3-days', 'less-than-week', 'week-or-more'])
+  symptomOnset?: 'today' | '2-3-days' | 'less-than-week' | 'week-or-more';
 
   @IsOptional()
   @Trim()

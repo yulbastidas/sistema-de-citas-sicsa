@@ -1,0 +1,7 @@
+"use client";
+
+import type { Patient } from "@/app/dashboard/admin/patients/types";
+
+export function AdminPatientSelector({ search, loading, patients, onSearch, onSelect }: { search: string; loading: boolean; patients: Patient[]; onSearch: (value: string) => void; onSelect: (patient: Patient) => void }) {
+  return <section className="relative rounded-2xl border border-slate-200 bg-slate-50 p-4"><label className="mb-1.5 block text-sm font-semibold text-slate-700">Buscar paciente registrado *</label><input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Documento, nombre, correo o celular" className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm outline-none focus:border-blue-500" />{loading && <p className="mt-2 text-xs text-slate-500">Buscando...</p>}{patients.length > 0 && <div className="absolute left-4 right-4 top-full z-20 mt-1 max-h-64 overflow-auto rounded-xl border bg-white p-2 shadow-xl">{patients.map((patient) => <button key={patient.id} type="button" onClick={() => onSelect(patient)} className="block w-full rounded-lg px-3 py-2 text-left hover:bg-blue-50"><span className="block font-semibold text-slate-900">{[patient.primerNombre, patient.segundoNombre, patient.primerApellido, patient.segundoApellido].filter(Boolean).join(" ")}</span><span className="text-xs text-slate-500">{patient.numeroDocumento} · {patient.eps || "EPS sin registrar"}</span></button>)}</div>}</section>;
+}

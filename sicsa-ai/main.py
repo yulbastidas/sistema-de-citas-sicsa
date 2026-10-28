@@ -54,6 +54,12 @@ class AppointmentData(BaseModel):
     dificultadRespiratoria: bool = False
     fiebre: bool = False
 
+    selectedSymptoms: list[str] = Field(default_factory=list, max_length=12)
+    painLevel: Literal["none", "mild", "moderate", "severe"] | None = None
+    symptomOnset: Literal[
+        "today", "2-3-days", "less-than-week", "week-or-more"
+    ] | None = None
+
     @field_validator("motivoConsulta")
     @classmethod
     def validar_motivo(cls, value: str) -> str:
@@ -119,8 +125,28 @@ def agregar_razon(
 
 
 def obtener_texto_completo(data: AppointmentData) -> str:
+    pain_labels = {
+        "none": "sin dolor",
+        "mild": "dolor leve",
+        "moderate": "dolor moderado",
+        "severe": "dolor fuerte dolor intenso",
+    }
+    onset_labels = {
+        "today": "inicio hoy",
+        "2-3-days": "inicio hace 2 3 dias",
+        "less-than-week": "inicio hace menos de una semana",
+        "week-or-more": "inicio hace una semana o mas",
+    }
     return normalizar_texto(
-        f"{data.motivoConsulta} {data.observaciones or ''}"
+        " ".join(
+            [
+                data.motivoConsulta,
+                data.observaciones or "",
+                " ".join(data.selectedSymptoms),
+                pain_labels.get(data.painLevel or "", ""),
+                onset_labels.get(data.symptomOnset or "", ""),
+            ]
+        )
     )
 
 

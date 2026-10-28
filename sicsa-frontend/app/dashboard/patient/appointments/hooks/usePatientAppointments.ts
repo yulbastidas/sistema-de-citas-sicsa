@@ -6,6 +6,7 @@ import { io, Socket } from "socket.io-client";
 
 import { getToken, getUser } from "@/service/session";
 import { getMyPatient } from "@/service/patient";
+import { getDoctorsBySpecialty } from "@/service/doctor";
 import { getMyVerification } from "@/service/verification";
 import { getSpecialties } from "@/service/specialty";
 import {
@@ -24,26 +25,16 @@ import type {
   SpecialtyItem,
   VerificationResponse,
   VerificationState,
+  BookingDoctor,
+  BookingPatientSummary,
 } from "../types";
+import { EMPTY_BOOKING_FORM, calculateAge, getWaitlistBaseHour, validateBookingForm, type BookingPriorityResult } from "@/app/components/appointment-booking/types";
 
 import { isAppointmentUpcoming } from "@/utils/appointment-date";
 import { confirmSicsa, notifySicsa as alert } from "@/app/components/SicsaFeedback";
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL || "http://74.161.42.39:3000";
-
-export const getWaitlistBaseHour = (fecha: string) => {
-  const [year, month, day] = fecha.split("-").map(Number);
-  const weekDay = new Date(year, month - 1, day).getDay();
-
-  if (weekDay === 2 || weekDay === 3) return "08:00";
-
-  if (weekDay === 4 || weekDay === 5 || weekDay === 6) {
-    return "07:00";
-  }
-
-  return "08:00";
-};
 
 function normalizeRole(
   role: string | number | undefined,
@@ -57,25 +48,7 @@ function normalizeRole(
   return undefined;
 }
 
-const EMPTY_FORM: AppointmentForm = {
-  specialtyId: "",
-  fecha: "",
-  hora: "",
-  motivoConsulta: "",
-  eps: "",
-  epsId: "",
-  departamento: "",
-  municipio: "",
-  appointmentClassId: "",
-  observaciones: "",
-  edad: "",
-  embarazada: false,
-  discapacidad: false,
-  dolorIntenso: false,
-  sangrado: false,
-  dificultadRespiratoria: false,
-  fiebre: false,
-};
+const EMPTY_FORM: AppointmentForm = EMPTY_BOOKING_FORM;
 
 export function usePatientAppointments() {
   const router = useRouter();
@@ -101,9 +74,13 @@ export function usePatientAppointments() {
   >([]);
 
   const [availableHours, setAvailableHours] = useState<string[]>([]);
+  const [doctors, setDoctors] = useState<BookingDoctor[]>([]);
+  const [patientProfile, setPatientProfile] = useState<BookingPatientSummary | null>(null);
+  const [lastResult, setLastResult] = useState<BookingPriorityResult | null>(null);
 
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [loadingHours, setLoadingHours] = useState(false);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
 
   const [saving, setSaving] = useState(false);
@@ -287,12 +264,17 @@ export function usePatientAppointments() {
 
       if (!mountedRef.current || !patient) return;
 
+      const age = calculateAge(patient.fechaNacimiento);
+      const patientName = [patient.primerNombre, patient.segundoNombre, patient.primerApellido, patient.segundoApellido].filter(Boolean).join(" ") || patient.nombre || "Paciente";
+      setPatientProfile({ id: patient.id, documento: patient.numeroDocumento || patient.documento || "", nombre: patientName, eps: typeof patient.eps === "string" ? patient.eps : patient.eps?.nombre || "", fechaNacimiento: patient.fechaNacimiento, edad: age, departamento: patient.departamento, municipio: patient.municipio });
+
       setForm((previous) => ({
         ...previous,
         eps: typeof patient.eps === "string" ? patient.eps : "",
         epsId: patient.epsId ? String(patient.epsId) : "",
         departamento: patient.departamento || previous.departamento,
         municipio: patient.municipio || previous.municipio,
+        edad: age === undefined ? "" : String(age),
       }));
     } catch (error: unknown) {
       if (!mountedRef.current) return;
@@ -350,7 +332,7 @@ export function usePatientAppointments() {
   }, []);
 
   const loadAvailableHours = useCallback(
-    async (fecha: string, specialtyId: string) => {
+    async (fecha: string, specialtyId: string, doctorId?: string) => {
       const token = getToken();
 
       if (!token || !fecha || !specialtyId) {
@@ -368,6 +350,7 @@ export function usePatientAppointments() {
           token,
           fecha,
           Number(specialtyId),
+          doctorId ? Number(doctorId) : undefined,
         );
 
         const hours = Array.isArray(result)
@@ -395,6 +378,14 @@ export function usePatientAppointments() {
     },
     [],
   );
+
+  const loadDoctors = useCallback(async (specialtyId: string) => {
+    const token = getToken();
+    if (!token || !specialtyId) { setDoctors([]); return; }
+    try { setLoadingDoctors(true); setDoctors(await getDoctorsBySpecialty(token, Number(specialtyId))); }
+    catch (error) { setDoctors([]); alert(error instanceof Error ? error.message : "No fue posible consultar los médicos"); }
+    finally { setLoadingDoctors(false); }
+  }, []);
 
   // ── Init (solo una vez) ──
   useEffect(() => {
@@ -557,7 +548,7 @@ export function usePatientAppointments() {
       return;
     }
 
-    if (!form.fecha || !form.specialtyId) {
+    if (!form.fecha || !form.specialtyId || !form.doctorId) {
       setAvailableHours([]);
       return;
     }
@@ -574,13 +565,17 @@ export function usePatientAppointments() {
     void loadAvailableHours(
       form.fecha,
       form.specialtyId,
+      form.doctorId,
     );
   }, [
     form.fecha,
     form.specialtyId,
+    form.doctorId,
     verificationStatus,
     loadAvailableHours,
   ]);
+
+  useEffect(() => { void loadDoctors(form.specialtyId); }, [form.specialtyId, loadDoctors]);
 
   // ── Handlers ──
   const handleChange = (
@@ -600,9 +595,15 @@ export function usePatientAppointments() {
       ...prev,
       [name]: nextValue,
       ...(name === "specialtyId"
-        ? { appointmentClassId: "", hora: "" }
+        ? { doctorId: "", appointmentClassId: "", fecha: "", hora: "" }
         : {}),
+      ...(name === "doctorId" || name === "fecha" ? { hora: "" } : {}),
     }));
+  };
+
+  const handleFieldChange = <K extends keyof AppointmentForm>(name: K, value: AppointmentForm[K]) => {
+    setLastResult(null);
+    setForm((prev) => ({ ...prev, [name]: value, ...(name === "specialtyId" ? { doctorId: "", appointmentClassId: "", fecha: "", hora: "" } : {}), ...(name === "doctorId" || name === "fecha" ? { hora: "" } : {}) }));
   };
 
   const handleSelectWeekDay = (date: string) => {
@@ -649,27 +650,15 @@ export function usePatientAppointments() {
       return;
     }
 
-    if (
-      !form.specialtyId ||
-      !form.fecha ||
-      !form.hora ||
-      !form.motivoConsulta ||
-      !form.eps ||
-      !form.departamento ||
-      !form.municipio ||
-      !form.appointmentClassId
-    ) {
-      alert(
-        "Completa especialidad, fecha, hora, motivo, EPS, municipio, departamento y clase de cita",
-      );
-      return;
-    }
+    const validationError = validateBookingForm(form, patientProfile);
+    if (validationError) { alert(validationError); return; }
 
     try {
       setSaving(true);
 
-      await createAppointment(token, {
+      const created = await createAppointment(token, {
         specialtyId: Number(form.specialtyId),
+        doctorId: Number(form.doctorId),
         fecha: form.fecha,
         hora: form.hora,
         motivoConsulta: form.motivoConsulta,
@@ -690,12 +679,14 @@ export function usePatientAppointments() {
         sangrado: form.sangrado,
         dificultadRespiratoria: form.dificultadRespiratoria,
         fiebre: form.fiebre,
+        selectedSymptoms: form.selectedSymptoms,
+        painLevel: form.painLevel || undefined,
+        symptomOnset: form.symptomOnset || undefined,
       });
 
-      alert("Cita creada correctamente");
+      setLastResult(created);
 
-      resetFormKeepingPatientData();
-      setAvailableHours([]);
+      alert("Cita creada correctamente");
 
       await loadAppointments();
       await loadVerificationStatus();
@@ -727,26 +718,15 @@ export function usePatientAppointments() {
       return;
     }
 
-    if (
-      !form.specialtyId ||
-      !form.fecha ||
-      !form.motivoConsulta ||
-      !form.eps ||
-      !form.departamento ||
-      !form.municipio ||
-      !form.appointmentClassId
-    ) {
-      alert(
-        "Completa especialidad, fecha, motivo, EPS, municipio, departamento y clase de cita antes de unirte a la lista de espera",
-      );
-      return;
-    }
+    const validationError = validateBookingForm(form, patientProfile, false);
+    if (validationError) { alert(validationError); return; }
 
     try {
       setSavingWaitlist(true);
 
       await createAppointment(token, {
         specialtyId: Number(form.specialtyId),
+        doctorId: Number(form.doctorId),
         fecha: form.fecha,
         hora: getWaitlistBaseHour(form.fecha),
         motivoConsulta: form.motivoConsulta,
@@ -767,6 +747,9 @@ export function usePatientAppointments() {
         sangrado: form.sangrado,
         dificultadRespiratoria: form.dificultadRespiratoria,
         fiebre: form.fiebre,
+        selectedSymptoms: form.selectedSymptoms,
+        painLevel: form.painLevel || undefined,
+        symptomOnset: form.symptomOnset || undefined,
       });
 
       alert(
@@ -867,10 +850,14 @@ export function usePatientAppointments() {
     verificationStatus,
     appointments,
     specialties,
+    doctors,
+    patientProfile,
+    lastResult,
     appointmentClasses,
     availableHours,
     loadingAppointments,
     loadingHours,
+    loadingDoctors,
     loadingCatalogs,
     saving,
     savingWaitlist,
@@ -880,6 +867,7 @@ export function usePatientAppointments() {
     showWaitlistButton,
     today,
     handleChange,
+    handleFieldChange,
     handleSelectWeekDay,
     handleSelectHour,
     handleCreateAppointment,

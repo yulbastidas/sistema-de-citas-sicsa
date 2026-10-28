@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import AdminSidebar from "@/app/components/AdminSidebar";
 import { useAdminAppointments } from "./hooks/useAdminAppointments";
-import { AdminAppointmentFormPanel } from "./components/AdminAppointmentForm";
+import { AppointmentBookingForm } from "@/app/components/appointment-booking/AppointmentBookingForm";
+import { AdminPatientSelector } from "./components/AdminPatientSelector";
 import { QueuePanel } from "./components/QueuePanel";
 import { AppointmentFilters } from "./components/AppointmentFilters";
 import { AdminAppointmentList } from "./components/AdminAppointmentList";
@@ -20,10 +21,17 @@ export default function AdminAppointmentsPage() {
     loadingHours,
     loadingCatalogs,
     saving,
+    savingWaitlist,
     queueItems,
     availableHours,
     specialties,
-    epsList,
+    doctors,
+    patientOptions,
+    selectedPatient,
+    patientSearch,
+    lastResult,
+    loadingDoctors,
+    loadingPatients,
     appointmentClasses,
     selectedDate,
     statusFilter,
@@ -39,11 +47,13 @@ export default function AdminAppointmentsPage() {
     setStatusFilter,
     setDateFilter,
     setSearchTerm,
-    handleTextChange,
-    handleCheckboxChange,
+    setPatientSearch,
+    handleFieldChange,
+    handleSelectPatient,
     handleApprove,
     handleCancel,
     handleCreateAppointment,
+    handleJoinWaitlist,
   } = useAdminAppointments();
 
   if (checkingAuth) {
@@ -142,19 +152,26 @@ export default function AdminAppointmentsPage() {
 
           {/* Formulario y cola priorizada */}
           <section className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.9fr)]">
-            <AdminAppointmentFormPanel
+            <AppointmentBookingForm
+              mode="admin"
+              patient={selectedPatient}
+              patientSelector={<AdminPatientSelector search={patientSearch} loading={loadingPatients} patients={patientOptions} onSearch={setPatientSearch} onSelect={handleSelectPatient} />}
               form={form}
               specialties={specialties}
-              epsList={epsList}
+              doctors={doctors}
               appointmentClasses={appointmentClasses}
               availableHours={availableHours}
               loadingCatalogs={loadingCatalogs}
+              loadingDoctors={loadingDoctors}
               loadingHours={loadingHours}
               saving={saving}
+              savingWaitlist={savingWaitlist}
+              showWaitlist={!!form.fecha && !loadingHours && availableHours.length === 0}
               today={today}
-              onTextChange={handleTextChange}
-              onCheckboxChange={handleCheckboxChange}
+              result={lastResult}
+              onChange={handleFieldChange}
               onSubmit={handleCreateAppointment}
+              onJoinWaitlist={handleJoinWaitlist}
             />
 
             <QueuePanel

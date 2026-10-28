@@ -19,6 +19,10 @@ describe('CreateAppointmentDto', () => {
       ...validPayload,
       motivoConsulta: '  Control médico general  ',
       observaciones: '  Sin observaciones  ',
+      doctorId: 2,
+      selectedSymptoms: ['Dolor en el pecho'],
+      painLevel: 'severe',
+      symptomOnset: 'today',
     });
 
     expect(await validate(dto)).toHaveLength(0);
@@ -33,6 +37,9 @@ describe('CreateAppointmentDto', () => {
     ['edad superior a 120', { edad: 121 }],
     ['especialidad no positiva', { specialtyId: 0 }],
     ['clase de cita no positiva', { appointmentClassId: 0 }],
+    ['médico no positivo', { doctorId: 0 }],
+    ['nivel de dolor desconocido', { painLevel: 'extremo' }],
+    ['más de doce síntomas', { selectedSymptoms: Array(13).fill('Dolor') }],
     ['motivo vacío', { motivoConsulta: '   ' }],
     ['motivo demasiado corto', { motivoConsulta: 'ab' }],
     ['observaciones demasiado largas', { observaciones: 'x'.repeat(3001) }],

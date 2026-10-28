@@ -33,7 +33,10 @@ describe('AppointmentsController', () => {
           provide: AppointmentsService,
           useValue: mockAppointmentsService,
         },
-        { provide: AuditService, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
+        {
+          provide: AuditService,
+          useValue: { record: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 
@@ -71,10 +74,7 @@ describe('AppointmentsController', () => {
 
     const result = await controller.create(body, req);
 
-    expect(mockAppointmentsService.create).toHaveBeenCalledWith(
-      body,
-      req.user,
-    );
+    expect(mockAppointmentsService.create).toHaveBeenCalledWith(body, req.user);
     expect(result).toEqual(expectedResponse);
   });
 
@@ -107,5 +107,17 @@ describe('AppointmentsController', () => {
     );
 
     expect(mockAppointmentsService.getAvailable).not.toHaveBeenCalled();
+  });
+
+  it('filters availability by the selected doctor', async () => {
+    mockAppointmentsService.getAvailable.mockResolvedValue(['08:00']);
+
+    await controller.getAvailable('2026-05-26', '13', '4');
+
+    expect(mockAppointmentsService.getAvailable).toHaveBeenCalledWith(
+      '2026-05-26',
+      13,
+      4,
+    );
   });
 });

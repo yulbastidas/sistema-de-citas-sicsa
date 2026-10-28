@@ -17,6 +17,10 @@ type AiPriorityResponse = {
   prioridad?: unknown;
   score?: unknown;
   explicacion?: unknown;
+  alertaUrgencias?: unknown;
+  mensajeUrgencias?: unknown;
+  requiereRevisionHumana?: unknown;
+  versionMotor?: unknown;
 };
 
 @Injectable()
@@ -36,6 +40,9 @@ export class AppointmentPriorityService {
           sangrado: data.sangrado ?? false,
           dificultadRespiratoria: data.dificultadRespiratoria ?? false,
           fiebre: data.fiebre ?? false,
+          selectedSymptoms: data.selectedSymptoms ?? [],
+          painLevel: data.painLevel,
+          symptomOnset: data.symptomOnset,
         },
         { timeout: getAiTimeoutMs() },
       );
@@ -47,20 +54,33 @@ export class AppointmentPriorityService {
       return {
         prioridad: response.data.prioridad,
         scorePrioridad: response.data.score,
-        explicacionPrioridad: response.data.explicacion,
+        explicacionPrioridad: [
+          response.data.explicacion,
+          response.data.alertaUrgencias === true &&
+          typeof response.data.mensajeUrgencias === 'string'
+            ? response.data.mensajeUrgencias
+            : '',
+        ]
+          .filter(Boolean)
+          .join('. '),
       };
     } catch {
       return {
-        prioridad: 'baja',
-        scorePrioridad: 0,
-        explicacionPrioridad: '',
+        prioridad: 'media',
+        scorePrioridad: 15,
+        explicacionPrioridad:
+          'El servicio de priorización no estuvo disponible; la solicitud requiere revisión administrativa humana.',
       };
     }
   }
 
   private isValidResponse(
     response: AiPriorityResponse,
-  ): response is { prioridad: string; score: number; explicacion: string } {
+  ): response is AiPriorityResponse & {
+    prioridad: string;
+    score: number;
+    explicacion: string;
+  } {
     return (
       typeof response === 'object' &&
       response !== null &&
@@ -69,7 +89,12 @@ export class AppointmentPriorityService {
       Number.isFinite(response.score) &&
       response.score >= 0 &&
       response.score <= 100 &&
-      typeof response.explicacion === 'string'
+      typeof response.explicacion === 'string' &&
+      (response.alertaUrgencias === undefined ||
+        typeof response.alertaUrgencias === 'boolean') &&
+      (response.mensajeUrgencias === undefined ||
+        response.mensajeUrgencias === null ||
+        typeof response.mensajeUrgencias === 'string')
     );
   }
 }

@@ -57,6 +57,7 @@ export async function createAppointment(
   token: string,
   data: {
     specialtyId: number;
+    doctorId?: number;
     fecha: string;
     hora: string;
     motivoConsulta: string;
@@ -64,7 +65,7 @@ export async function createAppointment(
     epsId?: number;
     departamento?: string;
     municipio?: string;
-    appointmentClassId?: number;
+    appointmentClassId: number;
     observaciones?: string;
     ordenMedicaUrl?: string;
     edad?: number;
@@ -74,6 +75,9 @@ export async function createAppointment(
     sangrado?: boolean;
     dificultadRespiratoria?: boolean;
     fiebre?: boolean;
+    selectedSymptoms?: string[];
+    painLevel?: "none" | "mild" | "moderate" | "severe";
+    symptomOnset?: "today" | "2-3-days" | "less-than-week" | "week-or-more";
   },
 ) {
   const response = await fetch(
@@ -130,6 +134,7 @@ export async function getAvailableAppointments(
   token: string,
   fecha: string,
   specialtyId?: number,
+  doctorId?: number,
 ) {
   const params = new URLSearchParams();
 
@@ -141,6 +146,7 @@ export async function getAvailableAppointments(
       String(specialtyId),
     );
   }
+  if (typeof doctorId === "number") params.set("doctorId", String(doctorId));
 
   const response = await fetch(
     `${API_URL}/appointments/available?${params.toString()}`,
@@ -328,6 +334,7 @@ export async function adminCreateAppointment(
   data: {
     documento: string;
     specialtyId: number;
+    doctorId?: number;
     fecha: string;
     hora: string;
     motivoConsulta: string;
@@ -342,9 +349,12 @@ export async function adminCreateAppointment(
     epsId?: number;
     departamento?: string;
     municipio?: string;
-    appointmentClassId?: number;
+    appointmentClassId: number;
     observaciones?: string;
     ordenMedicaUrl?: string;
+    selectedSymptoms?: string[];
+    painLevel?: "none" | "mild" | "moderate" | "severe";
+    symptomOnset?: "today" | "2-3-days" | "less-than-week" | "week-or-more";
   },
 ) {
   const response = await fetch(

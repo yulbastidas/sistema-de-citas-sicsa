@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -17,6 +18,12 @@ import { DoctorsService } from './doctors.service';
 @Controller('doctors')
 export class DoctorsController {
   constructor(private readonly doctorsService: DoctorsService) {}
+
+  @Roles('patient', 'admin')
+  @Get()
+  findActiveBySpecialty(@Query('specialtyId') specialtyId?: string) {
+    return this.doctorsService.findActiveBySpecialty(specialtyId);
+  }
 
   @Roles('doctor', 'admin')
   @Get('user/:userId')

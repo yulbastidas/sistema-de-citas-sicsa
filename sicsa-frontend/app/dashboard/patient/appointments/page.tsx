@@ -9,8 +9,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { usePatientAppointments } from "./hooks/usePatientAppointments";
-import { PatientAppointmentForm } from "./components/PatientAppointmentForm";
-import { WeeklyAvailability } from "./components/WeeklyAvailability";
+import { AppointmentBookingForm } from "@/app/components/appointment-booking/AppointmentBookingForm";
 import { PatientAppointmentList } from "./components/PatientAppointmentList";
 
 export default function PatientAppointmentsPage() {
@@ -21,9 +20,13 @@ export default function PatientAppointmentsPage() {
     appointments,
     specialties,
     appointmentClasses,
+    doctors,
+    patientProfile,
+    lastResult,
     availableHours,
     loadingAppointments,
     loadingHours,
+    loadingDoctors,
     loadingCatalogs,
     saving,
     savingWaitlist,
@@ -32,9 +35,7 @@ export default function PatientAppointmentsPage() {
     activeAppointments,
     showWaitlistButton,
     today,
-    handleChange,
-    handleSelectWeekDay,
-    handleSelectHour,
+    handleFieldChange,
     handleCreateAppointment,
     handleJoinWaitlist,
     handleCancelAppointment,
@@ -105,31 +106,28 @@ export default function PatientAppointmentsPage() {
 
       <section className="mx-auto max-w-[1600px] px-4 pb-8 pt-6 sm:px-6 lg:px-8">
       <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,2.15fr)_minmax(340px,1fr)]">
-        <PatientAppointmentForm
+        <AppointmentBookingForm
+          mode="patient"
+          patient={patientProfile}
           form={form}
           specialties={specialties}
+          doctors={doctors}
           appointmentClasses={appointmentClasses}
-          loadingCatalogs={loadingCatalogs}
-          canCreateAppointment={canCreateAppointment}
-          saving={saving}
-          onChange={handleChange}
-          onSubmit={handleCreateAppointment}
-        />
-
-        <WeeklyAvailability
-          form={form}
           availableHours={availableHours}
-          loadingHours={loadingHours}
-          canCreateAppointment={canCreateAppointment}
-          showWaitlistButton={showWaitlistButton}
-          savingWaitlist={savingWaitlist}
-          activeAppointments={activeAppointments}
-          appointments={appointments}
           today={today}
-          onSelectDay={handleSelectWeekDay}
-          onSelectHour={handleSelectHour}
+          loadingCatalogs={loadingCatalogs}
+          loadingDoctors={loadingDoctors}
+          loadingHours={loadingHours}
+          disabled={!canCreateAppointment}
+          saving={saving}
+          savingWaitlist={savingWaitlist}
+          showWaitlist={showWaitlistButton}
+          result={lastResult}
+          onChange={handleFieldChange}
+          onSubmit={handleCreateAppointment}
           onJoinWaitlist={handleJoinWaitlist}
         />
+        <aside className="rounded-3xl border border-blue-100 bg-white p-5 shadow-sm"><h2 className="font-bold text-slate-950">Seguimiento</h2><p className="mt-2 text-sm text-slate-600">Tienes {activeAppointments.length} cita(s) activa(s). La disponibilidad corresponde al médico seleccionado.</p></aside>
       </section>
 
       <PatientAppointmentList

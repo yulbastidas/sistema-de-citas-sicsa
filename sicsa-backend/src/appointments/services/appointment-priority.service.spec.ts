@@ -11,6 +11,10 @@ describe('AppointmentPriorityService', () => {
     hora: '09:00',
     motivoConsulta: 'Dolor moderado',
     specialtyId: 13,
+    appointmentClassId: 1,
+    selectedSymptoms: ['Dolor en el pecho'],
+    painLevel: 'severe' as const,
+    symptomOnset: 'today' as const,
   };
 
   beforeEach(() => {
@@ -18,6 +22,15 @@ describe('AppointmentPriorityService', () => {
     process.env.AI_TIMEOUT_MS = '1500';
     mockedAxios.post.mockReset();
   });
+
+  async function expectHumanReviewFallback() {
+    const result = await service.getPrioridad(appointment);
+    expect(result.prioridad).toBe('media');
+    expect(result.scorePrioridad).toBe(15);
+    expect(result.explicacionPrioridad).toContain(
+      'revisión administrativa humana',
+    );
+  }
 
   it('uses the configured service and returns a valid response', async () => {
     mockedAxios.post.mockResolvedValue({
@@ -36,7 +49,12 @@ describe('AppointmentPriorityService', () => {
 
     expect(mockedAxios.post.mock.calls[0]).toEqual([
       'http://ai.test:8000/prioridad',
-      expect.objectContaining({ specialtyId: 13 }),
+      expect.objectContaining({
+        specialtyId: 13,
+        selectedSymptoms: ['Dolor en el pecho'],
+        painLevel: 'severe',
+        symptomOnset: 'today',
+      }),
       { timeout: 1500 },
     ]);
   });
@@ -44,11 +62,7 @@ describe('AppointmentPriorityService', () => {
   it('uses the safe fallback when the service is unavailable', async () => {
     mockedAxios.post.mockRejectedValue(new Error('connection refused'));
 
-    await expect(service.getPrioridad(appointment)).resolves.toEqual({
-      prioridad: 'baja',
-      scorePrioridad: 0,
-      explicacionPrioridad: '',
-    });
+    await expectHumanReviewFallback();
   });
 
   it('uses the safe fallback when the request times out', async () => {
@@ -58,11 +72,7 @@ describe('AppointmentPriorityService', () => {
       }),
     );
 
-    await expect(service.getPrioridad(appointment)).resolves.toEqual({
-      prioridad: 'baja',
-      scorePrioridad: 0,
-      explicacionPrioridad: '',
-    });
+    await expectHumanReviewFallback();
   });
 
   it('rejects an invalid AI response and uses the safe fallback', async () => {
@@ -74,10 +84,25 @@ describe('AppointmentPriorityService', () => {
       },
     });
 
+    await expectHumanReviewFallback();
+  });
+
+  it('preserves the urgent guidance returned by the priority service', async () => {
+    mockedAxios.post.mockResolvedValue({
+      data: {
+        prioridad: 'alta',
+        score: 90,
+        explicacion: 'Se identificaron factores prioritarios',
+        alertaUrgencias: true,
+        mensajeUrgencias: 'Busca atención inmediata',
+      },
+    });
+
     await expect(service.getPrioridad(appointment)).resolves.toEqual({
-      prioridad: 'baja',
-      scorePrioridad: 0,
-      explicacionPrioridad: '',
+      prioridad: 'alta',
+      scorePrioridad: 90,
+      explicacionPrioridad:
+        'Se identificaron factores prioritarios. Busca atención inmediata',
     });
   });
 });

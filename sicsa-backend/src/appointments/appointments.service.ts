@@ -6,7 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 
 import { Appointment } from './entities/appointment.entity';
 import { Patient } from '../patients/entities/patient.entity';
@@ -110,7 +115,10 @@ export class AppointmentsService {
 
     this.scheduleService.validateRadiologyBase(data);
 
-    const prioridadData = await this.priorityService.getPrioridad(data);
+    const edad = this.resolvePatientAge(patient, data.edad);
+    const normalizedData = { ...data, edad };
+    const prioridadData =
+      await this.priorityService.getPrioridad(normalizedData);
 
     const appointmentData: Partial<Appointment> = {
       patientId: user.sub,
@@ -118,7 +126,7 @@ export class AppointmentsService {
       fecha: data.fecha,
       hora: data.hora,
       motivoConsulta: data.motivoConsulta,
-      edad: data.edad,
+      edad,
       embarazada: data.embarazada ?? false,
       discapacidad: data.discapacidad ?? false,
       dolorIntenso: data.dolorIntenso ?? false,
@@ -133,7 +141,7 @@ export class AppointmentsService {
       departamento: patient.departamento,
       municipio: patient.municipio,
       appointmentClassId: data.appointmentClassId,
-      observaciones: data.observaciones,
+      observaciones: this.buildStructuredObservations(normalizedData),
       ordenMedicaUrl: data.ordenMedicaUrl,
     };
 
@@ -141,6 +149,7 @@ export class AppointmentsService {
       appointmentData,
       data.specialtyId,
       duration,
+      data.doctorId,
     );
 
     const result = await this.mapperService.attachPatientData(saved);
@@ -193,7 +202,10 @@ export class AppointmentsService {
 
     this.scheduleService.validateRadiologyBase(data);
 
-    const prioridadData = await this.priorityService.getPrioridad(data);
+    const edad = this.resolvePatientAge(patient, data.edad);
+    const normalizedData = { ...data, edad };
+    const prioridadData =
+      await this.priorityService.getPrioridad(normalizedData);
 
     const appointmentData: Partial<Appointment> = {
       patientId: patient.userId,
@@ -201,7 +213,7 @@ export class AppointmentsService {
       fecha: data.fecha,
       hora: data.hora,
       motivoConsulta: data.motivoConsulta,
-      edad: data.edad,
+      edad,
       embarazada: data.embarazada ?? false,
       discapacidad: data.discapacidad ?? false,
       dolorIntenso: data.dolorIntenso ?? false,
@@ -211,12 +223,12 @@ export class AppointmentsService {
       prioridad: prioridadData.prioridad,
       scorePrioridad: prioridadData.scorePrioridad,
       explicacionPrioridad: prioridadData.explicacionPrioridad,
-      eps: data.eps ?? patient.eps,
-      epsId: data.epsId ?? patient.epsId,
-      departamento: data.departamento ?? patient.departamento,
-      municipio: data.municipio ?? patient.municipio,
+      eps: patient.eps,
+      epsId: patient.epsId,
+      departamento: patient.departamento,
+      municipio: patient.municipio,
       appointmentClassId: data.appointmentClassId,
-      observaciones: data.observaciones,
+      observaciones: this.buildStructuredObservations(normalizedData),
       ordenMedicaUrl: data.ordenMedicaUrl,
     };
 
@@ -224,6 +236,7 @@ export class AppointmentsService {
       appointmentData,
       data.specialtyId,
       duration,
+      data.doctorId,
     );
 
     const result = await this.mapperService.attachPatientData(saved);
@@ -256,17 +269,29 @@ export class AppointmentsService {
         status: filters.status.trim(),
       });
     }
-    if (filters.date) query.andWhere('appointment.fecha = :date', { date: filters.date });
+    if (filters.date)
+      query.andWhere('appointment.fecha = :date', { date: filters.date });
     if (filters.search?.trim()) {
-      query.leftJoin(Patient, 'listPatient', 'listPatient.userId = appointment.patientId')
-        .andWhere(`(listPatient.numeroDocumento LIKE :search OR listPatient.primerNombre LIKE :search
+      query
+        .leftJoin(
+          Patient,
+          'listPatient',
+          'listPatient.userId = appointment.patientId',
+        )
+        .andWhere(
+          `(listPatient.numeroDocumento LIKE :search OR listPatient.primerNombre LIKE :search
           OR listPatient.primerApellido LIKE :search OR listPatient.email LIKE :search
-          OR appointment.municipio LIKE :search)`, { search: `%${filters.search.trim()}%` });
+          OR appointment.municipio LIKE :search)`,
+          { search: `%${filters.search.trim()}%` },
+        );
     }
     return query;
   }
 
-  private async paginateAppointments(query: SelectQueryBuilder<Appointment>, pagination: PageRequest) {
+  private async paginateAppointments(
+    query: SelectQueryBuilder<Appointment>,
+    pagination: PageRequest,
+  ) {
     const [appointments, total] = await query
       .skip((pagination.page - 1) * pagination.limit)
       .take(pagination.limit)
@@ -275,17 +300,25 @@ export class AppointmentsService {
     return pageResult(data, total, pagination);
   }
 
-  async findAll(pagination: PageRequest, filters: { status?: string; date?: string; search?: string }) {
+  async findAll(
+    pagination: PageRequest,
+    filters: { status?: string; date?: string; search?: string },
+  ) {
     const query = this.applyListFilters(
-      this.appointmentRepo.createQueryBuilder('appointment'), filters,
-    ).orderBy('appointment.fecha', 'ASC').addOrderBy('appointment.hora', 'ASC');
+      this.appointmentRepo.createQueryBuilder('appointment'),
+      filters,
+    )
+      .orderBy('appointment.fecha', 'ASC')
+      .addOrderBy('appointment.hora', 'ASC');
     return this.paginateAppointments(query, pagination);
   }
 
   async getByUser(userId: number, pagination: PageRequest) {
-    const query = this.appointmentRepo.createQueryBuilder('appointment')
+    const query = this.appointmentRepo
+      .createQueryBuilder('appointment')
       .where('appointment.patientId = :userId', { userId })
-      .orderBy('appointment.fecha', 'DESC').addOrderBy('appointment.hora', 'DESC');
+      .orderBy('appointment.fecha', 'DESC')
+      .addOrderBy('appointment.hora', 'DESC');
     return this.paginateAppointments(query, pagination);
   }
 
@@ -297,10 +330,13 @@ export class AppointmentsService {
   ) {
     const realDoctorId = await this.resolveAuthorizedDoctorId(doctorId, user);
     const query = this.applyListFilters(
-      this.appointmentRepo.createQueryBuilder('appointment')
+      this.appointmentRepo
+        .createQueryBuilder('appointment')
         .where('appointment.doctorId = :doctorId', { doctorId: realDoctorId }),
       filters,
-    ).orderBy('appointment.fecha', 'ASC').addOrderBy('appointment.hora', 'ASC');
+    )
+      .orderBy('appointment.fecha', 'ASC')
+      .addOrderBy('appointment.hora', 'ASC');
     return this.paginateAppointments(query, pagination);
   }
 
@@ -311,12 +347,21 @@ export class AppointmentsService {
     filters: { search?: string; date?: string },
   ) {
     const realDoctorId = await this.resolveAuthorizedDoctorId(doctorId, user);
-    let query = this.appointmentRepo.createQueryBuilder('appointment')
-      .leftJoin(MedicalReport, 'historyReport', 'historyReport.appointmentId = appointment.id')
+    let query = this.appointmentRepo
+      .createQueryBuilder('appointment')
+      .leftJoin(
+        MedicalReport,
+        'historyReport',
+        'historyReport.appointmentId = appointment.id',
+      )
       .where('appointment.doctorId = :doctorId', { doctorId: realDoctorId })
-      .andWhere('(LOWER(TRIM(appointment.estado)) = :attended OR historyReport.id IS NOT NULL)', { attended: 'atendida' });
+      .andWhere(
+        '(LOWER(TRIM(appointment.estado)) = :attended OR historyReport.id IS NOT NULL)',
+        { attended: 'atendida' },
+      );
     query = this.applyListFilters(query, filters)
-      .orderBy('appointment.fecha', 'DESC').addOrderBy('appointment.hora', 'DESC');
+      .orderBy('appointment.fecha', 'DESC')
+      .addOrderBy('appointment.hora', 'DESC');
     return this.paginateAppointments(query, pagination);
   }
 
@@ -560,15 +605,26 @@ export class AppointmentsService {
     return result;
   }
 
-  async getAvailable(fecha: string, specialtyId?: number): Promise<string[]> {
+  async getAvailable(
+    fecha: string,
+    specialtyId?: number,
+    doctorId?: number,
+  ): Promise<string[]> {
     const doctors = specialtyId
       ? await this.doctorRepo.find({
-          where: { especialidadId: specialtyId, activo: true },
+          where: doctorId
+            ? { id: doctorId, especialidadId: specialtyId, activo: true }
+            : { especialidadId: specialtyId, activo: true },
           order: { id: 'ASC' },
         })
       : [];
 
     if (specialtyId && doctors.length === 0) {
+      if (doctorId) {
+        throw new BadRequestException(
+          'El médico seleccionado no pertenece a la especialidad o no está activo',
+        );
+      }
       return [];
     }
 
@@ -711,12 +767,14 @@ export class AppointmentsService {
     appointmentData: Partial<Appointment>,
     specialtyId: number,
     duration: number,
+    preferredDoctorId?: number,
   ): Promise<Appointment> {
     try {
       return await this.dataSource.transaction(async (manager) => {
         const doctors = await this.lockActiveDoctorsBySpecialty(
           manager,
           specialtyId,
+          preferredDoctorId,
         );
 
         if (!doctors.length) {
@@ -765,15 +823,88 @@ export class AppointmentsService {
   private lockActiveDoctorsBySpecialty(
     manager: EntityManager,
     specialtyId: number,
+    preferredDoctorId?: number,
   ): Promise<Doctor[]> {
-    return manager
+    const query = manager
       .getRepository(Doctor)
       .createQueryBuilder('doctor')
       .setLock('pessimistic_write')
       .where('doctor.especialidadId = :specialtyId', { specialtyId })
-      .andWhere('doctor.activo = :active', { active: true })
-      .orderBy('doctor.id', 'ASC')
-      .getMany();
+      .andWhere('doctor.activo = :active', { active: true });
+
+    if (preferredDoctorId) {
+      query.andWhere('doctor.id = :preferredDoctorId', { preferredDoctorId });
+    }
+
+    return query.orderBy('doctor.id', 'ASC').getMany();
+  }
+
+  private resolvePatientAge(
+    patient: Patient,
+    fallback?: number,
+  ): number | undefined {
+    const birthDate = patient.fechaNacimiento?.trim();
+    if (!birthDate || !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+      return fallback;
+    }
+
+    const [year, month, day] = birthDate.split('-').map(Number);
+    const nowParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(
+      nowParts.map((part) => [part.type, part.value]),
+    );
+    const currentYear = Number(values.year);
+    const currentMonth = Number(values.month);
+    const currentDay = Number(values.day);
+
+    let age = currentYear - year;
+    if (currentMonth < month || (currentMonth === month && currentDay < day)) {
+      age -= 1;
+    }
+
+    return age >= 0 && age <= 120 ? age : fallback;
+  }
+
+  private buildStructuredObservations(
+    data: CreateAppointmentDto | CreateAdminAppointmentDto,
+  ): string | undefined {
+    const lines: string[] = [];
+    if (data.selectedSymptoms?.length) {
+      lines.push(
+        `Motivos o síntomas seleccionados: ${data.selectedSymptoms.join(', ')}`,
+      );
+    }
+
+    const painLabels = {
+      none: 'Sin dolor',
+      mild: 'Leve',
+      moderate: 'Moderado',
+      severe: 'Fuerte',
+    } as const;
+    if (data.painLevel) {
+      lines.push(`Intensidad del dolor: ${painLabels[data.painLevel]}`);
+    }
+
+    const onsetLabels = {
+      today: 'Hoy',
+      '2-3-days': '2–3 días',
+      'less-than-week': 'Menos de una semana',
+      'week-or-more': '1 semana o más',
+    } as const;
+    if (data.symptomOnset) {
+      lines.push(
+        `Inicio o tiempo de evolución: ${onsetLabels[data.symptomOnset]}`,
+      );
+    }
+
+    const additional = data.observaciones?.trim();
+    if (additional) lines.push(`Observaciones adicionales: ${additional}`);
+    return lines.length ? lines.join('\n') : undefined;
   }
 
   private isDatabaseContention(error: unknown): boolean {

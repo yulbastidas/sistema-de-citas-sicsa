@@ -54,22 +54,6 @@ export type VerificationState =
   | "rejected"
   | "expired";
 
-export type AppointmentForm = {
-  specialtyId: string;
-  fecha: string;
-  hora: string;
-  motivoConsulta: string;
-  eps: string;
-  epsId: string;
-  departamento: string;
-  municipio: string;
-  appointmentClassId: string;
-  observaciones: string;
-  edad: string;
-  embarazada: boolean;
-  discapacidad: boolean;
-  dolorIntenso: boolean;
-  sangrado: boolean;
-  dificultadRespiratoria: boolean;
-  fiebre: boolean;
-};
+export type AppointmentForm = AppointmentBookingFormValue;
+import type { AppointmentBookingFormValue, BookingDoctor, BookingPatientSummary } from "@/app/components/appointment-booking/types";
+export type { BookingDoctor, BookingPatientSummary };

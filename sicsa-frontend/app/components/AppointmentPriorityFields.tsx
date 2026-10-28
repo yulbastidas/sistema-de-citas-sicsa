@@ -24,15 +24,11 @@ const FACTORS = [
 export default function AppointmentPriorityFields({
   value,
   disabled = false,
-  showAge = true,
-  onTextChange,
-  onCheckboxChange,
+  onChange,
 }: {
   value: PriorityFormValue;
   disabled?: boolean;
-  showAge?: boolean;
-  onTextChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onCheckboxChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange: (name: keyof PriorityFormValue, value: boolean) => void;
 }) {
   const age = value.edad === "" ? null : Number(value.edad);
   const isOlderAdult = age !== null && Number.isFinite(age) && age >= 65;
@@ -49,41 +45,21 @@ export default function AppointmentPriorityFields({
         </div>
       </header>
 
-      {showAge && <div>
-        <label htmlFor="appointment-priority-age" className="mb-1.5 block text-sm font-semibold text-slate-700">
-          Edad del paciente
-        </label>
-        <input
-          id="appointment-priority-age"
-          type="number"
-          name="edad"
-          min={0}
-          max={120}
-          value={value.edad}
-          onChange={onTextChange}
-          disabled={disabled}
-          placeholder="Edad"
-          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100 sm:max-w-48"
-        />
+      <div>
+        <p className="text-sm font-semibold text-slate-700">Edad registrada: {age ?? "No disponible"}</p>
         {isOlderAdult && (
           <p className="mt-2 text-xs font-semibold text-blue-800" aria-live="polite">
             Adulto mayor: el sistema lo considera automáticamente como factor prioritario.
           </p>
         )}
-      </div>}
-
-      {!showAge && isOlderAdult && (
-        <p className="text-xs font-semibold text-blue-800">
-          Adulto mayor: la edad registrada se aplicará automáticamente como factor prioritario.
-        </p>
-      )}
+      </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {FACTORS.map(({ name, label, icon: Icon }) => {
           const checked = value[name];
           return (
             <label key={name} className={`flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${checked ? "border-blue-400 bg-white text-blue-900 ring-2 ring-blue-100" : "border-slate-200 bg-white/70 text-slate-700 hover:border-blue-200"} ${disabled ? "cursor-not-allowed opacity-60" : ""}`}>
-              <input type="checkbox" name={name} checked={checked} onChange={onCheckboxChange} disabled={disabled} className="h-4 w-4 rounded border-slate-300" />
+              <input type="checkbox" name={name} checked={checked} onChange={(event) => onChange(name, event.target.checked)} disabled={disabled} className="h-4 w-4 rounded border-slate-300" />
               <Icon size={17} aria-hidden="true" />
               {label}
             </label>

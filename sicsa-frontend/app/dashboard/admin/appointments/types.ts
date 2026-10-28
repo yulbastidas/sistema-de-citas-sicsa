@@ -5,8 +5,17 @@ export type SessionUser = {
 };
 
 export type PatientInfo = {
+  id?: number;
   documento?: string;
+  numeroDocumento?: string;
   nombre?: string;
+  primerNombre?: string;
+  segundoNombre?: string;
+  primerApellido?: string;
+  segundoApellido?: string;
+  fechaNacimiento?: string;
+  departamento?: string;
+  municipio?: string;
   telefono?: string;
   email?: string;
   eps?: string;
@@ -53,23 +62,6 @@ export type AppointmentClassItem = {
   nombre?: string;
 };
 
-export type AdminAppointmentForm = {
-  documento: string;
-  specialtyId: string;
-  fecha: string;
-  hora: string;
-  motivoConsulta: string;
-  edad: string;
-  eps: string;
-  epsId: string;
-  departamento: string;
-  municipio: string;
-  appointmentClassId: string;
-  observaciones: string;
-  embarazada: boolean;
-  discapacidad: boolean;
-  dolorIntenso: boolean;
-  sangrado: boolean;
-  dificultadRespiratoria: boolean;
-  fiebre: boolean;
-};
+export type AdminAppointmentForm = AppointmentBookingFormValue & { documento?: string };
+import type { AppointmentBookingFormValue, BookingDoctor, BookingPatientSummary } from "@/app/components/appointment-booking/types";
+export type { BookingDoctor, BookingPatientSummary };
