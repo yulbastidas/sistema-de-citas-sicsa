@@ -62,7 +62,7 @@ export function usePatientRegister() {
   const [registrationChannel, setRegistrationChannel] = useState<"email" | "phone">("email");
 
   useEffect(() => {
-    const raw = localStorage.getItem("register_credentials");
+    const raw = sessionStorage.getItem("register_credentials");
     if (!raw) return;
     try {
       const credentials = JSON.parse(raw) as { channel?: "email" | "phone"; phone?: string };
@@ -352,7 +352,7 @@ export function usePatientRegister() {
   };
 
   const handleSubmit = async () => {
-    const credentials = localStorage.getItem("register_credentials");
+    const credentials = sessionStorage.getItem("register_credentials");
 
     if (!credentials) {
       alert("Primero completa el paso de correo y contraseña");
@@ -370,7 +370,7 @@ export function usePatientRegister() {
     try {
       parsedCredentials = JSON.parse(credentials);
     } catch {
-      localStorage.removeItem("register_credentials");
+      sessionStorage.removeItem("register_credentials");
       alert("Los datos del primer paso no son válidos. Intenta nuevamente.");
       router.push("/register");
       return;
@@ -417,14 +417,14 @@ export function usePatientRegister() {
 
       if (registrationChannel === "phone") {
         const result = await registerPatientByPhone(payload);
-        localStorage.removeItem("register_credentials");
+        sessionStorage.removeItem("register_credentials");
         router.push(`/verify?channel=phone&registrationId=${result.registrationId}&challengeId=${encodeURIComponent(result.challengeId)}&phone=${encodeURIComponent(result.maskedPhone)}`);
         return;
       }
 
       await registerPatient(payload);
 
-      localStorage.removeItem("register_credentials");
+      sessionStorage.removeItem("register_credentials");
 
       alert(
         "Registro completado con éxito. Revisa tu correo e ingresa el código de verificación.",

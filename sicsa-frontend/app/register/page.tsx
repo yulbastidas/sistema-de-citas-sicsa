@@ -74,7 +74,7 @@ export default function RegisterPage() {
       return;
     }
 
-    localStorage.setItem(
+    sessionStorage.setItem(
       "register_credentials",
       JSON.stringify({
         channel,

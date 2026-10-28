@@ -53,11 +53,11 @@ function setStorageItem(key: string, value: string) {
   if (typeof window === "undefined") return;
 
   try {
-    localStorage.setItem(key, value);
+    sessionStorage.setItem(key, value);
   } catch {}
 
   try {
-    sessionStorage.setItem(key, value);
+    localStorage.removeItem(key);
   } catch {}
 }
 
@@ -67,18 +67,20 @@ function getStorageItem(key: string): string | null {
   }
 
   try {
-    const localValue = localStorage.getItem(key);
-
-    if (localValue) {
-      return localValue;
-    }
-  } catch {}
-
-  try {
     const sessionValue = sessionStorage.getItem(key);
 
     if (sessionValue) {
       return sessionValue;
+    }
+  } catch {}
+
+  // Migra sesiones antiguas persistidas antes del endurecimiento.
+  try {
+    const legacyValue = localStorage.getItem(key);
+    if (legacyValue) {
+      sessionStorage.setItem(key, legacyValue);
+      localStorage.removeItem(key);
+      return legacyValue;
     }
   } catch {}
 
@@ -102,12 +104,11 @@ export function saveSession(token: string): SessionUser | null {
     return null;
   }
 
-  setStorageItem("access_token", token);
-
   const decoded = decodeJwt(token);
 
-  if (!decoded) {
+  if (!decoded || isTokenExpired(token)) {
     removeStorageItem("access_token");
+    removeStorageItem("user");
     return null;
   }
 
@@ -117,6 +118,8 @@ export function saveSession(token: string): SessionUser | null {
     role: normalizeRole(decoded.role),
     canViewReports: decoded.canViewReports === true,
   };
+
+  setStorageItem("access_token", token);
 
   setStorageItem(
     "user",
@@ -159,30 +162,6 @@ export function getUser(): SessionUser | null {
     return null;
   }
 
-  const savedUser = getStorageItem("user");
-
-  if (savedUser) {
-    try {
-      const parsed = JSON.parse(
-        savedUser,
-      ) as SessionUser;
-
-      return {
-        ...parsed,
-        id: parsed.id ?? parsed.sub,
-        role: normalizeRole(parsed.role),
-        canViewReports:
-          parsed.canViewReports === true,
-      };
-    } catch {
-      removeStorageItem("user");
-    }
-  }
-
-  /*
-   * Si no encuentra el usuario guardado, intenta
-   * recuperarlo directamente desde el JWT.
-   */
   const token = getToken();
 
   if (!token) {
